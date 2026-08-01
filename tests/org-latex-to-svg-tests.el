@@ -48,9 +48,13 @@ change to simulate a theme/font change."
   `(let ((org-latex-to-svg-tests--appearance '("#000" "#fff" 20))
          (org-latex-to-svg-tests--invalidated nil)
          (org-latex-to-svg-tests--metadata nil)
+         (org-latex-to-svg-tests--last-rescale nil)
          (latex-to-svg-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg)
-                (lambda (_latex &rest _) org-latex-to-svg-tests--image))
+                (lambda (_latex &rest args)
+                  (setq org-latex-to-svg-tests--last-rescale
+                        (plist-get args :rescale-by))
+                  org-latex-to-svg-tests--image))
                ((symbol-function 'latex-to-svg-appearance)
                 (lambda () org-latex-to-svg-tests--appearance))
                ((symbol-function 'latex-to-svg-flush-metrics) #'ignore)
@@ -480,6 +484,42 @@ change to simulate a theme/font change."
                "\\setcounter{equation}{2}%"
                (overlay-get (nth 1 (org-latex-to-svg-tests--overlays))
                             'org-latex-to-svg-value))))))
+
+;;;; Inline / display rescale
+
+(ert-deftest org-latex-to-svg-classifies-display-vs-inline ()
+  (should-not (org-latex-to-svg--display-p "$x$"))
+  (should-not (org-latex-to-svg--display-p "\\(x\\)"))
+  (should (org-latex-to-svg--display-p "\\[x\\]"))
+  (should (org-latex-to-svg--display-p "$$x$$"))
+  (should (org-latex-to-svg--display-p "\\begin{equation}x\\end{equation}\n")))
+
+(ert-deftest org-latex-to-svg-passes-inline-and-display-rescale ()
+  ;; Each element is rendered with the size multiplier for its kind.
+  (org-latex-to-svg-tests--with-stub
+    (let ((org-latex-to-svg-inline-rescale 1.0)
+          (org-latex-to-svg-display-rescale 1.4)
+          (org-latex-to-svg-number-equations nil))
+      (org-latex-to-svg-tests--org "inline $a$ end\n"
+        (org-latex-to-svg--render-region (point-min) (point-max))
+        (should (equal org-latex-to-svg-tests--last-rescale 1.0)))
+      (org-latex-to-svg-tests--org "\\[b\\]\n"
+        (org-latex-to-svg--render-region (point-min) (point-max))
+        (should (equal org-latex-to-svg-tests--last-rescale 1.4))))))
+
+(ert-deftest org-latex-to-svg-refresh-rescales-by-kind ()
+  ;; A refresh re-fetches each overlay at its own inline/display factor.
+  (org-latex-to-svg-tests--with-stub
+    (let ((org-latex-to-svg-inline-rescale 1.0)
+          (org-latex-to-svg-display-rescale 1.4)
+          (org-latex-to-svg-number-equations nil))
+      (org-latex-to-svg-tests--org "\\[b\\]\n"
+        (org-latex-to-svg--render-region (point-min) (point-max))
+        (let ((ov (car (org-latex-to-svg-tests--overlays))))
+          (should (overlay-get ov 'org-latex-to-svg-display-math))
+          (setq org-latex-to-svg-tests--last-rescale nil)
+          (org-latex-to-svg-refresh)
+          (should (equal org-latex-to-svg-tests--last-rescale 1.4)))))))
 
 ;;;; \eqref / \ref
 

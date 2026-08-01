@@ -5,8 +5,8 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.4.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.3.0"))
+;; Version: 0.5.0
+;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.3.1"))
 ;; Keywords: tex, org, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -49,6 +49,11 @@
 ;; clears all previews.  `M-x org-latex-to-svg-refresh' forces a re-render for
 ;; the current theme / font size (previews also refresh lazily on theme,
 ;; buffer-display, and zoom changes).
+;;
+;; Inline and display math can be sized independently with
+;; `org-latex-to-svg-inline-rescale' / `-display-rescale' (multipliers on top of
+;; the engine's `latex-to-svg-font-scale'); they re-scale from cache, so
+;; `org-latex-to-svg-refresh' applies a change with no recompile.
 ;;
 ;; Numbered display environments (`equation', `align', …) get their real
 ;; document-wide number via `org-latex-to-svg-number-equations' (on by
@@ -105,6 +110,23 @@ then refresh only on an explicit render)."
   :type '(choice (const :tag "Disabled" nil) number)
   :group 'org-latex-to-svg)
 
+(defcustom org-latex-to-svg-inline-rescale 1.0
+  "Size multiplier for inline math previews (`$…$', `\\(…\\)').
+Applied on top of the engine's global `latex-to-svg-font-scale' via
+`latex-to-svg's `:rescale-by'.  Re-scales from cache (no recompile);
+after changing it, run `org-latex-to-svg-refresh' to apply."
+  :type 'number
+  :group 'org-latex-to-svg)
+
+(defcustom org-latex-to-svg-display-rescale 1.0
+  "Size multiplier for display math previews (`\\[…\\]', `$$…$$', environments).
+Applied on top of the engine's global `latex-to-svg-font-scale' via
+`latex-to-svg's `:rescale-by' — e.g. set to 1.1 for display equations a
+touch larger than inline.  Re-scales from cache (no recompile); after
+changing it, run `org-latex-to-svg-refresh' to apply."
+  :type 'number
+  :group 'org-latex-to-svg)
+
 (defconst org-latex-to-svg--metadata-prefix "L2S="
   "Marker prefix for the `\\typeout' number probe (a distinctive `key='.
 Installed as `latex-to-svg-metadata-prefix' so the engine captures the
@@ -119,6 +141,20 @@ typeset by LaTeX, so they match the surrounding prose font.  Set it to
 
 (defconst org-latex-to-svg--element-types '(latex-fragment latex-environment)
   "Org element types rendered as equations.")
+
+(defun org-latex-to-svg--display-p (source)
+  "Non-nil when math SOURCE is display (environment, `\\[…\\]', or `$$…$$').
+Inline `$…$' / `\\(…\\)' return nil."
+  (let ((s (string-trim-left source)))
+    (or (string-prefix-p "\\begin" s)
+        (string-prefix-p "\\[" s)
+        (string-prefix-p "$$" s))))
+
+(defun org-latex-to-svg--rescale-for (display-p)
+  "Return the `:rescale-by' factor for a DISPLAY-P (else inline) preview."
+  (if display-p
+      org-latex-to-svg-display-rescale
+    org-latex-to-svg-inline-rescale))
 
 (defconst org-latex-to-svg--numbered-environments-single
   '("equation" "math" "displaymath" "multline" "dmath" "empheq")
@@ -209,7 +245,7 @@ ours — visible again when ours is revealed on cursor entry."
     (when (eq (overlay-get o 'org-overlay-type) 'org-latex-overlay)
       (delete-overlay o))))
 
-(defun org-latex-to-svg--set-overlay (beg end value image &optional source enums-fallback)
+(defun org-latex-to-svg--set-overlay (beg end value image &optional source enums-fallback display-p)
   "Overlay BEG..END (positions or markers) with IMAGE, keyed to render VALUE.
 VALUE is the exact string handed to the engine (a numbered environment
 carries its `\\setcounter' prefix) so a cache refresh re-fetches the same
@@ -230,6 +266,8 @@ preview overlay in the span; clears itself when the text is edited."
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'help-echo (or source value))
         (overlay-put ov 'display image)
+        ;; Remember inline-vs-display so a refresh re-scales by the right factor.
+        (overlay-put ov 'org-latex-to-svg-display-math display-p)
         ;; Keep the image so cursor-reveal can restore it (see
         ;; `org-latex-to-svg--close-overlay').
         (overlay-put ov 'org-latex-to-svg-image image)
@@ -556,25 +594,27 @@ returned unchanged.  `\\eqref' / `\\ref' fragments are handled separately
 
 ;;;; Rendering
 
-(defun org-latex-to-svg--place (buffer beg end value &optional source enums-fallback)
+(defun org-latex-to-svg--place (buffer beg end value &optional source enums-fallback display-p)
   "Ensure BUFFER's BEG..END shows the current image for render VALUE.
 VALUE is the exact engine input (numbered environments carry their
 `\\setcounter' prefix); SOURCE is the plain LaTeX for `help-echo'.
 ENUMS-FALLBACK, when non-nil, marks VALUE as a numbered equation: its
 `car' (INITIAL = K+1) is passed to the engine as `:metadata' and the cons
 is the number-range fallback (see `org-latex-to-svg--set-overlay').
+DISPLAY-P selects the inline / display size multiplier (`:rescale-by').
 Overlays immediately on a cache hit, else schedules an async compile and
 overlays when it finishes.  BEG / END should be markers."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (let ((image (latex-to-svg
                     value
+                    :rescale-by (org-latex-to-svg--rescale-for display-p)
                     :metadata (car enums-fallback)
                     :callback (lambda ()
                                 (org-latex-to-svg--place
-                                 buffer beg end value source enums-fallback)))))
+                                 buffer beg end value source enums-fallback display-p)))))
         (when image
-          (org-latex-to-svg--set-overlay beg end value image source enums-fallback))))))
+          (org-latex-to-svg--set-overlay beg end value image source enums-fallback display-p))))))
 
 (defun org-latex-to-svg--render-numbered (el k)
   "Render numbered environment EL starting at counter K.
@@ -588,7 +628,8 @@ before ground-truth `.eld' metadata is available."
     (org-latex-to-svg--place (current-buffer)
                              (copy-marker (car bounds))
                              (copy-marker (cdr bounds))
-                             value source (cons (1+ k) (+ k heuristic)))))
+                             value source (cons (1+ k) (+ k heuristic))
+                             (org-latex-to-svg--display-p source))))
 
 (defun org-latex-to-svg--render-element (el &optional table)
   "Render math element EL in the current buffer.
@@ -618,7 +659,8 @@ else is typeset verbatim by the engine."
      (t (org-latex-to-svg--place (current-buffer)
                                  (copy-marker (car bounds))
                                  (copy-marker (cdr bounds))
-                                 source source)))))
+                                 source source nil
+                                 (org-latex-to-svg--display-p source))))))
 
 (defun org-latex-to-svg--render-region (beg end)
   "Render every math element overlapping BEG..END in the current buffer."
@@ -720,7 +762,10 @@ new color / scale — no LaTeX) and updates the `display' property."
     (with-current-buffer buffer
       (dolist (ov (org-latex-to-svg--overlays-in (point-min) (point-max)))
         (when-let* ((value (overlay-get ov 'org-latex-to-svg-value))
-                    (image (latex-to-svg value)))
+                    (image (latex-to-svg
+                            value :rescale-by
+                            (org-latex-to-svg--rescale-for
+                             (overlay-get ov 'org-latex-to-svg-display-math)))))
           (overlay-put ov 'org-latex-to-svg-image image)
           ;; Don't clobber an overlay revealed for editing (display nil).
           (when (overlay-get ov 'display)
