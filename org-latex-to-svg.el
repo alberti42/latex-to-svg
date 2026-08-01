@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.3.0
+;; Version: 0.4.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.3.0"))
 ;; Keywords: tex, org, math, images
 
@@ -65,8 +65,10 @@
 ;; and a debounced reconcile threads the counter over the document, re-rendering
 ;; only previews whose number changed (`org-latex-to-svg--reconcile').  The
 ;; Elisp heuristic is a fast first guess; the cached metadata corrects it.
-;; Reveal-on-cursor-enter (editing without first clearing) is still a later
-;; milestone.
+;;
+;; Move point into a preview and it reveals its LaTeX source for editing;
+;; leaving re-shows the image, or re-renders it if you changed the text
+;; (`org-latex-to-svg--handle-cursor', on `post-command-hook').
 
 ;;; Code:
 
@@ -217,6 +219,9 @@ preview overlay in the span; clears itself when the text is edited."
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'help-echo (or source value))
         (overlay-put ov 'display image)
+        ;; Keep the image so cursor-reveal can restore it (see
+        ;; `org-latex-to-svg--close-overlay').
+        (overlay-put ov 'org-latex-to-svg-image image)
         (when enums-fallback
           (let ((meta (plist-get (latex-to-svg-metadata value) :nums)))
             (overlay-put ov 'org-latex-to-svg-enums (or meta enums-fallback))
@@ -224,12 +229,68 @@ preview overlay in the span; clears itself when the text is edited."
             ;; shift, so schedule a reconcile to correct them.
             (when (and meta (not (equal meta enums-fallback)))
               (org-latex-to-svg--schedule-reconcile))))
-        ;; Reveal the source when the fragment is edited (mirrors Org's own
-        ;; preview overlays): drop the image on any modification touching it.
+        ;; On edit: reveal the source and mark it for re-render on cursor exit
+        ;; (see `org-latex-to-svg--on-modify' / `--close-overlay').
         (overlay-put ov 'modification-hooks
-                     (list (lambda (o &rest _) (delete-overlay o))))
+                     (list #'org-latex-to-svg--on-modify))
         (setq org-latex-to-svg--rendered-appearance (latex-to-svg-appearance))
         ov))))
+
+;;;; Reveal on cursor entry
+
+(defvar-local org-latex-to-svg--open-overlay nil
+  "The image preview overlay currently revealed because point is inside it.")
+
+(defun org-latex-to-svg--on-modify (ov after &rest _)
+  "Modification hook for an image preview OV: reveal its source, flag it.
+When the covered text changes (AFTER the edit), drop the image so the
+source shows and mark the overlay `org-latex-to-svg-modified' so leaving
+it re-renders (see `org-latex-to-svg--close-overlay')."
+  (when after
+    (overlay-put ov 'org-latex-to-svg-modified t)
+    (overlay-put ov 'display nil)))
+
+(defun org-latex-to-svg--revealable-overlay-at (pos)
+  "Return this package's image preview overlay covering POS, or nil.
+Reference previews (plain text) are excluded."
+  (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-image))
+            (overlays-at pos)))
+
+(defun org-latex-to-svg--open-overlay (ov)
+  "Reveal OV's LaTeX source by hiding its image."
+  (overlay-put ov 'display nil))
+
+(defun org-latex-to-svg--close-overlay (ov)
+  "Re-show OV's image, or re-render it if its source was edited while open."
+  (when (overlay-buffer ov)
+    (if (overlay-get ov 'org-latex-to-svg-modified)
+        (progn
+          (overlay-put ov 'org-latex-to-svg-modified nil)
+          (org-latex-to-svg--rerender-overlay ov))
+      (overlay-put ov 'display (overlay-get ov 'org-latex-to-svg-image)))))
+
+(defun org-latex-to-svg--rerender-overlay (ov)
+  "Re-render the math element under OV after an edit; else drop OV."
+  (when-let* ((start (overlay-start ov)))
+    (let ((el (save-excursion (goto-char start) (org-element-context))))
+      (if (and el (memq (org-element-type el) org-latex-to-svg--element-types))
+          (progn
+            (org-latex-to-svg--render-element el)
+            (org-latex-to-svg--schedule-reconcile))
+        (delete-overlay ov)))))
+
+(defun org-latex-to-svg--handle-cursor ()
+  "Reveal the preview point moved into and re-hide the one it left.
+On `post-command-hook' while the mode is on."
+  (when org-latex-to-svg-mode
+    (let ((cur (org-latex-to-svg--revealable-overlay-at (point))))
+      (when (and org-latex-to-svg--open-overlay
+                 (not (eq cur org-latex-to-svg--open-overlay)))
+        (org-latex-to-svg--close-overlay org-latex-to-svg--open-overlay)
+        (setq org-latex-to-svg--open-overlay nil))
+      (when (and cur (not (eq cur org-latex-to-svg--open-overlay)))
+        (org-latex-to-svg--open-overlay cur)
+        (setq org-latex-to-svg--open-overlay cur)))))
 
 (defun org-latex-to-svg--set-reference-overlay (beg end label num display)
   "Overlay BEG..END with plain-text DISPLAY for a reference to LABEL.
@@ -582,7 +643,9 @@ and numbering are on."
                                      (- (cdr enums) (car enums) -1)
                                    (org-latex-to-svg--count-numbered-equations
                                     (org-element-property :value el)))))
-                  (when (and ov (not (equal (car enums) (1+ k))))
+                  (when (and ov
+                             (not (eq ov org-latex-to-svg--open-overlay))
+                             (not (equal (car enums) (1+ k))))
                     (org-latex-to-svg--render-numbered el k))
                   (setq k (+ k (max 0 consumed)))))))
           (org-latex-to-svg--refresh-references
@@ -622,7 +685,10 @@ new color / scale — no LaTeX) and updates the `display' property."
       (dolist (ov (org-latex-to-svg--overlays-in (point-min) (point-max)))
         (when-let* ((value (overlay-get ov 'org-latex-to-svg-value))
                     (image (latex-to-svg value)))
-          (overlay-put ov 'display image)))
+          (overlay-put ov 'org-latex-to-svg-image image)
+          ;; Don't clobber an overlay revealed for editing (display nil).
+          (when (overlay-get ov 'display)
+            (overlay-put ov 'display image))))
       (setq org-latex-to-svg--rendered-appearance (latex-to-svg-appearance)))))
 
 ;;;###autoload
@@ -812,11 +878,16 @@ interactive command bound to \\[org-latex-to-svg]."
             ;; Auto-heal equation numbers a short while after edits.
             (add-hook 'after-change-functions
                       #'org-latex-to-svg--schedule-reconcile nil t)
+            ;; Reveal the source of the preview point moves into.
+            (add-hook 'post-command-hook
+                      #'org-latex-to-svg--handle-cursor nil t)
             (org-latex-to-svg--render-region (point-min) (point-max)))
         (setq org-latex-to-svg-mode nil)
         (user-error "`org-latex-to-svg-mode' only works in Org buffers"))
     (remove-hook 'after-change-functions
                  #'org-latex-to-svg--schedule-reconcile t)
+    (remove-hook 'post-command-hook #'org-latex-to-svg--handle-cursor t)
+    (setq org-latex-to-svg--open-overlay nil)
     (when (timerp org-latex-to-svg--reconcile-timer)
       (cancel-timer org-latex-to-svg--reconcile-timer)
       (setq org-latex-to-svg--reconcile-timer nil))

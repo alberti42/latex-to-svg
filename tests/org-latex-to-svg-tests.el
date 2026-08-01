@@ -127,16 +127,54 @@ change to simulate a theme/font change."
       (org-latex-to-svg--clear-region (point-min) (point-max))
       (should (null (org-latex-to-svg-tests--overlays))))))
 
-(ert-deftest org-latex-to-svg-overlay-clears-on-edit ()
-  ;; Editing under an overlay drops it (revealing the source) via its
-  ;; modification hook.
+(ert-deftest org-latex-to-svg-overlay-reveals-on-edit ()
+  ;; Editing under an overlay reveals the source (hides the image) and flags
+  ;; the overlay for re-render, but keeps it (so leaving can restore/redraw).
   (org-latex-to-svg-tests--with-stub
     (org-latex-to-svg-tests--org "$a$\n"
       (org-latex-to-svg--render-region (point-min) (point-max))
       (should (= 1 (length (org-latex-to-svg-tests--overlays))))
       (goto-char (+ (point-min) 1))     ; inside the fragment
       (insert "x")
-      (should (null (org-latex-to-svg-tests--overlays))))))
+      (let ((ov (car (org-latex-to-svg-tests--overlays))))
+        (should ov)
+        (should (null (overlay-get ov 'display)))            ; image hidden
+        (should (overlay-get ov 'org-latex-to-svg-modified))))))
+
+(ert-deftest org-latex-to-svg-reveals-preview-under-cursor ()
+  ;; Point entering an image preview reveals its source; leaving (unmodified)
+  ;; re-shows the image.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$ after\n"
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ov (car (org-latex-to-svg-tests--overlays))))
+        ;; Move into the fragment -> revealed (image hidden).
+        (goto-char (+ (point-min) 1))
+        (org-latex-to-svg--handle-cursor)
+        (should (eq ov org-latex-to-svg--open-overlay))
+        (should (null (overlay-get ov 'display)))
+        ;; Move out -> image restored.
+        (goto-char (point-max))
+        (org-latex-to-svg--handle-cursor)
+        (should (null org-latex-to-svg--open-overlay))
+        (should (eq (overlay-get ov 'display) 'fake-image))))))
+
+(ert-deftest org-latex-to-svg-rerenders-after-reveal-edit ()
+  ;; Editing while revealed then leaving re-renders the fragment (fresh image).
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$ after\n"
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (goto-char (+ (point-min) 1))
+      (org-latex-to-svg--handle-cursor)            ; reveal
+      (insert "b")                                  ; edit -> modified
+      (let ((org-latex-to-svg-tests--image 'redrawn))
+        (goto-char (point-max))
+        (org-latex-to-svg--handle-cursor))         ; leave -> re-render
+      (let ((ov (car (org-latex-to-svg-tests--overlays))))
+        (should (eq (overlay-get ov 'display) 'redrawn))
+        (should (equal (overlay-get ov 'org-latex-to-svg-value) "$ba$"))))))
 
 (ert-deftest org-latex-to-svg-render-replaces-existing-overlay ()
   ;; Re-rendering the same span doesn't stack overlays.
@@ -371,12 +409,11 @@ change to simulate a theme/font change."
       (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
       (search-forward "\\end{equation}") (backward-char 1) (insert "*")
       (org-latex-to-svg--reconcile)
-      ;; Only eq2 remains, now renumbered to offset 0.
+      ;; eq1 is now unnumbered (equation*); eq2 renumbers from offset 1 to 0.
       (let ((ovs (org-latex-to-svg-tests--overlays)))
-        (should (= 1 (length ovs)))
         (should (string-prefix-p
                  "\\setcounter{equation}{0}%"
-                 (overlay-get (car ovs) 'org-latex-to-svg-value)))))))
+                 (overlay-get (car (last ovs)) 'org-latex-to-svg-value)))))))
 
 (ert-deftest org-latex-to-svg-reconcile-uses-ground-truth-consumed ()
   ;; When an overlay's `.eld' metadata says a block consumed more numbers than

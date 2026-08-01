@@ -94,5 +94,3 @@ about equations lives in this front-end.
 - **Live per-keystroke renumbering** — numbers refresh after the debounced
   reconcile (or an explicit render), not on every keystroke. A forward `\eqref`
   above its target likewise updates on the next reconcile / full render.
-- **Reveal-on-cursor-enter** (editing under a preview without first clearing) is
-  a separate, unrelated milestone.
