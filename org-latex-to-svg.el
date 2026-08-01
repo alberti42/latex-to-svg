@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.6.0
+;; Version: 0.6.1
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.3.1"))
 ;; Keywords: tex, org, math, images
 
@@ -348,7 +348,10 @@ a new label / number."
   "Reveal the preview point moved into and re-hide the one it left.
 On `post-command-hook' while the mode is on.  Closes the overlay at the
 *previous* point (`org-latex-to-svg--last-point') rather than a tracked
-reference, so it stays correct across overlay-to-overlay jumps and edits."
+reference, so it stays correct across overlay-to-overlay jumps and edits.
+A reference reached by *mouse* is not revealed: a click there is a jump
+\(`mouse-1' -> `org-latex-to-svg-goto-reference'), not an edit, so its
+number stays shown; keyboard entry still reveals it for label editing."
   (when org-latex-to-svg-mode
     (let* ((last (and org-latex-to-svg--last-point
                       (marker-position org-latex-to-svg--last-point)))
@@ -356,7 +359,9 @@ reference, so it stays correct across overlay-to-overlay jumps and edits."
            (cur (org-latex-to-svg--revealable-overlay-at (point))))
       (when (and prev (not (eq prev cur)))
         (org-latex-to-svg--close-overlay prev))
-      (when (and cur (not (eq cur prev)))
+      (when (and cur (not (eq cur prev))
+                 (not (and (overlay-get cur 'org-latex-to-svg-ref)
+                           (mouse-event-p last-command-event))))
         (org-latex-to-svg--open-overlay cur))
       (unless org-latex-to-svg--last-point
         (setq org-latex-to-svg--last-point (make-marker)))

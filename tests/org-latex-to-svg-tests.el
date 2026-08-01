@@ -649,6 +649,31 @@ change to simulate a theme/font change."
         (should (equal "(1)" (substring-no-properties
                               (overlay-get ref 'display))))))))
 
+(ert-deftest org-latex-to-svg-reference-mouse-entry-does-not-reveal ()
+  ;; A mouse click on a reference is a jump (mouse-1 -> goto-reference), not an
+  ;; edit: entering it via a mouse event keeps the (N) shown, while keyboard
+  ;; entry reveals the source for label editing.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "As in \\eqref{eq:a}.\n")
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        ;; Mouse entry -> NOT revealed (number stays).
+        (goto-char (1+ (overlay-start ref)))
+        (let ((last-command-event 'mouse-1))
+          (org-latex-to-svg--handle-cursor))
+        (should (equal "(1)" (substring-no-properties
+                              (overlay-get ref 'display))))
+        ;; Leave, then keyboard entry -> revealed.
+        (goto-char (point-min))
+        (let ((last-command-event 'right)) (org-latex-to-svg--handle-cursor))
+        (goto-char (1+ (overlay-start ref)))
+        (let ((last-command-event 'right)) (org-latex-to-svg--handle-cursor))
+        (should (null (overlay-get ref 'display)))))))
+
 (ert-deftest org-latex-to-svg-plain-ref-reveals-under-cursor ()
   ;; A plain `\ref' preview reveals its source on cursor entry just like
   ;; `\eqref' (same mechanism), and restores its bare `N' text on leave.
