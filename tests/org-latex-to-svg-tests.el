@@ -46,12 +46,16 @@ immediately) and `latex-to-svg-appearance' is a mutable list a test can
 change to simulate a theme/font change."
   (declare (indent 0) (debug t))
   `(let ((org-latex-to-svg-tests--appearance '("#000" "#fff" 20))
-         (org-latex-to-svg-tests--invalidated nil))
+         (org-latex-to-svg-tests--invalidated nil)
+         (org-latex-to-svg-tests--metadata nil)
+         (latex-to-svg-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg)
                 (lambda (_latex &rest _) org-latex-to-svg-tests--image))
                ((symbol-function 'latex-to-svg-appearance)
                 (lambda () org-latex-to-svg-tests--appearance))
                ((symbol-function 'latex-to-svg-flush-metrics) #'ignore)
+               ((symbol-function 'latex-to-svg-metadata)
+                (lambda (value) (cdr (assoc value org-latex-to-svg-tests--metadata))))
                ((symbol-function 'latex-to-svg-invalidate)
                 (lambda (latex) (push latex org-latex-to-svg-tests--invalidated))))
        ,@body)))
@@ -347,15 +351,16 @@ change to simulate a theme/font change."
         (org-latex-to-svg--render-region (point-min) (point-max))
         (org-latex-to-svg-regenerate))
       (should (equal org-latex-to-svg-tests--invalidated
-                     '("\\setcounter{equation}{0}%\n\\begin{equation}\nx\n\\end{equation}\n"))))))
+                     '("\\setcounter{equation}{0}%\n\\begin{equation}\nx\n\\end{equation}\n\\typeout{L2S=\\arabic{equation}}%\n"))))))
 
-(ert-deftest org-latex-to-svg-renumber-following-updates-downstream ()
-  ;; Turning an equation into its starred form drops its number; the equation
-  ;; below must renumber from 2 to 1 (offset 1 -> 0) via renumber-following.
+(ert-deftest org-latex-to-svg-reconcile-updates-downstream ()
+  ;; Turning an equation into its starred form drops its number; a reconcile
+  ;; must renumber the equation below from offset 1 to 0.
   (org-latex-to-svg-tests--with-stub
     (org-latex-to-svg-tests--org
         (concat "\\begin{equation}\na\n\\end{equation}\n\n"
                 "\\begin{equation}\nb\n\\end{equation}\n")
+      (setq-local org-latex-to-svg-mode t)
       (org-latex-to-svg--render-region (point-min) (point-max))
       (should (string-prefix-p
                "\\setcounter{equation}{1}%"
@@ -365,13 +370,33 @@ change to simulate a theme/font change."
       (goto-char (point-min))
       (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
       (search-forward "\\end{equation}") (backward-char 1) (insert "*")
-      (org-latex-to-svg--renumber-following (point))
+      (org-latex-to-svg--reconcile)
       ;; Only eq2 remains, now renumbered to offset 0.
       (let ((ovs (org-latex-to-svg-tests--overlays)))
         (should (= 1 (length ovs)))
         (should (string-prefix-p
                  "\\setcounter{equation}{0}%"
                  (overlay-get (car ovs) 'org-latex-to-svg-value)))))))
+
+(ert-deftest org-latex-to-svg-reconcile-uses-ground-truth-consumed ()
+  ;; When an overlay's `.eld' metadata says a block consumed more numbers than
+  ;; the heuristic guessed, the reconcile threads the ground-truth count: the
+  ;; block below is re-rendered at the corrected K.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+                "\\begin{equation}\nb\n\\end{equation}\n")
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      ;; Pretend eq1 actually consumed TWO numbers (INITIAL 1 . FINAL 2).
+      (overlay-put (nth 0 (org-latex-to-svg-tests--overlays))
+                   'org-latex-to-svg-enums '(1 . 2))
+      (org-latex-to-svg--reconcile)
+      ;; eq2 must move from K=1 to K=2.
+      (should (string-prefix-p
+               "\\setcounter{equation}{2}%"
+               (overlay-get (nth 1 (org-latex-to-svg-tests--overlays))
+                            'org-latex-to-svg-value))))))
 
 ;;;; \eqref / \ref
 
@@ -464,6 +489,7 @@ change to simulate a theme/font change."
         (concat "\\begin{equation}\na\n\\end{equation}\n\n"
                 "\\begin{equation}\\label{eq:b}\nb\n\\end{equation}\n\n"
                 "See \\eqref{eq:b}.\n")
+      (setq-local org-latex-to-svg-mode t)
       (org-latex-to-svg--render-region (point-min) (point-max))
       (should (equal "(2)"
                      (substring-no-properties
@@ -473,7 +499,7 @@ change to simulate a theme/font change."
       (goto-char (point-min))
       (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
       (search-forward "\\end{equation}") (backward-char 1) (insert "*")
-      (org-latex-to-svg--renumber-following (point))
+      (org-latex-to-svg--reconcile)
       (should (equal "(1)"
                      (substring-no-properties
                       (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
