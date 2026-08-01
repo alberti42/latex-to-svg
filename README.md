@@ -27,8 +27,39 @@ The shared cache is also used by any other `latex-to-svg` front-end (e.g.
 ## Requirements
 
 - Emacs 29.1+ with SVG image support.
-- [`latex-to-svg`](https://github.com/alberti42/emacs-latex-to-svg) 0.2.0+.
+- [`latex-to-svg`](https://github.com/alberti42/emacs-latex-to-svg) 0.2.1+ (the
+  rendering engine; repo `alberti42/emacs-latex-to-svg`).
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution).
+
+## Installation
+
+Neither package is on MELPA yet, so install both from their repositories.
+`latex-to-svg` is a hard dependency — declare it **before** `org-latex-to-svg`
+so it is on `load-path` when the latter's `(require 'latex-to-svg)` runs.
+
+```elisp
+;; use-package + :vc (Emacs 30+)
+(use-package latex-to-svg
+  :vc (:url "https://github.com/alberti42/emacs-latex-to-svg" :rev :newest))
+(use-package org-latex-to-svg
+  :vc (:url "https://github.com/alberti42/org-latex-to-svg" :rev :newest)
+  :after (org latex-to-svg)
+  :hook (org-mode . org-latex-to-svg-mode))
+
+;; use-package + straight
+(use-package latex-to-svg
+  :straight (latex-to-svg :type git :host github
+                          :repo "alberti42/emacs-latex-to-svg"))
+(use-package org-latex-to-svg
+  :straight (org-latex-to-svg :type git :host github
+                             :repo "alberti42/org-latex-to-svg")
+  :after (org latex-to-svg)
+  :hook (org-mode . org-latex-to-svg-mode))
+
+;; elpaca
+(elpaca (latex-to-svg :host github :repo "alberti42/emacs-latex-to-svg"))
+(elpaca (org-latex-to-svg :host github :repo "alberti42/org-latex-to-svg"))
+```
 
 ## Usage
 
