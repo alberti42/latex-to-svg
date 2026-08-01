@@ -249,8 +249,11 @@ preview overlay in the span; clears itself when the text is edited."
 
 ;;;; Reveal on cursor entry
 
-(defvar-local org-latex-to-svg--open-overlay nil
-  "The image preview overlay currently revealed because point is inside it.")
+(defvar-local org-latex-to-svg--last-point nil
+  "Marker at point after the previous command (for cursor reveal tracking).
+Since point doesn't move between commands, this is the position point had
+*before* the current command — so we can close the preview it left, without
+relying on a tracked overlay reference that can go stale.")
 
 (defun org-latex-to-svg--on-modify (ov after &rest _)
   "Modification hook for an image preview OV: reveal its source, flag it.
@@ -292,21 +295,26 @@ Reference previews (plain text) are excluded."
 
 (defun org-latex-to-svg--handle-cursor ()
   "Reveal the preview point moved into and re-hide the one it left.
-On `post-command-hook' while the mode is on."
+On `post-command-hook' while the mode is on.  Closes the overlay at the
+*previous* point (`org-latex-to-svg--last-point') rather than a tracked
+reference, so it stays correct across overlay-to-overlay jumps and edits."
   (when org-latex-to-svg-mode
-    (let ((cur (org-latex-to-svg--revealable-overlay-at (point))))
-      (when (and org-latex-to-svg--open-overlay
-                 (not (eq cur org-latex-to-svg--open-overlay)))
-        (org-latex-to-svg--close-overlay org-latex-to-svg--open-overlay)
-        (setq org-latex-to-svg--open-overlay nil))
-      (when (and cur (not (eq cur org-latex-to-svg--open-overlay)))
-        (org-latex-to-svg--open-overlay cur)
-        (setq org-latex-to-svg--open-overlay cur)))))
+    (let* ((last (and org-latex-to-svg--last-point
+                      (marker-position org-latex-to-svg--last-point)))
+           (prev (and last (org-latex-to-svg--revealable-overlay-at last)))
+           (cur (org-latex-to-svg--revealable-overlay-at (point))))
+      (when (and prev (not (eq prev cur)))
+        (org-latex-to-svg--close-overlay prev))
+      (when (and cur (not (eq cur prev)))
+        (org-latex-to-svg--open-overlay cur))
+      (unless org-latex-to-svg--last-point
+        (setq org-latex-to-svg--last-point (make-marker)))
+      (set-marker org-latex-to-svg--last-point (point)))))
 
 (defun org-latex-to-svg--heal-modified ()
   "Re-render previews that were edited and then left by point.
-Backstop for the cursor state machine (which only re-renders when the
-leave transition fires on the tracked overlay): any preview flagged
+Backstop for the cursor state machine (e.g. a fragment never entered via
+cursor, or an overlay that evaporated mid-edit): any preview flagged
 `org-latex-to-svg-modified' whose span no longer contains point is
 re-rendered now.  A preview still under point is left revealed (you are
 still editing it)."
@@ -315,8 +323,6 @@ still editing it)."
                (or (< (point) (overlay-start ov))
                    (> (point) (overlay-end ov))))
       (overlay-put ov 'org-latex-to-svg-modified nil)
-      (when (eq ov org-latex-to-svg--open-overlay)
-        (setq org-latex-to-svg--open-overlay nil))
       (org-latex-to-svg--rerender-overlay ov))))
 
 (defun org-latex-to-svg--set-reference-overlay (beg end label num display)
@@ -671,7 +677,8 @@ and numbering are on."
                                    (org-latex-to-svg--count-numbered-equations
                                     (org-element-property :value el)))))
                   (when (and ov
-                             (not (eq ov org-latex-to-svg--open-overlay))
+                             ;; Skip a preview revealed for editing (point in it).
+                             (overlay-get ov 'display)
                              (not (equal (car enums) (1+ k))))
                     (org-latex-to-svg--render-numbered el k))
                   (setq k (+ k (max 0 consumed)))))))
@@ -918,7 +925,9 @@ interactive command bound to \\[org-latex-to-svg]."
     (remove-hook 'after-change-functions
                  #'org-latex-to-svg--schedule-reconcile t)
     (remove-hook 'post-command-hook #'org-latex-to-svg--handle-cursor t)
-    (setq org-latex-to-svg--open-overlay nil)
+    (when (markerp org-latex-to-svg--last-point)
+      (set-marker org-latex-to-svg--last-point nil))
+    (setq org-latex-to-svg--last-point nil)
     (when (timerp org-latex-to-svg--reconcile-timer)
       (cancel-timer org-latex-to-svg--reconcile-timer)
       (setq org-latex-to-svg--reconcile-timer nil))

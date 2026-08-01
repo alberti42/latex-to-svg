@@ -152,13 +152,29 @@ change to simulate a theme/font change."
         ;; Move into the fragment -> revealed (image hidden).
         (goto-char (+ (point-min) 1))
         (org-latex-to-svg--handle-cursor)
-        (should (eq ov org-latex-to-svg--open-overlay))
         (should (null (overlay-get ov 'display)))
-        ;; Move out -> image restored.
+        ;; Move out -> the overlay left at the previous point is closed,
+        ;; restoring its image.
         (goto-char (point-max))
         (org-latex-to-svg--handle-cursor)
-        (should (null org-latex-to-svg--open-overlay))
         (should (eq (overlay-get ov 'display) 'fake-image))))))
+
+(ert-deftest org-latex-to-svg-cursor-jump-between-previews ()
+  ;; Jumping straight from one preview into another closes the first
+  ;; (restores its image) and reveals the second — the previous-point close
+  ;; handles it without a tracked-overlay reference.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$ $b$\n"
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ovs (org-latex-to-svg-tests--overlays)))
+        (goto-char (+ (point-min) 1))            ; into $a$
+        (org-latex-to-svg--handle-cursor)
+        (should (null (overlay-get (nth 0 ovs) 'display)))
+        (goto-char (overlay-start (nth 1 ovs)))  ; jump into $b$
+        (org-latex-to-svg--handle-cursor)
+        (should (eq (overlay-get (nth 0 ovs) 'display) 'fake-image)) ; a restored
+        (should (null (overlay-get (nth 1 ovs) 'display)))))))         ; b revealed
 
 (ert-deftest org-latex-to-svg-heal-rerenders-left-edit ()
   ;; Backstop: a fragment edited then left by point (without a clean cursor
