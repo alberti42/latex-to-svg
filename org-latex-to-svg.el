@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.6.1
+;; Version: 0.7.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.3.1"))
 ;; Keywords: tex, org, math, images
 
@@ -76,6 +76,10 @@
 ;; Move point into a preview (image or reference) and it reveals its LaTeX
 ;; source for editing; leaving re-shows the preview, or re-renders it if you
 ;; changed the text (`org-latex-to-svg--handle-cursor', on `post-command-hook').
+;; Newly typed math renders the moment the cursor leaves it
+;; (`org-latex-to-svg--render-left'), never while still inside — so half-typed
+;; equations are not compiled, and new equations appear without invoking the
+;; render command.
 
 ;;; Code:
 
@@ -344,8 +348,26 @@ a new label / number."
             (org-latex-to-svg--schedule-reconcile))
         (delete-overlay ov)))))
 
+(defun org-latex-to-svg--render-left (from to)
+  "Render the math element FROM was inside, once TO has left its span.
+This is how newly typed math appears: a complete, not-yet-rendered
+element is compiled the moment the cursor leaves it (never while still
+inside, so half-typed math is not compiled).  A `latex-fragment' /
+`latex-environment' that `org-element-context' doesn't recognise (e.g. an
+unfinished environment) yields nothing until it is closed and left."
+  (when-let* ((el (save-excursion (goto-char from) (org-element-context))))
+    (when (memq (org-element-type el) org-latex-to-svg--element-types)
+      (let* ((bounds (org-latex-to-svg--element-bounds el))
+             (b (car bounds)) (e (cdr bounds)))
+        (when (and (or (< to b) (> to e))
+                   (not (org-latex-to-svg--overlays-in b e)))
+          (org-latex-to-svg--render-element el)
+          ;; A new equation can shift every number below it.
+          (org-latex-to-svg--schedule-reconcile))))))
+
 (defun org-latex-to-svg--handle-cursor ()
-  "Reveal the preview point moved into and re-hide the one it left.
+  "Reveal the preview point moved into, re-hide the one it left, and render
+any newly finished equation the cursor just left.
 On `post-command-hook' while the mode is on.  Closes the overlay at the
 *previous* point (`org-latex-to-svg--last-point') rather than a tracked
 reference, so it stays correct across overlay-to-overlay jumps and edits.
@@ -353,10 +375,13 @@ A reference reached by *mouse* is not revealed: a click there is a jump
 \(`mouse-1' -> `org-latex-to-svg-goto-reference'), not an edit, so its
 number stays shown; keyboard entry still reveals it for label editing."
   (when org-latex-to-svg-mode
-    (let* ((last (and org-latex-to-svg--last-point
-                      (marker-position org-latex-to-svg--last-point)))
-           (prev (and last (org-latex-to-svg--revealable-overlay-at last)))
-           (cur (org-latex-to-svg--revealable-overlay-at (point))))
+    (let ((last (and org-latex-to-svg--last-point
+                     (marker-position org-latex-to-svg--last-point))))
+      ;; Render an equation the cursor just left (event-driven, no idle timer).
+      (when (and last (/= last (point)))
+        (org-latex-to-svg--render-left last (point)))
+      (let* ((prev (and last (org-latex-to-svg--revealable-overlay-at last)))
+             (cur (org-latex-to-svg--revealable-overlay-at (point))))
       (when (and prev (not (eq prev cur)))
         (org-latex-to-svg--close-overlay prev))
       (when (and cur (not (eq cur prev))
@@ -365,7 +390,7 @@ number stays shown; keyboard entry still reveals it for label editing."
         (org-latex-to-svg--open-overlay cur))
       (unless org-latex-to-svg--last-point
         (setq org-latex-to-svg--last-point (make-marker)))
-      (set-marker org-latex-to-svg--last-point (point)))))
+      (set-marker org-latex-to-svg--last-point (point))))))
 
 (defun org-latex-to-svg--heal-modified ()
   "Re-render previews that were edited and then left by point.
@@ -756,15 +781,16 @@ and numbering are on."
            (cdr (org-latex-to-svg--scan-numbering))))))))
 
 (defvar-local org-latex-to-svg--reconcile-timer nil
-  "Pending debounced `org-latex-to-svg--reconcile' timer for this buffer.")
+  "Pending debounced reconcile timer for this buffer.")
 
 (defun org-latex-to-svg--schedule-reconcile (&rest _)
-  "Debounce a numbering reconcile of the current buffer (see `-reconcile').
-Hooked to `after-change-functions' and fired when ground truth corrects a
-heuristic guess.  No-op unless the mode, numbering, and the idle option
-are on."
+  "Debounce a numbering reconcile of the current buffer (see `--reconcile').
+Hooked to `after-change-functions' (and fired when ground truth corrects a
+heuristic guess).  A backstop that re-renders any preview edited and left
+\(`--heal-modified') and renumbers downstream; the initial render of newly
+typed math is handled event-driven, on cursor leave (`--render-left'), not
+here.  No-op unless the mode and the idle option are on."
   (when (and (bound-and-true-p org-latex-to-svg-mode)
-             org-latex-to-svg-number-equations
              org-latex-to-svg-reconcile-idle)
     (when (timerp org-latex-to-svg--reconcile-timer)
       (cancel-timer org-latex-to-svg--reconcile-timer))
@@ -776,8 +802,8 @@ are on."
                (when (buffer-live-p buf)
                  (with-current-buffer buf
                    (setq org-latex-to-svg--reconcile-timer nil)
-                   ;; Re-render fragments edited then left, then renumber.
-                   (org-latex-to-svg--heal-modified)
+                   (when (bound-and-true-p org-latex-to-svg-mode)
+                     (org-latex-to-svg--heal-modified))
                    (org-latex-to-svg--reconcile buf)))))))))
 
 ;;;; Refresh (theme / font tracking)

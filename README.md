@@ -120,11 +120,15 @@ Implemented:
 - **Reveal-on-cursor editing** — move point into a preview (image or reference)
   to reveal and edit its source; it re-renders on leave. A mouse click on a
   reference is a jump, not an edit.
+- **Auto-render on cursor-leave** — newly typed math renders the moment you move
+  point out of it (never while still inside, so half-typed math isn't compiled),
+  so you rarely need to invoke the render command by hand.
 
 Not yet:
 
-- **Live renumber while typing** — numbers refresh when the edited block (or a
-  covering region / buffer) is next rendered, not on every keystroke.
+- **Per-keystroke renumbering** — a new preview renders as soon as you leave it,
+  but downstream numbers / references settle on a short debounced pass, not on
+  every keystroke.
 - `\tag`-based references and `subequations` (see [`docs/numbering.md`](docs/numbering.md)).
 
 ## Tests

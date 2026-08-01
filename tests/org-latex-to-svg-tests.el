@@ -225,6 +225,41 @@ change to simulate a theme/font change."
         (should (eq (overlay-get ov 'display) 'redrawn))
         (should (equal (overlay-get ov 'org-latex-to-svg-value) "$ba$"))))))
 
+(ert-deftest org-latex-to-svg-auto-renders-new-equation-on-leave ()
+  ;; A brand-new equation typed after the initial render renders itself the
+  ;; moment point leaves its span (event-driven; no idle timer).
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "intro text\n\n"
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (should (null (org-latex-to-svg-tests--overlays)))
+      (goto-char (point-max))
+      (insert "\\begin{equation}\nx=1\n\\end{equation}\n")
+      (goto-char (- (point) 4))                  ; inside the new environment
+      (org-latex-to-svg--handle-cursor)          ; register cursor inside
+      (should (null (org-latex-to-svg-tests--overlays)))  ; not rendered inside
+      (goto-char (point-min))                    ; leave the span
+      (org-latex-to-svg--handle-cursor)          ; -> renders on leave
+      (let ((ovs (org-latex-to-svg-tests--overlays)))
+        (should (= 1 (length ovs)))
+        (should (string-prefix-p "\\setcounter{equation}{0}%\n\\begin{equation}"
+                                 (overlay-get (car ovs) 'org-latex-to-svg-value)))
+        (should (eq (overlay-get (car ovs) 'display) 'fake-image))))))
+
+(ert-deftest org-latex-to-svg-no-render-while-inside-equation ()
+  ;; While point is still inside a just-typed fragment, nothing is compiled;
+  ;; we wait until the cursor leaves.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "intro\n\n"
+      (setq-local org-latex-to-svg-mode t)
+      (goto-char (point-max))
+      (insert "$x$")
+      (goto-char (1+ (point-min)))               ; seed last-point elsewhere
+      (org-latex-to-svg--handle-cursor)
+      (goto-char (1- (point-max)))               ; move inside $x$
+      (org-latex-to-svg--handle-cursor)
+      (should (null (org-latex-to-svg-tests--overlays))))))
+
 (ert-deftest org-latex-to-svg-render-replaces-existing-overlay ()
   ;; Re-rendering the same span doesn't stack overlays.
   (org-latex-to-svg-tests--with-stub
