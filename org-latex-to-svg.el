@@ -199,6 +199,16 @@ Parses the whole (widened) buffer with `org-element' and keeps
   "Delete this package's preview overlays intersecting BEG..END."
   (mapc #'delete-overlay (org-latex-to-svg--overlays-in beg end)))
 
+(defun org-latex-to-svg--clear-native (beg end)
+  "Delete Org's built-in `org-latex-preview' image overlays in BEG..END.
+With this mode on, `org-latex-to-svg' owns the previews for these
+fragments; a leftover native overlay (from `#+STARTUP: latexpreview' or a
+prior `org-latex-preview') would otherwise stack its own image under
+ours — visible again when ours is revealed on cursor entry."
+  (dolist (o (overlays-in beg end))
+    (when (eq (overlay-get o 'org-overlay-type) 'org-latex-overlay)
+      (delete-overlay o))))
+
 (defun org-latex-to-svg--set-overlay (beg end value image &optional source enums-fallback)
   "Overlay BEG..END (positions or markers) with IMAGE, keyed to render VALUE.
 VALUE is the exact string handed to the engine (a numbered environment
@@ -213,6 +223,7 @@ preview overlay in the span; clears itself when the text is edited."
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
       (org-latex-to-svg--clear-region b e)
+      (org-latex-to-svg--clear-native b e)
       (let ((ov (make-overlay b e)))
         (overlay-put ov 'org-latex-to-svg t)
         (overlay-put ov 'org-latex-to-svg-value value)
@@ -881,6 +892,8 @@ interactive command bound to \\[org-latex-to-svg]."
             ;; Reveal the source of the preview point moves into.
             (add-hook 'post-command-hook
                       #'org-latex-to-svg--handle-cursor nil t)
+            ;; Take over from any built-in Org LaTeX previews in the buffer.
+            (org-latex-to-svg--clear-native (point-min) (point-max))
             (org-latex-to-svg--render-region (point-min) (point-max)))
         (setq org-latex-to-svg-mode nil)
         (user-error "`org-latex-to-svg-mode' only works in Org buffers"))
