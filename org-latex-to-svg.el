@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.5.0
+;; Version: 0.6.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.3.1"))
 ;; Keywords: tex, org, math, images
 
@@ -63,7 +63,9 @@
 ;; against a `\\label' -> number map built in the same scan and shown as plain
 ;; buffer text (e.g. `(3)', in the `org-latex-to-svg-reference' face — not a
 ;; LaTeX image, so it matches the surrounding font); their previews are
-;; click-to-jump (mouse-1 / RET) to the equation defining the label.
+;; click-to-jump (mouse-1 / RET) to the equation defining the label.  Like an
+;; image preview, a reference reveals its `\eqref' / `\ref' source on cursor
+;; entry so you can edit the label, then re-renders on leave.
 ;;
 ;; Numbers are kept correct as you edit: each numbered block is rendered with a
 ;; `\\typeout' probe so the engine caches its true final counter (ground truth),
@@ -71,9 +73,9 @@
 ;; only previews whose number changed (`org-latex-to-svg--reconcile').  The
 ;; Elisp heuristic is a fast first guess; the cached metadata corrects it.
 ;;
-;; Move point into a preview and it reveals its LaTeX source for editing;
-;; leaving re-shows the image, or re-renders it if you changed the text
-;; (`org-latex-to-svg--handle-cursor', on `post-command-hook').
+;; Move point into a preview (image or reference) and it reveals its LaTeX
+;; source for editing; leaving re-shows the preview, or re-renders it if you
+;; changed the text (`org-latex-to-svg--handle-cursor', on `post-command-hook').
 
 ;;; Code:
 
@@ -303,23 +305,34 @@ it re-renders (see `org-latex-to-svg--close-overlay')."
     (overlay-put ov 'display nil)))
 
 (defun org-latex-to-svg--revealable-overlay-at (pos)
-  "Return this package's image preview overlay covering POS, or nil.
-Reference previews (plain text) are excluded."
-  (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-image))
+  "Return this package's preview overlay covering POS, or nil.
+Both image previews (`org-latex-to-svg-image') and `\\eqref' / `\\ref'
+text previews (`org-latex-to-svg-ref') qualify: moving point into either
+reveals its LaTeX source so it can be edited (see
+`org-latex-to-svg--open-overlay')."
+  (seq-find (lambda (o) (or (overlay-get o 'org-latex-to-svg-image)
+                            (overlay-get o 'org-latex-to-svg-ref)))
             (overlays-at pos)))
 
 (defun org-latex-to-svg--open-overlay (ov)
-  "Reveal OV's LaTeX source by hiding its image."
+  "Reveal OV's LaTeX source by hiding its image / reference text."
   (overlay-put ov 'display nil))
 
 (defun org-latex-to-svg--close-overlay (ov)
-  "Re-show OV's image, or re-render it if its source was edited while open."
+  "Re-show OV's preview, or re-render it if its source was edited while open.
+An unedited image preview restores its cached image and an unedited
+reference restores its `(N)' / `N' text; an edited preview (its LaTeX
+source changed) is re-rendered so images retypeset and references pick up
+a new label / number."
   (when (overlay-buffer ov)
-    (if (overlay-get ov 'org-latex-to-svg-modified)
-        (progn
-          (overlay-put ov 'org-latex-to-svg-modified nil)
-          (org-latex-to-svg--rerender-overlay ov))
-      (overlay-put ov 'display (overlay-get ov 'org-latex-to-svg-image)))))
+    (cond
+     ((overlay-get ov 'org-latex-to-svg-modified)
+      (overlay-put ov 'org-latex-to-svg-modified nil)
+      (org-latex-to-svg--rerender-overlay ov))
+     ((overlay-get ov 'org-latex-to-svg-image)
+      (overlay-put ov 'display (overlay-get ov 'org-latex-to-svg-image)))
+     ((overlay-get ov 'org-latex-to-svg-ref)
+      (overlay-put ov 'display (overlay-get ov 'org-latex-to-svg-ref-display))))))
 
 (defun org-latex-to-svg--rerender-overlay (ov)
   "Re-render the math element under OV after an edit; else drop OV."
@@ -370,7 +383,10 @@ reconcile can detect when the target renumbered.
 Unlike `org-latex-to-svg--set-overlay' this draws ordinary buffer text
 \(so it matches the prose font and needs no theme / zoom refresh) rather
 than a LaTeX image, and makes the span click-to-jump (`mouse-1' / `RET')
-to the equation defining LABEL.  Clears itself when the text is edited."
+to the equation defining LABEL.  Like an image preview it reveals its
+source on cursor entry / edit and re-renders on leave (see
+`org-latex-to-svg--close-overlay'); DISPLAY is stashed in
+`org-latex-to-svg-ref-display' so an unedited leave can restore it."
   (let ((b (if (markerp beg) (marker-position beg) beg))
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
@@ -379,14 +395,18 @@ to the equation defining LABEL.  Clears itself when the text is edited."
         (overlay-put ov 'org-latex-to-svg t)
         (overlay-put ov 'org-latex-to-svg-ref label)
         (overlay-put ov 'org-latex-to-svg-ref-num num)
+        (overlay-put ov 'org-latex-to-svg-ref-display display)
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'display display)
         (overlay-put ov 'keymap org-latex-to-svg--reference-keymap)
         (overlay-put ov 'mouse-face 'highlight)
         (overlay-put ov 'help-echo
                      (format "mouse-1: jump to the equation labelled %s" label))
+        ;; On edit: reveal the source and mark for re-render on cursor exit
+        ;; (shared with image previews; see `org-latex-to-svg--on-modify' /
+        ;; `--close-overlay').
         (overlay-put ov 'modification-hooks
-                     (list (lambda (o &rest _) (delete-overlay o))))
+                     (list #'org-latex-to-svg--on-modify))
         ov))))
 
 ;;;; Numbering
@@ -683,11 +703,14 @@ Rewrites the overlay's displayed `(N)' / `N' in place (no LaTeX)."
         (when-let* ((parsed (org-latex-to-svg--reference-parse
                              (buffer-substring-no-properties
                               (overlay-start ov) (overlay-end ov)))))
-          (overlay-put ov 'display
-                       (propertize (if (equal (car parsed) "eqref")
-                                       (format "(%d)" want) (number-to-string want))
-                                   'face 'org-latex-to-svg-reference))
-          (overlay-put ov 'org-latex-to-svg-ref-num want))))))
+          (let ((disp (propertize (if (equal (car parsed) "eqref")
+                                      (format "(%d)" want) (number-to-string want))
+                                  'face 'org-latex-to-svg-reference)))
+            (overlay-put ov 'org-latex-to-svg-ref-display disp)
+            ;; Don't clobber an overlay revealed for editing (display nil).
+            (when (overlay-get ov 'display)
+              (overlay-put ov 'display disp))
+            (overlay-put ov 'org-latex-to-svg-ref-num want)))))))
 
 (defun org-latex-to-svg--reconcile (&optional buffer)
   "Recompute equation numbers and re-render previews whose number changed.

@@ -628,6 +628,75 @@ change to simulate a theme/font change."
                       (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
                                    'display)))))))
 
+(ert-deftest org-latex-to-svg-reference-reveals-under-cursor ()
+  ;; Point entering a reference preview reveals its `\eqref' source; leaving
+  ;; (unmodified) restores the `(N)' text.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "As in \\eqref{eq:a}.\n")
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        ;; Move into the reference -> revealed (text hidden).
+        (goto-char (1+ (overlay-start ref)))
+        (org-latex-to-svg--handle-cursor)
+        (should (null (overlay-get ref 'display)))
+        ;; Move out -> restored to its number text.
+        (goto-char (point-min))
+        (org-latex-to-svg--handle-cursor)
+        (should (equal "(1)" (substring-no-properties
+                              (overlay-get ref 'display))))))))
+
+(ert-deftest org-latex-to-svg-plain-ref-reveals-under-cursor ()
+  ;; A plain `\ref' preview reveals its source on cursor entry just like
+  ;; `\eqref' (same mechanism), and restores its bare `N' text on leave.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "See \\ref{eq:a}.\n")
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        (should (equal "1" (substring-no-properties  ; \ref -> bare N
+                            (overlay-get ref 'display))))
+        (goto-char (1+ (overlay-start ref)))
+        (org-latex-to-svg--handle-cursor)
+        (should (null (overlay-get ref 'display)))   ; source revealed
+        (goto-char (point-min))
+        (org-latex-to-svg--handle-cursor)
+        (should (equal "1" (substring-no-properties
+                            (overlay-get ref 'display))))))))
+
+(ert-deftest org-latex-to-svg-reference-rerenders-after-label-edit ()
+  ;; Editing the label of a revealed reference then leaving re-renders it to
+  ;; the new target's number (here eq:a -> eq:b, (1) -> (2)).
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "\\begin{equation}\\label{eq:b}\ny\n\\end{equation}\n\n"
+                "As in \\eqref{eq:a}.\n")
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        (goto-char (1+ (overlay-start ref)))
+        (org-latex-to-svg--handle-cursor)          ; reveal source
+        ;; Change the label eq:a -> eq:b in the revealed source.
+        (save-excursion
+          (goto-char (overlay-start ref))
+          (search-forward "eq:a")
+          (replace-match "eq:b"))
+        (goto-char (point-min))
+        (org-latex-to-svg--handle-cursor))         ; leave -> re-render
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        (should (equal (overlay-get ref 'org-latex-to-svg-ref) "eq:b"))
+        (should (equal "(2)" (substring-no-properties
+                              (overlay-get ref 'display))))))))
+
 (provide 'org-latex-to-svg-tests)
 
 ;;; org-latex-to-svg-tests.el ends here
