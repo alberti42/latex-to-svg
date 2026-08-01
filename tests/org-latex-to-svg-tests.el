@@ -57,7 +57,6 @@ change to simulate a theme/font change."
                   org-latex-to-svg-tests--image))
                ((symbol-function 'latex-to-svg-appearance)
                 (lambda () org-latex-to-svg-tests--appearance))
-               ((symbol-function 'latex-to-svg-flush-metrics) #'ignore)
                ((symbol-function 'latex-to-svg-metadata)
                 (lambda (value) (cdr (assoc value org-latex-to-svg-tests--metadata))))
                ((symbol-function 'latex-to-svg-invalidate)

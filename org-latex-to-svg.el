@@ -804,10 +804,8 @@ new color / scale — no LaTeX) and updates the `display' property."
 (defun org-latex-to-svg-refresh (&optional buffer)
   "Re-render previews in BUFFER (default current) for the current theme and font.
 Previews also refresh lazily on theme, buffer-display, and zoom
-changes; this forces it now (and after a pure global font-size change).
-The pixels-per-point calibration is dropped so it is re-measured."
+changes; this forces it now (and after a pure global font-size change)."
   (interactive)
-  (latex-to-svg-flush-metrics)
   (org-latex-to-svg--refresh-buffer (or buffer (current-buffer))))
 
 (defun org-latex-to-svg--present-p ()
