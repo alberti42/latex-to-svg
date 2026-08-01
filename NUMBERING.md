@@ -5,11 +5,13 @@
 counting, nested-`\\` stripping, the document-order offset table, `\setcounter`
 injection into the per-fragment render / cache / regenerate path, a
 `label → number` map with `\eqref` / `\ref` rendered as `$(N)$` / `$N$`, and
-downstream re-render on re-render of an edited block (`--renumber-following`).
-Still **pending / out of scope:** click-to-jump on a reference overlay,
-`\eqref` *to* a `\tag` (tag text isn't harvested), `subequations`
-sub-lettering, and truly-automatic renumber on every keystroke (numbers refresh
-when the edited block, or a covering region/buffer, is re-rendered).
+downstream re-render on re-render of an edited block (`--renumber-following`),
+and **click-to-jump** (`mouse-1` / `RET`) from a reference preview to the
+equation defining its label (`org-latex-to-svg-goto-reference`). Still
+**pending / out of scope:** `\eqref` *to* a `\tag` (tag text isn't harvested),
+`subequations` sub-lettering, and truly-automatic renumber on every keystroke
+(numbers refresh when the edited block, or a covering region/buffer, is
+re-rendered).
 
 ## Design principle
 

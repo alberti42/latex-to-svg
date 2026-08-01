@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.2.0
+;; Version: 0.2.1
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.2.1"))
 ;; Keywords: tex, org, math, images
 
@@ -56,8 +56,9 @@
 ;; and baked in as a `\\setcounter' prefix, so the number is part of the
 ;; engine's content hash (see NUMBERING.md).  `\\eqref' / `\\ref' are resolved
 ;; against a `\\label' -> number map built in the same scan and rendered as
-;; `$(N)$' / `$N$'.  Reveal-on-cursor-enter (editing without first clearing)
-;; is still a later milestone.
+;; `$(N)$' / `$N$'; their previews are click-to-jump (mouse-1 / RET) to the
+;; equation defining the label.  Reveal-on-cursor-enter (editing without first
+;; clearing) is still a later milestone.
 
 ;;; Code:
 
@@ -113,6 +114,11 @@ the `N.a'/`N.b' sub-lettering is not modelled).")
 ;; helpers above it.
 (defvar org-latex-to-svg-mode)
 
+;; Forward declaration: the reference-overlay keymap is defined with the
+;; interactive commands near the end of the file, but `--set-overlay' (above it)
+;; installs it on `\eqref' / `\ref' previews.
+(defvar org-latex-to-svg--reference-keymap)
+
 (defvar-local org-latex-to-svg--rendered-appearance nil
   "Appearance signature this buffer's previews were last rendered for.
 A value of `latex-to-svg-appearance', compared against the current one
@@ -162,11 +168,13 @@ Parses the whole (widened) buffer with `org-element' and keeps
   "Delete this package's preview overlays intersecting BEG..END."
   (mapc #'delete-overlay (org-latex-to-svg--overlays-in beg end)))
 
-(defun org-latex-to-svg--set-overlay (beg end value image &optional source)
+(defun org-latex-to-svg--set-overlay (beg end value image &optional source ref-label)
   "Overlay BEG..END (positions or markers) with IMAGE, keyed to render VALUE.
 VALUE is the exact string handed to the engine (a numbered environment
 carries its `\\setcounter' prefix) so a cache refresh re-fetches the same
 hash; SOURCE, if given, is the human-readable LaTeX shown in `help-echo'.
+REF-LABEL, when non-nil, marks this as an `\\eqref' / `\\ref' preview for
+the named label and makes the overlay click-to-jump to that equation.
 Replaces any existing preview overlay in the span.  The overlay clears
 itself when the underlying text is edited, revealing the source."
   (let ((b (if (markerp beg) (marker-position beg) beg))
@@ -179,6 +187,14 @@ itself when the underlying text is edited, revealing the source."
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'help-echo (or source value))
         (overlay-put ov 'display image)
+        ;; An \eqref / \ref preview jumps to its target equation on click.
+        (when ref-label
+          (overlay-put ov 'org-latex-to-svg-ref ref-label)
+          (overlay-put ov 'keymap org-latex-to-svg--reference-keymap)
+          (overlay-put ov 'mouse-face 'highlight)
+          (overlay-put ov 'help-echo
+                       (format "mouse-1: jump to the equation labelled %s"
+                               ref-label)))
         ;; Reveal the source when the fragment is edited (mirrors Org's own
         ;; preview overlays): drop the image on any modification touching it.
         (overlay-put ov 'modification-hooks
@@ -330,12 +346,10 @@ See `org-latex-to-svg--scan-numbering' for the full scan."
   (and org-latex-to-svg-number-equations
        (org-latex-to-svg--scan-numbering)))
 
-(defun org-latex-to-svg--reference-value (source labels)
-  "If SOURCE is a resolvable `\\eqref' / `\\ref' fragment, return its rendered form.
-SOURCE may be bare or wrapped in `$…$' / `\\(…\\)'.  Looks the label up in
-LABELS (name -> number) and returns a `$(N)$' (eqref) or `$N$' (ref)
-string, or nil when SOURCE isn't such a reference or the label is unknown
-\(leave it verbatim then)."
+(defun org-latex-to-svg--reference-parse (source)
+  "Parse SOURCE as a reference fragment; return (KIND . NAME) or nil.
+KIND is \"eqref\" or \"ref\"; NAME is the label.  SOURCE may be bare or
+wrapped in `$…$' / `\\(…\\)'."
   (let ((s (string-trim source)))
     (cond
      ((and (string-prefix-p "$" s) (string-suffix-p "$" s) (> (length s) 1))
@@ -343,10 +357,35 @@ string, or nil when SOURCE isn't such a reference or the label is unknown
      ((and (string-prefix-p "\\(" s) (string-suffix-p "\\)" s))
       (setq s (string-trim (substring s 2 -2)))))
     (when (string-match "\\`\\\\\\(eqref\\|ref\\){\\([^}]+\\)}\\'" s)
-      (let ((kind (match-string 1 s))
-            (num (gethash (match-string 2 s) labels)))
-        (when num
-          (if (equal kind "eqref") (format "$(%d)$" num) (format "$%d$" num)))))))
+      (cons (match-string 1 s) (match-string 2 s)))))
+
+(defun org-latex-to-svg--reference-value (source labels)
+  "If SOURCE is a resolvable `\\eqref' / `\\ref' fragment, return its rendered form.
+Looks the label up in LABELS (name -> number) and returns a `$(N)$'
+\(eqref) or `$N$' (ref) string, or nil when SOURCE isn't such a reference
+or the label is unknown (leave it verbatim then)."
+  (when-let* ((parsed (org-latex-to-svg--reference-parse source))
+              (num (gethash (cdr parsed) labels)))
+    (if (equal (car parsed) "eqref") (format "$(%d)$" num) (format "$%d$" num))))
+
+(defun org-latex-to-svg--reference-label (source)
+  "Return the label NAME if SOURCE is an `\\eqref' / `\\ref' fragment, else nil."
+  (cdr (org-latex-to-svg--reference-parse source)))
+
+(defun org-latex-to-svg--label-position (label)
+  "Return the `:begin' of the math element defining LABEL, or nil.
+Searches the widened buffer for `\\label{LABEL}' inside a math element."
+  (save-restriction
+    (widen)
+    (save-excursion
+      (goto-char (point-min))
+      (let ((needle (format "\\label{%s}" label)) pos)
+        (while (and (not pos) (search-forward needle nil t))
+          (let ((el (save-excursion (goto-char (match-beginning 0))
+                                    (org-element-context))))
+            (when (memq (org-element-type el) org-latex-to-svg--element-types)
+              (setq pos (org-element-property :begin el)))))
+        pos))))
 
 (defun org-latex-to-svg--numbered-value (el source table)
   "Return the string to render for EL: SOURCE, adjusted for numbering.
@@ -367,10 +406,11 @@ otherwise SOURCE is returned unchanged."
 
 ;;;; Rendering
 
-(defun org-latex-to-svg--place (buffer beg end value &optional source)
+(defun org-latex-to-svg--place (buffer beg end value &optional source ref-label)
   "Ensure BUFFER's BEG..END shows the current image for render VALUE.
 VALUE is the exact engine input (numbered environments carry their
-`\\setcounter' prefix); SOURCE is the plain LaTeX for `help-echo'.
+`\\setcounter' prefix); SOURCE is the plain LaTeX for `help-echo';
+REF-LABEL, when non-nil, makes an `\\eqref' / `\\ref' preview click-to-jump.
 Overlays immediately when the engine has the image (cache hit), else
 schedules an async compile and overlays when it finishes.  BEG / END
 should be markers so the overlay lands on the right span even after
@@ -380,9 +420,9 @@ edits.  Tint and scale are read from BUFFER at call time."
       (let ((image (latex-to-svg
                     value
                     :callback (lambda ()
-                                (org-latex-to-svg--place buffer beg end value source)))))
+                                (org-latex-to-svg--place buffer beg end value source ref-label)))))
         (when image
-          (org-latex-to-svg--set-overlay beg end value image source))))))
+          (org-latex-to-svg--set-overlay beg end value image source ref-label))))))
 
 (defun org-latex-to-svg--render-element (el &optional table)
   "Render math element EL in the current buffer.
@@ -392,11 +432,14 @@ correctly.  Pass a shared TABLE when rendering many elements."
   (let* ((bounds (org-latex-to-svg--element-bounds el))
          (source (org-element-property :value el))
          (table (or table (org-latex-to-svg--maybe-table)))
-         (value (org-latex-to-svg--numbered-value el source table)))
+         (value (org-latex-to-svg--numbered-value el source table))
+         (ref-label (and (eq (org-element-type el) 'latex-fragment)
+                         (not (equal value source))
+                         (org-latex-to-svg--reference-label source))))
     (org-latex-to-svg--place (current-buffer)
                              (copy-marker (car bounds))
                              (copy-marker (cdr bounds))
-                             value source)))
+                             value source ref-label)))
 
 (defun org-latex-to-svg--render-region (beg end)
   "Render every math element overlapping BEG..END in the current buffer."
@@ -494,6 +537,40 @@ is fully applied."
 (add-hook 'window-buffer-change-functions #'org-latex-to-svg--maybe-refresh)
 
 ;;;; Command and mode
+
+(defun org-latex-to-svg--ref-overlay-at (pos)
+  "Return this package's reference overlay covering POS, or nil."
+  (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+            (overlays-in (max (point-min) (1- pos))
+                         (min (point-max) (1+ pos)))))
+
+(defun org-latex-to-svg-goto-reference (&optional event)
+  "Jump to the equation defining the label of the reference preview at point.
+Bound in `\\eqref' / `\\ref' preview overlays to `mouse-1' and `RET'; EVENT
+is the triggering input event when invoked with the mouse."
+  (interactive (list last-command-event))
+  (when (and (consp event) (eventp event))
+    (let ((posn (event-start event)))
+      (when (windowp (posn-window posn)) (select-window (posn-window posn)))
+      (when (numberp (posn-point posn)) (goto-char (posn-point posn)))))
+  (let* ((ov (org-latex-to-svg--ref-overlay-at (point)))
+         (label (and ov (overlay-get ov 'org-latex-to-svg-ref)))
+         (pos (and label (org-latex-to-svg--label-position label))))
+    (cond
+     ((null label) (user-error "No equation reference here"))
+     ((null pos) (user-error "Cannot find an equation labelled %s" label))
+     (t (push-mark)
+        (goto-char pos)
+        (when (fboundp 'org-fold-show-context) (org-fold-show-context))
+        (when (get-buffer-window (current-buffer)) (recenter))
+        (message "Jumped to \\label{%s}" label)))))
+
+(defvar org-latex-to-svg--reference-keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-1] #'org-latex-to-svg-goto-reference)
+    (define-key map (kbd "RET") #'org-latex-to-svg-goto-reference)
+    map)
+  "Keymap installed on `\\eqref' / `\\ref' preview overlays for click-to-jump.")
 
 ;;;###autoload
 (defun org-latex-to-svg-clear (&optional beg end)

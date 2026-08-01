@@ -412,7 +412,7 @@ change to simulate a theme/font change."
 
 (ert-deftest org-latex-to-svg-renders-eqref-as-number ()
   ;; End to end: an \eqref fragment overlays with the resolved `$(N)$' input,
-  ;; while its help-echo keeps the original \eqref source.
+  ;; and is marked click-to-jump for its label.
   (org-latex-to-svg-tests--with-stub
     (org-latex-to-svg-tests--org
         (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
@@ -421,7 +421,38 @@ change to simulate a theme/font change."
       (let* ((ovs (org-latex-to-svg-tests--overlays))
              (ref (car (last ovs))))
         (should (equal (overlay-get ref 'org-latex-to-svg-value) "$(1)$"))
-        (should (equal (overlay-get ref 'help-echo) "\\eqref{eq:a}"))))))
+        (should (equal (overlay-get ref 'org-latex-to-svg-ref) "eq:a"))
+        (should (eq (overlay-get ref 'keymap)
+                    org-latex-to-svg--reference-keymap))))))
+
+(ert-deftest org-latex-to-svg-label-position-finds-defining-element ()
+  (org-latex-to-svg-tests--org
+      (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+              "\\begin{align}\ny&=1\\label{eq:b}\\\\\nz&=2\n\\end{align}\n")
+    ;; Each label resolves to the :begin of the environment that defines it.
+    (should (= (org-latex-to-svg--label-position "eq:a") (point-min)))
+    (let ((align-begin (save-excursion (goto-char (point-min))
+                                       (search-forward "\\begin{align}")
+                                       (match-beginning 0))))
+      (should (= (org-latex-to-svg--label-position "eq:b") align-begin)))
+    (should (null (org-latex-to-svg--label-position "eq:missing")))))
+
+(ert-deftest org-latex-to-svg-goto-reference-jumps-to-target ()
+  ;; Invoking the jump command over an \eqref preview moves point to the
+  ;; equation that defines the label.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "See \\eqref{eq:a}.\n\n"
+                "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n")
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let* ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                            (org-latex-to-svg-tests--overlays)))
+             (target (save-excursion (goto-char (point-min))
+                                     (search-forward "\\begin{equation}")
+                                     (match-beginning 0))))
+        (goto-char (overlay-start ref))
+        (org-latex-to-svg-goto-reference)
+        (should (= (point) target))))))
 
 (ert-deftest org-latex-to-svg-eqref-follows-renumber ()
   ;; A downstream \eqref updates when the target equation renumbers: two
