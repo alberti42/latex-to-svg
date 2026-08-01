@@ -69,6 +69,10 @@ so it is on `load-path` when the latter's `(require 'latex-to-svg)` runs.
 
 With the mode on, all fragments/environments render when the buffer opens.
 
+See [`docs/example.org`](docs/example.org) for a ready-to-open demo of inline /
+display math, automatic numbering, `\eqref` cross-references, and
+reveal-on-cursor editing.
+
 - `C-c C-x C-l` (`org-latex-to-svg`) — toggle the fragment at point; or render
   the active region; or (failing both) the whole buffer. This shadows Org's
   classic `org-latex-preview` on the same key while the mode is on.
