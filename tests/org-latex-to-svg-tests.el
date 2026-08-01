@@ -45,12 +45,15 @@
 immediately) and `latex-to-svg-appearance' is a mutable list a test can
 change to simulate a theme/font change."
   (declare (indent 0) (debug t))
-  `(let ((org-latex-to-svg-tests--appearance '("#000" "#fff" 20)))
+  `(let ((org-latex-to-svg-tests--appearance '("#000" "#fff" 20))
+         (org-latex-to-svg-tests--invalidated nil))
      (cl-letf (((symbol-function 'latex-to-svg)
                 (lambda (_latex &rest _) org-latex-to-svg-tests--image))
                ((symbol-function 'latex-to-svg-appearance)
                 (lambda () org-latex-to-svg-tests--appearance))
-               ((symbol-function 'latex-to-svg-flush-metrics) #'ignore))
+               ((symbol-function 'latex-to-svg-flush-metrics) #'ignore)
+               ((symbol-function 'latex-to-svg-invalidate)
+                (lambda (latex) (push latex org-latex-to-svg-tests--invalidated))))
        ,@body)))
 
 (defmacro org-latex-to-svg-tests--org (text &rest body)
@@ -151,13 +154,51 @@ change to simulate a theme/font change."
       (org-latex-to-svg)                ; toggle off
       (should (null (org-latex-to-svg-tests--overlays))))))
 
-(ert-deftest org-latex-to-svg-command-clears-with-prefix ()
+(ert-deftest org-latex-to-svg-command-rerenders-with-prefix ()
+  ;; `C-u' clears and re-renders the buffer (rebuilding overlays from cache) —
+  ;; changing the stub image proves the overlays were actually rebuilt.
   (org-latex-to-svg-tests--with-stub
     (org-latex-to-svg-tests--org "$a$ $b$\n"
       (org-latex-to-svg--render-region (point-min) (point-max))
       (should (= 2 (length (org-latex-to-svg-tests--overlays))))
-      (org-latex-to-svg '(4))           ; C-u => clear buffer
+      (let ((org-latex-to-svg-tests--image 'rebuilt))
+        (org-latex-to-svg '(4)))        ; C-u => clear + render
+      (let ((ovs (org-latex-to-svg-tests--overlays)))
+        (should (= 2 (length ovs)))
+        (should (cl-every (lambda (o) (eq (overlay-get o 'display) 'rebuilt)) ovs))))))
+
+(ert-deftest org-latex-to-svg-command-regenerates-with-double-prefix ()
+  ;; `C-u C-u' invalidates each equation's cached SVG, then re-renders.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$ \\[b\\]\n"
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (org-latex-to-svg '(16))          ; C-u C-u => regenerate
+      ;; Both equations were invalidated (order-independent).
+      (should (equal (sort (copy-sequence org-latex-to-svg-tests--invalidated)
+                           #'string<)
+                     '("$a$" "\\[b\\]")))
+      (should (= 2 (length (org-latex-to-svg-tests--overlays)))))))
+
+(ert-deftest org-latex-to-svg-clear-command ()
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$ $b$\n"
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (should (= 2 (length (org-latex-to-svg-tests--overlays))))
+      (org-latex-to-svg-clear)
       (should (null (org-latex-to-svg-tests--overlays))))))
+
+(ert-deftest org-latex-to-svg-regenerate-command ()
+  ;; `org-latex-to-svg-regenerate' invalidates the cache per element and leaves
+  ;; fresh overlays in place.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$\n"
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((org-latex-to-svg-tests--image 'fresh))
+        (org-latex-to-svg-regenerate))
+      (should (equal org-latex-to-svg-tests--invalidated '("$a$")))
+      (let ((ovs (org-latex-to-svg-tests--overlays)))
+        (should (= 1 (length ovs)))
+        (should (eq (overlay-get (car ovs) 'display) 'fresh))))))
 
 ;;;; Minor mode
 

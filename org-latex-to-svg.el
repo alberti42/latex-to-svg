@@ -5,8 +5,8 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.1.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.2.0"))
+;; Version: 0.1.1
+;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.2.1"))
 ;; Keywords: tex, org, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -245,19 +245,57 @@ is fully applied."
 ;;;; Command and mode
 
 ;;;###autoload
+(defun org-latex-to-svg-clear (&optional beg end)
+  "Clear previews in BEG..END, revealing the LaTeX source.
+Interactively acts on the active region, or the whole buffer."
+  (interactive (if (use-region-p)
+                   (list (region-beginning) (region-end))
+                 (list (point-min) (point-max))))
+  (org-latex-to-svg--clear-region (or beg (point-min)) (or end (point-max))))
+
+;;;###autoload
+(defun org-latex-to-svg-regenerate (&optional beg end)
+  "Force a fresh recompile of previews in BEG..END.
+
+Deletes each equation's cached SVG (via `latex-to-svg-invalidate') and
+clears its overlay, then re-renders — bypassing the content-addressed
+cache.  Use this to recover from a stale or corrupt cached image.
+Interactively acts on the active region, or the whole buffer."
+  (interactive (if (use-region-p)
+                   (list (region-beginning) (region-end))
+                 (list (point-min) (point-max))))
+  (let ((beg (or beg (point-min)))
+        (end (or end (point-max))))
+    (dolist (el (org-latex-to-svg--elements beg end))
+      (latex-to-svg-invalidate (org-element-property :value el)))
+    (org-latex-to-svg--clear-region beg end)
+    (org-latex-to-svg--render-region beg end)))
+
+;;;###autoload
 (defun org-latex-to-svg (&optional arg)
   "Preview Org LaTeX math as SVG images.
 
 With no prefix ARG: toggle the fragment at point; or, with an active
-region, render the region; or, failing both, render the whole buffer.
+region, render that region; or, failing both, render the whole buffer.
 
-With a `\\[universal-argument]' prefix ARG, clear all previews in the
-buffer."
+With a `\\[universal-argument]' prefix, re-render the whole buffer (clear
+then render) — rebuilds overlays from cache, fixing a stale display.
+
+With a `\\[universal-argument] \\[universal-argument]' prefix, regenerate
+the whole buffer: a fresh recompile bypassing the cache (see
+`org-latex-to-svg-regenerate').
+
+To clear previews without re-rendering, use `org-latex-to-svg-clear' or
+turn off `org-latex-to-svg-mode'."
   (interactive "P")
   (cond
+   ((equal arg '(16))
+    (org-latex-to-svg-regenerate (point-min) (point-max))
+    (message "Regenerated LaTeX previews"))
    ((equal arg '(4))
     (org-latex-to-svg--clear-region (point-min) (point-max))
-    (message "Cleared LaTeX previews"))
+    (org-latex-to-svg--render-region (point-min) (point-max))
+    (message "Re-rendered LaTeX previews"))
    ((use-region-p)
     (org-latex-to-svg--render-region (region-beginning) (region-end))
     (deactivate-mark))

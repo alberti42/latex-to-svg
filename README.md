@@ -41,12 +41,25 @@ With the mode on, all fragments/environments render when the buffer opens.
 - `C-c C-x C-l` (`org-latex-to-svg`) — toggle the fragment at point; or render
   the active region; or (failing both) the whole buffer. This shadows Org's
   classic `org-latex-preview` on the same key while the mode is on.
-- `C-u C-c C-x C-l` — clear all previews in the buffer.
-- `M-x org-latex-to-svg-refresh` — force a re-render for the current theme /
-  font size (previews also refresh lazily on theme, buffer-display, and zoom
-  changes).
+- `C-u C-c C-x C-l` — **re-render** the buffer (clear then render; rebuilds
+  overlays from cache — fixes a stale display).
+- `C-u C-u C-c C-x C-l` — **regenerate** the buffer: a fresh recompile that
+  bypasses the cache (see `org-latex-to-svg-regenerate`), for a stale/corrupt
+  cached SVG.
+- `M-x org-latex-to-svg-clear` — clear previews (region or buffer), revealing
+  source. (Turning off `org-latex-to-svg-mode` also clears.)
+- `M-x org-latex-to-svg-refresh` — re-tint / re-scale existing previews for the
+  current theme / font size from cache (previews also refresh lazily on theme,
+  buffer-display, and zoom changes).
 
 Editing the text under a preview clears it, revealing the source.
+
+### Cache note
+
+The engine caches each equation by content hash (`LaTeX + preamble`), so a
+matching render is trusted and never recompiled — repeats are instant. If you
+ever see a genuinely stale or corrupt image, `org-latex-to-svg-regenerate`
+(or `C-u C-u C-c C-x C-l`) deletes those SVGs and recompiles.
 
 ## Status (v0.1)
 
