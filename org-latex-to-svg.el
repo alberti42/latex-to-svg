@@ -303,6 +303,22 @@ On `post-command-hook' while the mode is on."
         (org-latex-to-svg--open-overlay cur)
         (setq org-latex-to-svg--open-overlay cur)))))
 
+(defun org-latex-to-svg--heal-modified ()
+  "Re-render previews that were edited and then left by point.
+Backstop for the cursor state machine (which only re-renders when the
+leave transition fires on the tracked overlay): any preview flagged
+`org-latex-to-svg-modified' whose span no longer contains point is
+re-rendered now.  A preview still under point is left revealed (you are
+still editing it)."
+  (dolist (ov (org-latex-to-svg--overlays-in (point-min) (point-max)))
+    (when (and (overlay-get ov 'org-latex-to-svg-modified)
+               (or (< (point) (overlay-start ov))
+                   (> (point) (overlay-end ov))))
+      (overlay-put ov 'org-latex-to-svg-modified nil)
+      (when (eq ov org-latex-to-svg--open-overlay)
+        (setq org-latex-to-svg--open-overlay nil))
+      (org-latex-to-svg--rerender-overlay ov))))
+
 (defun org-latex-to-svg--set-reference-overlay (beg end label num display)
   "Overlay BEG..END with plain-text DISPLAY for a reference to LABEL.
 NUM is the resolved number, recorded in `org-latex-to-svg-ref-num' so a
@@ -683,6 +699,8 @@ are on."
                (when (buffer-live-p buf)
                  (with-current-buffer buf
                    (setq org-latex-to-svg--reconcile-timer nil)
+                   ;; Re-render fragments edited then left, then renumber.
+                   (org-latex-to-svg--heal-modified)
                    (org-latex-to-svg--reconcile buf)))))))))
 
 ;;;; Refresh (theme / font tracking)

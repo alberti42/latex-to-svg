@@ -160,6 +160,36 @@ change to simulate a theme/font change."
         (should (null org-latex-to-svg--open-overlay))
         (should (eq (overlay-get ov 'display) 'fake-image))))))
 
+(ert-deftest org-latex-to-svg-heal-rerenders-left-edit ()
+  ;; Backstop: a fragment edited then left by point (without a clean cursor
+  ;; leave) is re-rendered by `--heal-modified'.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$ after\n"
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (goto-char (+ (point-min) 1))
+      (insert "b")                                 ; edit -> modified + revealed
+      (goto-char (point-max))                      ; point already outside
+      (let ((org-latex-to-svg-tests--image 'healed))
+        (org-latex-to-svg--heal-modified))
+      (let ((ov (car (org-latex-to-svg-tests--overlays))))
+        (should (eq (overlay-get ov 'display) 'healed))
+        (should (equal (overlay-get ov 'org-latex-to-svg-value) "$ba$"))
+        (should-not (overlay-get ov 'org-latex-to-svg-modified))))))
+
+(ert-deftest org-latex-to-svg-heal-leaves-fragment-under-point ()
+  ;; A fragment still under point (being edited) is NOT healed — stays revealed.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "$a$ after\n"
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (goto-char (+ (point-min) 1))
+      (insert "b")                                 ; point stays inside
+      (org-latex-to-svg--heal-modified)
+      (let ((ov (car (org-latex-to-svg-tests--overlays))))
+        (should (null (overlay-get ov 'display)))            ; still revealed
+        (should (overlay-get ov 'org-latex-to-svg-modified))))))
+
 (ert-deftest org-latex-to-svg-rerenders-after-reveal-edit ()
   ;; Editing while revealed then leaving re-renders the fragment (fresh image).
   (org-latex-to-svg-tests--with-stub
