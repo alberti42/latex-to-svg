@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.1.1
+;; Version: 0.2.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.2.1"))
 ;; Keywords: tex, org, math, images
 
@@ -50,24 +50,63 @@
 ;; the current theme / font size (previews also refresh lazily on theme,
 ;; buffer-display, and zoom changes).
 ;;
-;; This is v0: previews render on mode-enable and on demand, and an overlay
-;; clears (revealing its source) when you edit the fragment under it.
-;; Reveal-on-cursor-enter (editing without first clearing) is a later
-;; milestone, as is equation numbering / `\\eqref' resolution.
+;; Numbered display environments (`equation', `align', …) get their real
+;; document-wide number via `org-latex-to-svg-number-equations' (on by
+;; default): the count of preceding numbered equations is computed in Elisp
+;; and baked in as a `\\setcounter' prefix, so the number is part of the
+;; engine's content hash (see NUMBERING.md).  `\\eqref' / `\\ref' are resolved
+;; against a `\\label' -> number map built in the same scan and rendered as
+;; `$(N)$' / `$N$'.  Reveal-on-cursor-enter (editing without first clearing)
+;; is still a later milestone.
 
 ;;; Code:
 
 (require 'latex-to-svg)
 (require 'org-element)
 (require 'seq)
+(require 'cl-lib)
 
 (defgroup org-latex-to-svg nil
   "Preview Org LaTeX math as SVG images via `latex-to-svg'."
   :group 'org
   :prefix "org-latex-to-svg-")
 
+(defcustom org-latex-to-svg-number-equations t
+  "Whether to compute and bake equation numbers into display-math previews.
+
+When non-nil, numbered LaTeX environments (`equation', `align', …) are
+rendered with a `\\setcounter{equation}{N}' prefix so each preview shows
+its real document-wide number.  N is derived purely in Elisp by counting
+the numbered equations that precede the block (see NUMBERING.md); the
+number is part of the engine's content hash, so a block re-renders only
+when its number actually changes.
+
+When nil, every element renders verbatim (no numbering)."
+  :type 'boolean
+  :group 'org-latex-to-svg)
+
 (defconst org-latex-to-svg--element-types '(latex-fragment latex-environment)
   "Org element types rendered as equations.")
+
+(defconst org-latex-to-svg--numbered-environments-single
+  '("equation" "math" "displaymath" "multline" "dmath" "empheq")
+  "LaTeX environments that produce a single numbered equation.
+`multline' lives here (not with the multi-row environments): it typesets
+one number for the whole line-broken equation, so its `\\\\' are line
+breaks, not equation separators.  Mirrors the reference implementation in
+tecosaur's `org-latex-preview.el', with `multline' corrected.")
+
+(defconst org-latex-to-svg--numbered-environments-multi
+  '("eqnarray" "align" "alignat" "flalign" "gather"
+    "xalignat" "xxalignat" "subequations" "dseries" "dgroup" "darray")
+  "LaTeX environments that produce one numbered equation per row.
+`subequations' is best-effort (its inner environments are counted, but
+the `N.a'/`N.b' sub-lettering is not modelled).")
+
+(defconst org-latex-to-svg--numbered-environments-all
+  (append org-latex-to-svg--numbered-environments-single
+          org-latex-to-svg--numbered-environments-multi)
+  "All LaTeX environments that produce numbered equations.")
 
 ;; Forward declaration: the minor-mode variable is defined by the
 ;; `define-minor-mode' at the end of the file but referenced by the refresh
@@ -123,8 +162,11 @@ Parses the whole (widened) buffer with `org-element' and keeps
   "Delete this package's preview overlays intersecting BEG..END."
   (mapc #'delete-overlay (org-latex-to-svg--overlays-in beg end)))
 
-(defun org-latex-to-svg--set-overlay (beg end value image)
-  "Overlay BEG..END (positions or markers) with IMAGE, keyed to source VALUE.
+(defun org-latex-to-svg--set-overlay (beg end value image &optional source)
+  "Overlay BEG..END (positions or markers) with IMAGE, keyed to render VALUE.
+VALUE is the exact string handed to the engine (a numbered environment
+carries its `\\setcounter' prefix) so a cache refresh re-fetches the same
+hash; SOURCE, if given, is the human-readable LaTeX shown in `help-echo'.
 Replaces any existing preview overlay in the span.  The overlay clears
 itself when the underlying text is edited, revealing the source."
   (let ((b (if (markerp beg) (marker-position beg) beg))
@@ -135,7 +177,7 @@ itself when the underlying text is edited, revealing the source."
         (overlay-put ov 'org-latex-to-svg t)
         (overlay-put ov 'org-latex-to-svg-value value)
         (overlay-put ov 'evaporate t)
-        (overlay-put ov 'help-echo value)
+        (overlay-put ov 'help-echo (or source value))
         (overlay-put ov 'display image)
         ;; Reveal the source when the fragment is edited (mirrors Org's own
         ;; preview overlays): drop the image on any modification touching it.
@@ -144,10 +186,191 @@ itself when the underlying text is edited, revealing the source."
         (setq org-latex-to-svg--rendered-appearance (latex-to-svg-appearance))
         ov))))
 
+;;;; Numbering
+
+(defun org-latex-to-svg--environment-name (value)
+  "Return the LaTeX environment name at the start of source VALUE, or nil.
+VALUE is an element's verbatim `:value'; matches a leading
+`\\begin{NAME}' (fragments, which have no such prefix, return nil)."
+  (and (string-match "\\`[ \t\n]*\\\\begin{\\([^}]+\\)}" value)
+       (match-string 1 value)))
+
+(defun org-latex-to-svg--count-multi-rows (value env)
+  "Count numbered rows in multi-equation environment source VALUE named ENV.
+Strips the outer environment and every nested environment (whose
+`\\\\' are not equation separators) in a scratch buffer, counts the
+remaining `\\\\' row breaks, then subtracts `\\nonumber' / `\\notag' /
+`\\tag' suppressed rows.  Never returns below zero."
+  (with-temp-buffer
+    (insert value)
+    ;; Drop the outer \begin{ENV} … \end{ENV} wrapper.
+    (goto-char (point-min))
+    (when (re-search-forward (concat "\\\\begin{" (regexp-quote env) "}") nil t)
+      (delete-region (point-min) (point)))
+    (goto-char (point-max))
+    (when (re-search-backward (concat "\\\\end{" (regexp-quote env) "}") nil t)
+      (delete-region (match-beginning 0) (point-max)))
+    ;; Remove nested environments (matrix, cases, array, aligned, …): repeatedly
+    ;; delete the nearest \begin…\end pair, innermost first.
+    (goto-char (point-min))
+    (while (re-search-forward "\\\\end{\\([^}]+\\)}" nil t)
+      (let ((name (match-string 1))
+            (eto (match-end 0))
+            (efrom (match-beginning 0)))
+        (goto-char efrom)
+        (if (re-search-backward (concat "\\\\begin{" (regexp-quote name) "}") nil t)
+            (progn (delete-region (match-beginning 0) eto)
+                   (goto-char (match-beginning 0)))
+          (goto-char eto))))
+    ;; rows = 1 + hard row breaks; minus suppressed rows.
+    (let ((rows 1) (suppressed 0))
+      (goto-char (point-min))
+      (while (re-search-forward "\\\\\\\\" nil t) (cl-incf rows))
+      (goto-char (point-min))
+      (while (re-search-forward "\\\\nonumber\\|\\\\notag\\|\\\\tag{" nil t)
+        (cl-incf suppressed))
+      (max 0 (- rows suppressed)))))
+
+(defun org-latex-to-svg--count-numbered-equations (value)
+  "Return how many numbered equations the environment source VALUE consumes.
+Unknown / non-numbered environments (and starred forms) consume 0."
+  (let ((env (org-latex-to-svg--environment-name value)))
+    (cond
+     ((member env org-latex-to-svg--numbered-environments-single)
+      ;; A lone \nonumber / \notag / \tag suppresses the single number.
+      (if (string-match-p "\\\\nonumber\\|\\\\notag\\|\\\\tag{" value) 0 1))
+     ((member env org-latex-to-svg--numbered-environments-multi)
+      (org-latex-to-svg--count-multi-rows value env))
+     (t 0))))
+
+(defun org-latex-to-svg--labels-in (text)
+  "Return the list of `\\label' names in TEXT, in document order."
+  (let ((names nil) (start 0))
+    (while (string-match "\\\\label{\\([^}]+\\)}" text start)
+      (push (match-string 1 text) names)
+      (setq start (match-end 0)))
+    (nreverse names)))
+
+(defun org-latex-to-svg--multi-row-labels (value env offset)
+  "Return an alist of (LABEL . NUMBER) for multi-equation source VALUE.
+ENV is the environment name; OFFSET the counter before the block, so the
+first numbered row is OFFSET+1.  Rows are split on top-level `\\\\' (breaks
+inside nested environments don't split); a `\\nonumber' / `\\notag' /
+`\\tag' row is unnumbered and does not advance the counter."
+  (with-temp-buffer
+    (insert value)
+    ;; Strip the outer \begin{ENV} … \end{ENV} wrapper.
+    (goto-char (point-min))
+    (when (re-search-forward (concat "\\\\begin{" (regexp-quote env) "}") nil t)
+      (delete-region (point-min) (point)))
+    (goto-char (point-max))
+    (when (re-search-backward (concat "\\\\end{" (regexp-quote env) "}") nil t)
+      (delete-region (match-beginning 0) (point-max)))
+    ;; Split into rows on top-level `\\', tracking nested-environment depth.
+    (let ((rows nil) (depth 0) (row-start (point-min)))
+      (goto-char (point-min))
+      (while (re-search-forward "\\\\begin{[^}]+}\\|\\\\end{[^}]+}\\|\\\\\\\\" nil t)
+        (let ((m (match-string 0)))
+          (cond
+           ((string-prefix-p "\\begin" m) (cl-incf depth))
+           ((string-prefix-p "\\end" m) (setq depth (max 0 (1- depth))))
+           ((= depth 0)
+            (push (buffer-substring-no-properties row-start (match-beginning 0)) rows)
+            (setq row-start (match-end 0))))))
+      (push (buffer-substring-no-properties row-start (point-max)) rows)
+      (setq rows (nreverse rows))
+      ;; Assign each numbered row's number to the labels it carries.
+      (let ((num (1+ offset)) (out nil))
+        (dolist (row rows)
+          (if (string-match-p "\\\\nonumber\\|\\\\notag\\|\\\\tag{" row)
+              nil
+            (dolist (name (org-latex-to-svg--labels-in row))
+              (push (cons name num) out))
+            (cl-incf num)))
+        (nreverse out)))))
+
+(defun org-latex-to-svg--scan-numbering ()
+  "Scan the widened buffer; return the cons (OFFSETS . LABELS).
+OFFSETS maps a numbered environment's `:begin' to its counter offset
+\(preceding numbered equations), so prepending
+`\\setcounter{equation}{OFFSET}' makes LaTeX print the block's numbers.
+LABELS maps a `\\label' name (string) to its resolved equation number,
+for `\\eqref' / `\\ref'.  One document-order pass; only
+`latex-environment' elements can be numbered."
+  (let ((offsets (make-hash-table :test 'eql))
+        (labels (make-hash-table :test 'equal))
+        (offset 0))
+    (save-restriction
+      (widen)
+      (dolist (el (org-element-map (org-element-parse-buffer)
+                      'latex-environment #'identity))
+        (let* ((value (org-element-property :value el))
+               (env (org-latex-to-svg--environment-name value)))
+          (when (member env org-latex-to-svg--numbered-environments-all)
+            (puthash (org-element-property :begin el) offset offsets)
+            (let ((count (org-latex-to-svg--count-numbered-equations value)))
+              (cond
+               ((member env org-latex-to-svg--numbered-environments-single)
+                (when (= count 1)
+                  (dolist (name (org-latex-to-svg--labels-in value))
+                    (puthash name (1+ offset) labels))))
+               ((member env org-latex-to-svg--numbered-environments-multi)
+                (dolist (pair (org-latex-to-svg--multi-row-labels value env offset))
+                  (puthash (car pair) (cdr pair) labels))))
+              (cl-incf offset count))))))
+    (cons offsets labels)))
+
+(defun org-latex-to-svg--numbering-table ()
+  "Return only the `:begin' -> offset hash.
+See `org-latex-to-svg--scan-numbering' for the full scan."
+  (car (org-latex-to-svg--scan-numbering)))
+
+(defun org-latex-to-svg--maybe-table ()
+  "Return a fresh (OFFSETS . LABELS) scan when numbering is enabled, else nil."
+  (and org-latex-to-svg-number-equations
+       (org-latex-to-svg--scan-numbering)))
+
+(defun org-latex-to-svg--reference-value (source labels)
+  "If SOURCE is a resolvable `\\eqref' / `\\ref' fragment, return its rendered form.
+SOURCE may be bare or wrapped in `$…$' / `\\(…\\)'.  Looks the label up in
+LABELS (name -> number) and returns a `$(N)$' (eqref) or `$N$' (ref)
+string, or nil when SOURCE isn't such a reference or the label is unknown
+\(leave it verbatim then)."
+  (let ((s (string-trim source)))
+    (cond
+     ((and (string-prefix-p "$" s) (string-suffix-p "$" s) (> (length s) 1))
+      (setq s (string-trim (substring s 1 -1))))
+     ((and (string-prefix-p "\\(" s) (string-suffix-p "\\)" s))
+      (setq s (string-trim (substring s 2 -2)))))
+    (when (string-match "\\`\\\\\\(eqref\\|ref\\){\\([^}]+\\)}\\'" s)
+      (let ((kind (match-string 1 s))
+            (num (gethash (match-string 2 s) labels)))
+        (when num
+          (if (equal kind "eqref") (format "$(%d)$" num) (format "$%d$" num)))))))
+
+(defun org-latex-to-svg--numbered-value (el source table)
+  "Return the string to render for EL: SOURCE, adjusted for numbering.
+TABLE is a (OFFSETS . LABELS) scan.  A numbered environment gets a
+`\\setcounter' prefix (folded into the engine hash, so the number is
+cached); a resolvable `\\eqref' / `\\ref' fragment becomes `$(N)$' / `$N$';
+otherwise SOURCE is returned unchanged."
+  (let ((offsets (car-safe table))
+        (labels (cdr-safe table)))
+    (cond
+     ((and offsets (gethash (org-element-property :begin el) offsets))
+      (format "\\setcounter{equation}{%d}%%\n%s"
+              (gethash (org-element-property :begin el) offsets) source))
+     ((and labels
+           (eq (org-element-type el) 'latex-fragment)
+           (org-latex-to-svg--reference-value source labels)))
+     (t source))))
+
 ;;;; Rendering
 
-(defun org-latex-to-svg--place (buffer beg end value)
-  "Ensure BUFFER's BEG..END shows the current image for source VALUE.
+(defun org-latex-to-svg--place (buffer beg end value &optional source)
+  "Ensure BUFFER's BEG..END shows the current image for render VALUE.
+VALUE is the exact engine input (numbered environments carry their
+`\\setcounter' prefix); SOURCE is the plain LaTeX for `help-echo'.
 Overlays immediately when the engine has the image (cache hit), else
 schedules an async compile and overlays when it finishes.  BEG / END
 should be markers so the overlay lands on the right span even after
@@ -157,23 +380,51 @@ edits.  Tint and scale are read from BUFFER at call time."
       (let ((image (latex-to-svg
                     value
                     :callback (lambda ()
-                                (org-latex-to-svg--place buffer beg end value)))))
+                                (org-latex-to-svg--place buffer beg end value source)))))
         (when image
-          (org-latex-to-svg--set-overlay beg end value image))))))
+          (org-latex-to-svg--set-overlay beg end value image source))))))
 
-(defun org-latex-to-svg--render-element (el)
-  "Render math element EL in the current buffer."
+(defun org-latex-to-svg--render-element (el &optional table)
+  "Render math element EL in the current buffer.
+TABLE is a numbering table (see `org-latex-to-svg--numbering-table'); when
+omitted one is built on demand so single-element renders still number
+correctly.  Pass a shared TABLE when rendering many elements."
   (let* ((bounds (org-latex-to-svg--element-bounds el))
-         (value (org-element-property :value el)))
+         (source (org-element-property :value el))
+         (table (or table (org-latex-to-svg--maybe-table)))
+         (value (org-latex-to-svg--numbered-value el source table)))
     (org-latex-to-svg--place (current-buffer)
                              (copy-marker (car bounds))
                              (copy-marker (cdr bounds))
-                             value)))
+                             value source)))
 
 (defun org-latex-to-svg--render-region (beg end)
   "Render every math element overlapping BEG..END in the current buffer."
-  (dolist (el (org-latex-to-svg--elements beg end))
-    (org-latex-to-svg--render-element el)))
+  (let ((table (org-latex-to-svg--maybe-table)))
+    (dolist (el (org-latex-to-svg--elements beg end))
+      (org-latex-to-svg--render-element el table))))
+
+(defun org-latex-to-svg--renumber-following (pos)
+  "Re-render numbered-environment previews starting after POS.
+When an edit above changes how many numbers a block consumes, every
+numbered equation below shifts; this refreshes them for the current
+numbering.  Only spans that already carry a preview overlay are touched
+\(so we update what's on screen without previewing cleared equations),
+and numbers that didn't actually change are engine cache hits — so the
+propagation is cheap and stops costing nothing once the count restabilises.
+A no-op when numbering is disabled."
+  (when org-latex-to-svg-number-equations
+    (let ((table (org-latex-to-svg--scan-numbering)))
+      (dolist (el (org-latex-to-svg--elements pos (point-max)))
+        (let ((bounds (org-latex-to-svg--element-bounds el))
+              (source (org-element-property :value el)))
+          (when (and (> (org-element-property :begin el) pos)
+                     (org-latex-to-svg--overlays-in (car bounds) (cdr bounds))
+                     ;; Only elements whose rendering actually depends on
+                     ;; numbering: a numbered env or a resolvable \eqref/\ref.
+                     (not (equal source
+                                 (org-latex-to-svg--numbered-value el source table))))
+            (org-latex-to-svg--render-element el table)))))))
 
 ;;;; Refresh (theme / font tracking)
 
@@ -265,9 +516,14 @@ Interactively acts on the active region, or the whole buffer."
                    (list (region-beginning) (region-end))
                  (list (point-min) (point-max))))
   (let ((beg (or beg (point-min)))
-        (end (or end (point-max))))
+        (end (or end (point-max)))
+        (table (org-latex-to-svg--maybe-table)))
     (dolist (el (org-latex-to-svg--elements beg end))
-      (latex-to-svg-invalidate (org-element-property :value el)))
+      ;; Invalidate the *rendered* string (with any `\setcounter' prefix), so
+      ;; the hash we drop matches the one actually cached.
+      (latex-to-svg-invalidate
+       (org-latex-to-svg--numbered-value
+        el (org-element-property :value el) table)))
     (org-latex-to-svg--clear-region beg end)
     (org-latex-to-svg--render-region beg end)))
 
@@ -297,7 +553,11 @@ turn off `org-latex-to-svg-mode'."
     (org-latex-to-svg--render-region (point-min) (point-max))
     (message "Re-rendered LaTeX previews"))
    ((use-region-p)
-    (org-latex-to-svg--render-region (region-beginning) (region-end))
+    (let ((end (region-end)))
+      (org-latex-to-svg--render-region (region-beginning) end)
+      ;; A rendered region may have added / removed a number; refresh the
+      ;; numbered equations below it.
+      (org-latex-to-svg--renumber-following end))
     (deactivate-mark))
    ((org-latex-to-svg--context)
     (let* ((el (org-latex-to-svg--context))
@@ -305,7 +565,9 @@ turn off `org-latex-to-svg-mode'."
            (e (org-element-property :end el)))
       (if (org-latex-to-svg--overlays-in b e)
           (org-latex-to-svg--clear-region b e)
-        (org-latex-to-svg--render-element el))))
+        (org-latex-to-svg--render-element el)
+        ;; Re-rendering an edited equation can shift every number below it.
+        (org-latex-to-svg--renumber-following e))))
    (t
     (org-latex-to-svg--render-region (point-min) (point-max)))))
 

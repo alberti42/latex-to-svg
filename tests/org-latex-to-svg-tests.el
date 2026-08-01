@@ -250,6 +250,201 @@ change to simulate a theme/font change."
         (should (eq (overlay-get (car (org-latex-to-svg-tests--overlays)) 'display)
                     'applied))))))
 
+;;;; Numbering
+
+(ert-deftest org-latex-to-svg-counts-single-environments ()
+  ;; A single-equation environment consumes 1, its starred form 0, and a
+  ;; \nonumber / \notag / \tag suppresses the number.
+  (should (= 1 (org-latex-to-svg--count-numbered-equations
+                "\\begin{equation}\nx=1\n\\end{equation}\n")))
+  (should (= 0 (org-latex-to-svg--count-numbered-equations
+                "\\begin{equation*}\nx=1\n\\end{equation*}\n")))
+  (should (= 0 (org-latex-to-svg--count-numbered-equations
+                "\\begin{equation}\nx=1\\nonumber\n\\end{equation}\n"))))
+
+(ert-deftest org-latex-to-svg-multline-consumes-one ()
+  ;; `multline' is a single number for the whole line-broken equation, so its
+  ;; internal `\\' must NOT be counted as separate equations.
+  (should (= 1 (org-latex-to-svg--count-numbered-equations
+                "\\begin{multline}\na\\\\b\\\\c\n\\end{multline}\n"))))
+
+(ert-deftest org-latex-to-svg-counts-multi-rows ()
+  ;; `align' consumes one per row, minus \nonumber rows.
+  (should (= 3 (org-latex-to-svg--count-numbered-equations
+                "\\begin{align}\na&=b\\\\\nc&=d\\\\\ne&=f\n\\end{align}\n")))
+  (should (= 2 (org-latex-to-svg--count-numbered-equations
+                "\\begin{align}\na&=b\\\\\nc&=d\\nonumber\\\\\ne&=f\n\\end{align}\n"))))
+
+(ert-deftest org-latex-to-svg-nested-rows-not-counted ()
+  ;; `\\' inside a nested environment (matrix/cases/…) are line breaks, not
+  ;; align rows, so they must be stripped before counting.
+  (should (= 2 (org-latex-to-svg--count-numbered-equations
+                (concat "\\begin{align}\n"
+                        "x&=\\begin{pmatrix}a\\\\b\\end{pmatrix}\\\\\n"
+                        "y&=2\n"
+                        "\\end{align}\n")))))
+
+(ert-deftest org-latex-to-svg-numbering-table-threads-offsets ()
+  ;; Offsets are the count of preceding numbered equations: equation (1) then
+  ;; a two-row align (2) then equation => offsets 0, 1, 3.
+  (org-latex-to-svg-tests--org
+      (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+              "\\begin{align}\nb&=1\\\\\nc&=2\n\\end{align}\n\n"
+              "\\begin{equation}\nd\n\\end{equation}\n")
+    (let* ((table (org-latex-to-svg--numbering-table))
+           (offsets (org-element-map (org-element-parse-buffer)
+                        'latex-environment
+                      (lambda (el) (gethash (org-element-property :begin el)
+                                            table)))))
+      (should (equal offsets '(0 1 3))))))
+
+(ert-deftest org-latex-to-svg-bakes-setcounter-into-overlay ()
+  ;; With numbering on, an environment's rendered (and cached) value carries a
+  ;; `\setcounter' prefix with the right offset; a fragment never does.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "$a$\n\n\\begin{equation}\nx\n\\end{equation}\n\n"
+                "\\begin{equation}\ny\n\\end{equation}\n")
+      (let ((org-latex-to-svg-number-equations t))
+        (org-latex-to-svg--render-region (point-min) (point-max)))
+      (let ((values (mapcar (lambda (o) (overlay-get o 'org-latex-to-svg-value))
+                            (org-latex-to-svg-tests--overlays))))
+        ;; Fragment: unchanged.
+        (should (equal (nth 0 values) "$a$"))
+        ;; First equation: offset 0.
+        (should (string-prefix-p "\\setcounter{equation}{0}%\n\\begin{equation}"
+                                 (nth 1 values)))
+        ;; Second equation: offset 1.
+        (should (string-prefix-p "\\setcounter{equation}{1}%\n\\begin{equation}"
+                                 (nth 2 values)))))))
+
+(ert-deftest org-latex-to-svg-help-echo-is-plain-source ()
+  ;; The tooltip shows the plain LaTeX, not the \setcounter-prefixed input.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "\\begin{equation}\nx\n\\end{equation}\n"
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ov (car (org-latex-to-svg-tests--overlays))))
+        (should (equal (overlay-get ov 'help-echo)
+                       "\\begin{equation}\nx\n\\end{equation}\n"))
+        (should-not (string-match-p "setcounter" (overlay-get ov 'help-echo)))))))
+
+(ert-deftest org-latex-to-svg-numbering-can-be-disabled ()
+  ;; With numbering off, environments render verbatim (no \setcounter).
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "\\begin{equation}\nx\n\\end{equation}\n"
+      (let ((org-latex-to-svg-number-equations nil))
+        (org-latex-to-svg--render-region (point-min) (point-max)))
+      (let ((ov (car (org-latex-to-svg-tests--overlays))))
+        (should (equal (overlay-get ov 'org-latex-to-svg-value)
+                       "\\begin{equation}\nx\n\\end{equation}\n"))))))
+
+(ert-deftest org-latex-to-svg-regenerate-invalidates-numbered-value ()
+  ;; Regenerate must invalidate the *prefixed* string (the real cache key), not
+  ;; the bare source, so the right hash is dropped.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "\\begin{equation}\nx\n\\end{equation}\n"
+      (let ((org-latex-to-svg-number-equations t))
+        (org-latex-to-svg--render-region (point-min) (point-max))
+        (org-latex-to-svg-regenerate))
+      (should (equal org-latex-to-svg-tests--invalidated
+                     '("\\setcounter{equation}{0}%\n\\begin{equation}\nx\n\\end{equation}\n"))))))
+
+(ert-deftest org-latex-to-svg-renumber-following-updates-downstream ()
+  ;; Turning an equation into its starred form drops its number; the equation
+  ;; below must renumber from 2 to 1 (offset 1 -> 0) via renumber-following.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+                "\\begin{equation}\nb\n\\end{equation}\n")
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (should (string-prefix-p
+               "\\setcounter{equation}{1}%"
+               (overlay-get (nth 1 (org-latex-to-svg-tests--overlays))
+                            'org-latex-to-svg-value)))
+      ;; Edit eq1 into equation* (its overlay clears on modification).
+      (goto-char (point-min))
+      (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
+      (search-forward "\\end{equation}") (backward-char 1) (insert "*")
+      (org-latex-to-svg--renumber-following (point))
+      ;; Only eq2 remains, now renumbered to offset 0.
+      (let ((ovs (org-latex-to-svg-tests--overlays)))
+        (should (= 1 (length ovs)))
+        (should (string-prefix-p
+                 "\\setcounter{equation}{0}%"
+                 (overlay-get (car ovs) 'org-latex-to-svg-value)))))))
+
+;;;; \eqref / \ref
+
+(ert-deftest org-latex-to-svg-scan-harvests-labels ()
+  ;; The scan resolves \label names to numbers: a single equation (1), then a
+  ;; two-row align whose rows are labelled (2, 3).
+  (org-latex-to-svg-tests--org
+      (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+              "\\begin{align}\ny&=1\\label{eq:b}\\\\\nz&=2\\label{eq:c}\n\\end{align}\n")
+    (let ((labels (cdr (org-latex-to-svg--scan-numbering))))
+      (should (= 1 (gethash "eq:a" labels)))
+      (should (= 2 (gethash "eq:b" labels)))
+      (should (= 3 (gethash "eq:c" labels))))))
+
+(ert-deftest org-latex-to-svg-nonumber-row-label-skipped ()
+  ;; A \nonumber row doesn't advance the counter, and its label stays unresolved.
+  (org-latex-to-svg-tests--org
+      (concat "\\begin{align}\n"
+              "a&=1\\label{eq:x}\\\\\n"
+              "b&=2\\nonumber\\label{eq:y}\\\\\n"
+              "c&=3\\label{eq:z}\n"
+              "\\end{align}\n")
+    (let ((labels (cdr (org-latex-to-svg--scan-numbering))))
+      (should (= 1 (gethash "eq:x" labels)))
+      (should (null (gethash "eq:y" labels)))
+      (should (= 2 (gethash "eq:z" labels))))))
+
+(ert-deftest org-latex-to-svg-reference-value-renders ()
+  ;; \eqref -> $(N)$, \ref -> $N$, wrapped forms too; unknown -> nil.
+  (let ((labels (make-hash-table :test 'equal)))
+    (puthash "eq:a" 7 labels)
+    (should (equal "$(7)$" (org-latex-to-svg--reference-value "\\eqref{eq:a}" labels)))
+    (should (equal "$7$"   (org-latex-to-svg--reference-value "\\ref{eq:a}" labels)))
+    (should (equal "$(7)$" (org-latex-to-svg--reference-value "$\\eqref{eq:a}$" labels)))
+    (should (equal "$(7)$" (org-latex-to-svg--reference-value "\\(\\eqref{eq:a}\\)" labels)))
+    (should (null (org-latex-to-svg--reference-value "\\eqref{eq:missing}" labels)))
+    (should (null (org-latex-to-svg--reference-value "$x=1$" labels)))))
+
+(ert-deftest org-latex-to-svg-renders-eqref-as-number ()
+  ;; End to end: an \eqref fragment overlays with the resolved `$(N)$' input,
+  ;; while its help-echo keeps the original \eqref source.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "As in \\eqref{eq:a}.\n")
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let* ((ovs (org-latex-to-svg-tests--overlays))
+             (ref (car (last ovs))))
+        (should (equal (overlay-get ref 'org-latex-to-svg-value) "$(1)$"))
+        (should (equal (overlay-get ref 'help-echo) "\\eqref{eq:a}"))))))
+
+(ert-deftest org-latex-to-svg-eqref-follows-renumber ()
+  ;; A downstream \eqref updates when the target equation renumbers: two
+  ;; equations, \eqref{eq:b} -> (2); delete the first equation's number so the
+  ;; second becomes (1) and the reference re-renders to $(1)$.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+                "\\begin{equation}\\label{eq:b}\nb\n\\end{equation}\n\n"
+                "See \\eqref{eq:b}.\n")
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (should (equal "$(2)$"
+                     (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
+                                  'org-latex-to-svg-value)))
+      ;; Turn the first equation into equation* (its overlay clears on edit).
+      (goto-char (point-min))
+      (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
+      (search-forward "\\end{equation}") (backward-char 1) (insert "*")
+      (org-latex-to-svg--renumber-following (point))
+      (should (equal "$(1)$"
+                     (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
+                                  'org-latex-to-svg-value))))))
+
 (provide 'org-latex-to-svg-tests)
 
 ;;; org-latex-to-svg-tests.el ends here
