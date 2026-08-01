@@ -1,7 +1,7 @@
 # org-latex-to-svg
 
 Preview Org-mode LaTeX math as SVG images, on top of the
-[`latex-to-svg`](https://github.com/alberti42/latex-to-svg) rendering engine.
+[`latex-to-svg`](https://github.com/alberti42/emacs-latex-to-svg) rendering engine.
 
 It finds `latex-fragment` and `latex-environment` elements with `org-element`
 and overlays each with an SVG typeset by `latex-to-svg`. Because the engine
@@ -27,7 +27,7 @@ The shared cache is also used by any other `latex-to-svg` front-end (e.g.
 ## Requirements
 
 - Emacs 29.1+ with SVG image support.
-- [`latex-to-svg`](https://github.com/alberti42/latex-to-svg) 0.2.0+.
+- [`latex-to-svg`](https://github.com/alberti42/emacs-latex-to-svg) 0.2.0+.
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution).
 
 ## Usage
