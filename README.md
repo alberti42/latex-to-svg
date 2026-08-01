@@ -27,7 +27,7 @@ The shared cache is also used by any other `latex-to-svg` front-end (e.g.
 ## Requirements
 
 - Emacs 29.1+ with SVG image support.
-- [`latex-to-svg`](https://github.com/alberti42/emacs-latex-to-svg) 0.2.1+ (the
+- [`latex-to-svg`](https://github.com/alberti42/emacs-latex-to-svg) 0.3.1+ (the
   rendering engine; repo `alberti42/emacs-latex-to-svg`).
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution).
 
@@ -87,7 +87,19 @@ reveal-on-cursor editing.
   current theme / font size from cache (previews also refresh lazily on theme,
   buffer-display, and zoom changes).
 
-Editing the text under a preview clears it, revealing the source.
+Move point into a preview to reveal its LaTeX source for editing; leaving
+re-shows the image, or re-renders it if you changed the text. This applies to
+`\eqref` / `\ref` references too — arrow into one to edit its label, and it
+re-renders to the new target's number on leave.
+
+### Numbering and cross-references
+
+Numbered environments (`equation`, `align`, …) are numbered in document order
+(`(1)`, `(2)`, …) and stay correct as you edit; toggle with
+`org-latex-to-svg-number-equations`. `\eqref` / `\ref` are resolved against the
+document's `\label`s and drawn as plain buffer text (`(3)` / `3`, in the
+surrounding font — not a LaTeX image). Click a reference (`mouse-1`) or press
+`RET` on it to **jump** to the equation defining its label.
 
 ### Cache note
 
@@ -96,15 +108,24 @@ matching render is trusted and never recompiled — repeats are instant. If you
 ever see a genuinely stale or corrupt image, `org-latex-to-svg-regenerate`
 (or `C-u C-u C-c C-x C-l`) deletes those SVGs and recompiles.
 
-## Status (v0.1)
+## Status
 
-- Renders on mode-enable and on demand; theme/zoom refresh from cache; clears
-  on edit.
-- **Not yet:** reveal-on-cursor-enter (edit without first clearing) and
-  equation **numbering** — numbered environments currently show the standalone
-  `(1)`. Numbering + `\eqref` resolution (via a `label → number` map and a
-  `\setcounter` injected into the per-fragment LaTeX, which folds into the
-  engine's content hash) is a planned milestone.
+Implemented:
+
+- Renders on mode-enable and on demand; theme / zoom refresh from cache.
+- **Equation numbering** in document order, kept correct across edits via a
+  debounced reconcile that uses the engine's ground-truth counter metadata.
+- **`\eqref` / `\ref`** resolved to plain buffer text and click-to-jump to the
+  equation defining the label.
+- **Reveal-on-cursor editing** — move point into a preview (image or reference)
+  to reveal and edit its source; it re-renders on leave. A mouse click on a
+  reference is a jump, not an edit.
+
+Not yet:
+
+- **Live renumber while typing** — numbers refresh when the edited block (or a
+  covering region / buffer) is next rendered, not on every keystroke.
+- `\tag`-based references and `subequations` (see [`docs/numbering.md`](docs/numbering.md)).
 
 ## Tests
 
