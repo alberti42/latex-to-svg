@@ -399,20 +399,20 @@ change to simulate a theme/font change."
       (should (null (gethash "eq:y" labels)))
       (should (= 2 (gethash "eq:z" labels))))))
 
-(ert-deftest org-latex-to-svg-reference-value-renders ()
-  ;; \eqref -> $(N)$, \ref -> $N$, wrapped forms too; unknown -> nil.
+(ert-deftest org-latex-to-svg-reference-display-renders ()
+  ;; \eqref -> "(N)", \ref -> "N" as plain text, wrapped forms too; unknown -> nil.
   (let ((labels (make-hash-table :test 'equal)))
     (puthash "eq:a" 7 labels)
-    (should (equal "$(7)$" (org-latex-to-svg--reference-value "\\eqref{eq:a}" labels)))
-    (should (equal "$7$"   (org-latex-to-svg--reference-value "\\ref{eq:a}" labels)))
-    (should (equal "$(7)$" (org-latex-to-svg--reference-value "$\\eqref{eq:a}$" labels)))
-    (should (equal "$(7)$" (org-latex-to-svg--reference-value "\\(\\eqref{eq:a}\\)" labels)))
-    (should (null (org-latex-to-svg--reference-value "\\eqref{eq:missing}" labels)))
-    (should (null (org-latex-to-svg--reference-value "$x=1$" labels)))))
+    (should (equal "(7)" (org-latex-to-svg--reference-display "\\eqref{eq:a}" labels)))
+    (should (equal "7"   (org-latex-to-svg--reference-display "\\ref{eq:a}" labels)))
+    (should (equal "(7)" (org-latex-to-svg--reference-display "$\\eqref{eq:a}$" labels)))
+    (should (equal "(7)" (org-latex-to-svg--reference-display "\\(\\eqref{eq:a}\\)" labels)))
+    (should (null (org-latex-to-svg--reference-display "\\eqref{eq:missing}" labels)))
+    (should (null (org-latex-to-svg--reference-display "$x=1$" labels)))))
 
-(ert-deftest org-latex-to-svg-renders-eqref-as-number ()
-  ;; End to end: an \eqref fragment overlays with the resolved `$(N)$' input,
-  ;; and is marked click-to-jump for its label.
+(ert-deftest org-latex-to-svg-renders-eqref-as-text ()
+  ;; End to end: an \eqref fragment overlays with plain text `(N)' (no LaTeX
+  ;; image / cached value) and is marked click-to-jump for its label.
   (org-latex-to-svg-tests--with-stub
     (org-latex-to-svg-tests--org
         (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
@@ -420,7 +420,8 @@ change to simulate a theme/font change."
       (org-latex-to-svg--render-region (point-min) (point-max))
       (let* ((ovs (org-latex-to-svg-tests--overlays))
              (ref (car (last ovs))))
-        (should (equal (overlay-get ref 'org-latex-to-svg-value) "$(1)$"))
+        (should (equal (substring-no-properties (overlay-get ref 'display)) "(1)"))
+        (should (null (overlay-get ref 'org-latex-to-svg-value)))
         (should (equal (overlay-get ref 'org-latex-to-svg-ref) "eq:a"))
         (should (eq (overlay-get ref 'keymap)
                     org-latex-to-svg--reference-keymap))))))
@@ -464,17 +465,19 @@ change to simulate a theme/font change."
                 "\\begin{equation}\\label{eq:b}\nb\n\\end{equation}\n\n"
                 "See \\eqref{eq:b}.\n")
       (org-latex-to-svg--render-region (point-min) (point-max))
-      (should (equal "$(2)$"
-                     (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
-                                  'org-latex-to-svg-value)))
+      (should (equal "(2)"
+                     (substring-no-properties
+                      (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
+                                   'display))))
       ;; Turn the first equation into equation* (its overlay clears on edit).
       (goto-char (point-min))
       (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
       (search-forward "\\end{equation}") (backward-char 1) (insert "*")
       (org-latex-to-svg--renumber-following (point))
-      (should (equal "$(1)$"
-                     (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
-                                  'org-latex-to-svg-value))))))
+      (should (equal "(1)"
+                     (substring-no-properties
+                      (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
+                                   'display)))))))
 
 (provide 'org-latex-to-svg-tests)
 

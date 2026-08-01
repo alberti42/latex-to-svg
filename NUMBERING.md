@@ -7,7 +7,10 @@ injection into the per-fragment render / cache / regenerate path, a
 `label → number` map with `\eqref` / `\ref` rendered as `$(N)$` / `$N$`, and
 downstream re-render on re-render of an edited block (`--renumber-following`),
 and **click-to-jump** (`mouse-1` / `RET`) from a reference preview to the
-equation defining its label (`org-latex-to-svg-goto-reference`). Still
+equation defining its label (`org-latex-to-svg-goto-reference`). References
+are drawn as **plain buffer text** (e.g. `(3)`, in the
+`org-latex-to-svg-reference' face) rather than a LaTeX image, so they match the
+prose font and track theme / zoom for free with no compile. Still
 **pending / out of scope:** `\eqref` *to* a `\tag` (tag text isn't harvested),
 `subequations` sub-lettering, and truly-automatic renumber on every keystroke
 (numbers refresh when the edited block, or a covering region/buffer, is
