@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.8.0
+;; Version: 0.9.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.4.0"))
 ;; Keywords: tex, math, images
 
@@ -38,7 +38,7 @@
 ;;   display   $$ … $$    \[ … \]     \begin{env} … \end{env}
 ;;
 ;; plus bare `\\eqref' / `\\ref'.  Each delimiter family can be toggled off
-;; (`latex-to-svg-frontend-detect-dollar-delimiters' and friends).  A blank
+;; (`latex-to-svg-frontend-detect-dollar-inline' and friends).  A blank
 ;; line always bounds a span (LaTeX forbids one inside), which keeps detection
 ;; from running away on half-typed input.
 ;;
@@ -140,13 +140,29 @@ changing it, run `latex-to-svg-frontend-refresh' to apply."
   :type 'number
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-detect-dollar-delimiters t
-  "Whether to detect TeX dollar math: `$…$' (inline) and `$$…$$' (display)."
+(defcustom latex-to-svg-frontend-detect-dollar-inline t
+  "Whether to detect inline TeX dollar math `$…$'.
+This is the least reliable delimiter: a lone `$' is also ordinary prose
+(prices, shell variables), so detection can misfire on text such as
+\"the cost varies between 30$ and 50$\".  Turn this off (leaving the other
+three families on) in buffers where `$' is mostly currency."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-detect-bracket-delimiters t
-  "Whether to detect LaTeX bracket math: `\\(…\\)' (inline) and `\\[…\\]' (display)."
+(defcustom latex-to-svg-frontend-detect-dollar-display t
+  "Whether to detect display TeX dollar math `$$…$$'.
+Safe to keep on even when `latex-to-svg-frontend-detect-dollar-inline' is
+off: a doubled `$$' is unlikely to occur by accident in prose."
+  :type 'boolean
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-detect-bracket-inline t
+  "Whether to detect inline LaTeX bracket math `\\(…\\)'."
+  :type 'boolean
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-detect-bracket-display t
+  "Whether to detect display LaTeX bracket math `\\[…\\]'."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
@@ -293,8 +309,10 @@ are swept in order), so this is kept only for ad-hoc / external callers."
 (defun latex-to-svg-frontend--family-enabled-p (tok)
   "Non-nil when opener TOK's delimiter family is enabled by its `-detect-*' toggle."
   (cond
-   ((member tok '("$" "$$")) latex-to-svg-frontend-detect-dollar-delimiters)
-   ((member tok '("\\[" "\\(")) latex-to-svg-frontend-detect-bracket-delimiters)
+   ((equal tok "$$") latex-to-svg-frontend-detect-dollar-display)
+   ((equal tok "$") latex-to-svg-frontend-detect-dollar-inline)
+   ((equal tok "\\[") latex-to-svg-frontend-detect-bracket-display)
+   ((equal tok "\\(") latex-to-svg-frontend-detect-bracket-inline)
    ((string-prefix-p "\\begin{" tok) latex-to-svg-frontend-detect-environments)
    ((or (string-prefix-p "\\eqref{" tok) (string-prefix-p "\\ref{" tok))
     latex-to-svg-frontend-detect-references)

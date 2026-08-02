@@ -142,19 +142,29 @@ you set **buffer-locally in the mode hook** — so Org and Markdown can differ:
 
 ### Delimiter toggles
 
-Each delimiter family can be turned off (all default on) — buffer-locally in a
-hook, or globally:
+Each delimiter kind can be turned off independently (all default on) —
+buffer-locally in a hook, or globally. Inline and display are **separate**
+toggles, so you can keep display math while silencing the error-prone inline
+form:
 
-| variable                                       | governs               |
-|------------------------------------------------|-----------------------|
-| `latex-to-svg-frontend-detect-dollar-delimiters`  | `$…$`, `$$…$$` (TeX syntax) |
-| `latex-to-svg-frontend-detect-bracket-delimiters` | `\(…\)`, `\[…\]` (LaTeX syntax) |
-| `latex-to-svg-frontend-detect-environments`       | `\begin{env}…\end{env}` |
-| `latex-to-svg-frontend-detect-references`         | `\eqref` / `\ref`     |
+| variable                                        | governs             |
+|-------------------------------------------------|---------------------|
+| `latex-to-svg-frontend-detect-dollar-inline`    | `$…$` (inline TeX)   |
+| `latex-to-svg-frontend-detect-dollar-display`   | `$$…$$` (display TeX) |
+| `latex-to-svg-frontend-detect-bracket-inline`   | `\(…\)` (inline LaTeX) |
+| `latex-to-svg-frontend-detect-bracket-display`  | `\[…\]` (display LaTeX) |
+| `latex-to-svg-frontend-detect-environments`     | `\begin{env}…\end{env}` |
+| `latex-to-svg-frontend-detect-references`       | `\eqref` / `\ref`   |
 
-(“Dollar” is plain-TeX `$…$`; “bracket” is LaTeX `\(…\)` / `\[…\]`.) E.g. in a
-CommonMark-math buffer you might disable bracket delimiters, or disable dollar
-math in a document that uses `$` as currency.
+**Why inline dollar is split out.** A lone `$` is the one delimiter that also
+occurs in ordinary prose — prices, shell variables — so `$…$` detection can
+misfire on a sentence like *“the cost varies between 30\$ and 50\$”*, turning
+the text between the two dollar signs into a (broken) equation. If that bites
+you, turn **`latex-to-svg-frontend-detect-dollar-inline` off** and leave the
+other three families on: `$$…$$` still renders (a doubled `$$` almost never
+appears by accident), as do `\(…\)` / `\[…\]` and environments. The bracket
+forms are split the same way for symmetry. (“Dollar” is plain-TeX `$`/`$$`;
+“bracket” / parentheses is LaTeX `\(…\)` / `\[…\]`.)
 
 ### Numbering and cross-references
 
@@ -221,8 +231,9 @@ as templates.
 
 ## Status
 
-Implemented: universal scanner with per-mode exclusions and four delimiter
-toggles; one overlay per element; theme / zoom refresh from cache; equation
+Implemented: universal scanner with per-mode exclusions and per-kind delimiter
+toggles (inline / display dollar and bracket, plus environments and references);
+one overlay per element; theme / zoom refresh from cache; equation
 numbering with ground-truth reconcile; `\eqref` / `\ref` resolution (incl.
 `(??)` for dangling / re-resolving on rename); reveal-on-cursor editing;
 render-on-leave.

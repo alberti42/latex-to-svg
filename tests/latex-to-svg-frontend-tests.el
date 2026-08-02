@@ -179,19 +179,38 @@ A plain buffer suffices — detection is a regexp scanner."
                            (latex-to-svg-frontend--elements (point-min) (point-max)))
                    '("$a$" "$b$")))))
 
-(ert-deftest l2sf-toggle-dollar-off ()
-  (l2sf-tests--md "$a$ and \\(b\\)\n"
-    (let ((latex-to-svg-frontend-detect-dollar-delimiters nil))
+(ert-deftest l2sf-toggle-dollar-inline-off ()
+  ;; Disabling inline `$…$' leaves display `$$…$$' (and brackets) detected —
+  ;; the point of the split: kill the currency-prone inline dollar only.
+  (l2sf-tests--md "$a$ and $$b$$ and \\(c\\)\n"
+    (let ((latex-to-svg-frontend-detect-dollar-inline nil))
       (should (equal (mapcar #'latex-to-svg-frontend--math-value
                              (latex-to-svg-frontend--elements (point-min) (point-max)))
-                     '("\\(b\\)"))))))
+                     '("$$b$$" "\\(c\\)"))))))
 
-(ert-deftest l2sf-toggle-bracket-off ()
-  (l2sf-tests--md "$a$ and \\(b\\) and \\[c\\]\n"
-    (let ((latex-to-svg-frontend-detect-bracket-delimiters nil))
+(ert-deftest l2sf-toggle-dollar-display-off ()
+  ;; Disabling display `$$…$$' leaves inline `$…$' detected.
+  (l2sf-tests--md "$a$ and $$b$$\n"
+    (let ((latex-to-svg-frontend-detect-dollar-display nil))
       (should (equal (mapcar #'latex-to-svg-frontend--math-value
                              (latex-to-svg-frontend--elements (point-min) (point-max)))
                      '("$a$"))))))
+
+(ert-deftest l2sf-toggle-bracket-inline-off ()
+  ;; Disabling inline `\(…\)' leaves display `\[…\]' (and dollars) detected.
+  (l2sf-tests--md "$a$ and \\(b\\) and \\[c\\]\n"
+    (let ((latex-to-svg-frontend-detect-bracket-inline nil))
+      (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                             (latex-to-svg-frontend--elements (point-min) (point-max)))
+                     '("$a$" "\\[c\\]"))))))
+
+(ert-deftest l2sf-toggle-bracket-display-off ()
+  ;; Disabling display `\[…\]' leaves inline `\(…\)' detected.
+  (l2sf-tests--md "\\(b\\) and \\[c\\]\n"
+    (let ((latex-to-svg-frontend-detect-bracket-display nil))
+      (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                             (latex-to-svg-frontend--elements (point-min) (point-max)))
+                     '("\\(b\\)"))))))
 
 (ert-deftest l2sf-toggle-environments-off ()
   (l2sf-tests--md "$a$\n\n\\begin{equation}\nx\n\\end{equation}\n"
