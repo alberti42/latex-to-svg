@@ -706,6 +706,31 @@ change to simulate a theme/font change."
         (should (equal "(1)" (substring-no-properties (overlay-get ref 'display))))
         (should (= 1 (overlay-get ref 'org-latex-to-svg-ref-num)))))))
 
+(ert-deftest org-latex-to-svg-reference-follows-label-edit ()
+  ;; Renaming an equation's \label re-points references: one to the OLD label
+  ;; goes `(??)', one to the NEW label resolves.  This falls out of the full
+  ;; re-resolve in `--reconcile-references' (no per-overlay label state).
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "See \\eqref{eq:a} and \\eqref{eq:c}.\n")
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (org-latex-to-svg--reconcile)
+      (cl-flet ((ref (label)
+                  (seq-find (lambda (o)
+                              (equal (overlay-get o 'org-latex-to-svg-ref) label))
+                            (org-latex-to-svg--overlays-in (point-min) (point-max))))
+                (disp (o) (substring-no-properties (overlay-get o 'display))))
+        (should (equal "(1)"  (disp (ref "eq:a"))))
+        (should (equal "(??)" (disp (ref "eq:c"))))
+        (goto-char (point-min))
+        (search-forward "\\label{eq:a}")
+        (replace-match "\\label{eq:c}" nil t)
+        (org-latex-to-svg--reconcile)
+        (should (equal "(??)" (disp (ref "eq:a"))))    ; old target gone
+        (should (equal "(1)"  (disp (ref "eq:c"))))))))  ; new target resolves
+
 (ert-deftest org-latex-to-svg-reference-reveals-under-cursor ()
   ;; Point entering a reference preview reveals its `\eqref' source; leaving
   ;; (unmodified) restores the `(N)' text.

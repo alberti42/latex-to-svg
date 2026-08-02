@@ -73,8 +73,11 @@ compile. Each reference preview is click-to-jump (`mouse-1` / `RET` →
 reconcile, `--reconcile-references` re-resolves each reference against the
 current label map and patches its text in place — covering all transitions: a
 shifted number, a target that was **deleted** (number -> `(??)`), and a target
-that became **defined** (`(??)` -> a number).  A reference thus never shows a
-stale number: an unresolved one always reads `(??)` / `??`.
+that became **defined** (`(??)` -> a number).  No per-overlay label state is
+kept: every reference is re-resolved from the buffer's current `\label`s, so
+**renaming** an equation's label (old label deleted + new one defined) re-points
+its references for free.  A reference thus never shows a stale number: an
+unresolved one always reads `(??)` / `??`.
 
 ## Engine boundary
 
