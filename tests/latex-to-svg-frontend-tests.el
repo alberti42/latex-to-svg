@@ -380,6 +380,80 @@ A plain buffer suffices — detection is a regexp scanner."
                  (overlay-get (car (last ovs))
                               'latex-to-svg-frontend-value)))))))
 
+(ert-deftest l2sf-incremental-leave-updates-reference ()
+  ;; The incremental leave path (default) re-resolves references from the
+  ;; overlay-derived label map, not a buffer scan: inserting a numbered
+  ;; equation above a labelled one bumps an `\eqref' to it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "intro\n\n\\begin{equation}\\label{eq:b}\nb\n\\end{equation}\n\n"
+                "See \\eqref{eq:b}.\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (should latex-to-svg-frontend-incremental-reconcile) ; default on
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                           (l2sf-tests--overlays))))
+        (should (equal (substring-no-properties (overlay-get ref 'display)) "(1)"))
+        ;; Insert a numbered equation above eq:b and leave it.
+        (goto-char (point-min))
+        (insert "\\begin{equation}\na\n\\end{equation}\n\n")
+        (goto-char 27)
+        (latex-to-svg-frontend--handle-cursor)
+        (goto-char (point-max))
+        (latex-to-svg-frontend--handle-cursor)
+        ;; eq:b is now (2); the reference followed via `--overlay-labels'.
+        (should (equal (substring-no-properties (overlay-get ref 'display))
+                       "(2)"))))))
+
+(ert-deftest l2sf-incremental-in-place-edit-early-exits ()
+  ;; Editing an equation's body without changing its count must not renumber
+  ;; (nor recompile) downstream equations: the incremental reconcile stops as
+  ;; soon as numbers realign.  We prove it by leaving with a sentinel image:
+  ;; only the edited block picks it up; the downstream overlay is untouched.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+                "\\begin{equation}\nb\n\\end{equation}\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((eq2 (car (last (l2sf-tests--overlays)))))
+        (should (string-prefix-p "\\setcounter{equation}{1}%"
+                                 (overlay-get eq2 'latex-to-svg-frontend-value)))
+        ;; Reveal the first equation, edit its body (count unchanged), leave.
+        (goto-char (+ (point-min) 18))         ; inside eq1 (on the "a" line)
+        (latex-to-svg-frontend--handle-cursor) ; reveal
+        (insert "a")                           ; "a" -> "aa", still consumes 1
+        (let ((l2sf-tests--image 'sentinel))
+          (goto-char (point-max))
+          (latex-to-svg-frontend--handle-cursor)) ; leave -> incremental reconcile
+        (let ((ovs (l2sf-tests--overlays)))
+          ;; eq1 re-rendered (sentinel); eq2 NOT touched (still fake-image, {1}).
+          (should (eq (overlay-get (car ovs) 'display) 'sentinel))
+          (should (eq (overlay-get (car (last ovs)) 'display) 'fake-image))
+          (should (string-prefix-p
+                   "\\setcounter{equation}{1}%"
+                   (overlay-get (car (last ovs)) 'latex-to-svg-frontend-value))))))))
+
+(ert-deftest l2sf-incremental-disabled-still-renumbers ()
+  ;; With the incremental path off, the leave still renumbers downstream via a
+  ;; full `--reconcile' \=-- same observable result.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text\n\n\\begin{equation}\nb\n\\end{equation}\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (setq-local latex-to-svg-frontend-incremental-reconcile nil)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (goto-char (point-min))
+      (insert "\\begin{equation}\na\n\\end{equation}\n\n")
+      (goto-char 20)
+      (latex-to-svg-frontend--handle-cursor)
+      (goto-char (point-max))
+      (latex-to-svg-frontend--handle-cursor)
+      (should (= 2 (length (l2sf-tests--overlays))))
+      (should (string-prefix-p
+               "\\setcounter{equation}{1}%"
+               (overlay-get (car (last (l2sf-tests--overlays)))
+                            'latex-to-svg-frontend-value))))))
+
 (ert-deftest l2sf-no-render-while-inside-equation ()
   ;; While point is still inside a just-typed (complete) equation, nothing is
   ;; compiled — we wait until the cursor leaves.

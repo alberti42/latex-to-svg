@@ -147,5 +147,47 @@ E_%d = m c^2 + \\sum_{k=0}^{%d} k
         (push (l2sf-bench--one n reps nil) out)))
     (concat "\n== Org ==\n" (mapconcat #'identity (nreverse out) "\n") "\n")))
 
+(defun l2sf-bench-leave (&optional sizes reps)
+  "Benchmark the cursor-leave reconcile: incremental vs full, across SIZES.
+Stubs the engine (instant dummy image) so overlays exist without a compile,
+renders the whole buffer, then times a full `--reconcile' against
+`--reconcile-from' for an in-place edit near the TOP (no count change, so
+the incremental pass early-exits) and near the BOTTOM."
+  (let ((sizes (or sizes '(100 250 500 1000)))
+        (reps (or reps 20))
+        (out '()))
+    (cl-letf (((symbol-function 'latex-to-svg-backend)
+               (lambda (&rest _) 'bench-image))
+              ((symbol-function 'latex-to-svg-backend-metadata) (lambda (_) nil)))
+      (dolist (n sizes)
+        (with-temp-buffer
+          (insert (l2sf-bench--md-doc n))
+          (delay-mode-hooks
+            (if (fboundp 'markdown-ts-mode) (markdown-ts-mode) (fundamental-mode)))
+          (setq-local latex-to-svg-frontend-exclude-function
+                      #'latex-to-svg-for-markdown--exclusions)
+          (setq-local latex-to-svg-frontend-mode t)
+          (setq-local latex-to-svg-frontend-number-equations t)
+          (latex-to-svg-frontend--exclusions (point-min) (point-max)) ; warm parser
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (let* ((ovs (latex-to-svg-frontend--numbered-overlays))
+                 (top (overlay-start (nth 1 ovs)))
+                 (bot (overlay-start (car (last ovs))))
+                 (t-full (l2sf-bench--ms
+                          (lambda () (latex-to-svg-frontend--reconcile)) reps))
+                 (t-top  (l2sf-bench--ms
+                          (lambda () (latex-to-svg-frontend--reconcile-from top))
+                          reps))
+                 (t-bot  (l2sf-bench--ms
+                          (lambda () (latex-to-svg-frontend--reconcile-from bot))
+                          reps)))
+            (push (format (concat "n=%-5d openers=%-5d | full=%.2f  "
+                                  "from-top=%.2f  from-bottom=%.2f  "
+                                  "(ms, avg of %d)")
+                          n (length ovs) t-full t-top t-bot reps)
+                  out)))))
+    (concat "\n== Leave reconcile (Markdown) ==\n"
+            (mapconcat #'identity (nreverse out) "\n") "\n")))
+
 (provide 'latex-to-svg-frontend-bench)
 ;;; latex-to-svg-frontend-bench.el ends here

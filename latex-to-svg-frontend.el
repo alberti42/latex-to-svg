@@ -110,6 +110,19 @@ any downstream preview whose number changed (see
   :type '(choice (const :tag "Disabled" nil) number)
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-incremental-reconcile t
+  "When non-nil, renumber incrementally on a cursor-leave render.
+Leaving a just-typed or edited equation renumbers only from that equation
+downward, seeding the counter from the nearest preceding overlay and
+stopping as soon as numbers realign \=-- no whole-buffer scan (see
+`latex-to-svg-frontend--reconcile-from').  The equation's own number is
+likewise computed from that preceding overlay rather than by a full scan.
+Falls back to a full `latex-to-svg-frontend--reconcile' on any structural
+surprise, and the debounced backstop / explicit commands always use the
+full pass.  Set to nil to force the full scan everywhere."
+  :type 'boolean
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-inline-rescale 1.0
   "Size multiplier for inline math previews (`$…$', `\\(…\\)').
 Applied on top of the engine's global `latex-to-svg-font-scale' via
@@ -503,6 +516,9 @@ in the span."
       (let ((ov (make-overlay b e)))
         (overlay-put ov 'latex-to-svg-frontend t)
         (overlay-put ov 'latex-to-svg-frontend-value value)
+        ;; Raw LaTeX (no `\setcounter' prefix) so a numbered overlay can be
+        ;; renumbered from itself, without re-scanning buffer text.
+        (overlay-put ov 'latex-to-svg-frontend-source (or source value))
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'help-echo (or source value))
         (overlay-put ov 'display image)
@@ -552,17 +568,28 @@ Both image previews and `\\eqref' / `\\ref' text previews qualify."
      ((overlay-get ov 'latex-to-svg-frontend-ref)
       (overlay-put ov 'display (overlay-get ov 'latex-to-svg-frontend-ref-display))))))
 
+(defun latex-to-svg-frontend--render-on-leave-element (el)
+  "Render EL on cursor-leave and renumber synchronously from it.
+Cursor-leave is a discrete event, so we reconcile now, not on the
+debounced backstop.  When `latex-to-svg-frontend-incremental-reconcile'
+is on, EL is numbered from the preceding overlay and only the equations
+below it are re-threaded (`--reconcile-from'); otherwise a full scan."
+  (if latex-to-svg-frontend-incremental-reconcile
+      (progn
+        (latex-to-svg-frontend--render-element
+         el (latex-to-svg-frontend--local-table el))
+        (latex-to-svg-frontend--reconcile-from
+         (latex-to-svg-frontend--math-begin el)))
+    (latex-to-svg-frontend--render-element el)
+    (latex-to-svg-frontend--reconcile)))
+
 (defun latex-to-svg-frontend--rerender-overlay (ov)
   "Re-render the math element under OV after an edit; else drop OV."
   (when-let* ((start (overlay-start ov)))
     (let ((el (latex-to-svg-frontend--element-at start)))
       (if (and el (memq (latex-to-svg-frontend--math-type el)
                         latex-to-svg-frontend--element-types))
-          (progn
-            (latex-to-svg-frontend--render-element el)
-            ;; Cursor-leave is a discrete event: renumber + re-resolve
-            ;; references now, synchronously, not on the debounced backstop.
-            (latex-to-svg-frontend--reconcile))
+          (latex-to-svg-frontend--render-on-leave-element el)
         (delete-overlay ov)))))
 
 (defun latex-to-svg-frontend--render-on-leave (from to)
@@ -577,12 +604,11 @@ happens until it is closed and left."
           (e (latex-to-svg-frontend--math-end el)))
       (when (and (or (< to b) (> to e))
                  (not (latex-to-svg-frontend--overlays-in b e)))
-        (latex-to-svg-frontend--render-element el)
         ;; A new equation can shift every number below it.  Leaving it is a
-        ;; discrete event, so reconcile synchronously for an instant renumber
-        ;; (the debounced `--schedule-reconcile' is only the after-change
-        ;; backstop for edits with no clean leave: delete, paste, undo).
-        (latex-to-svg-frontend--reconcile)))))
+        ;; discrete event, so renumber synchronously (the debounced
+        ;; `--schedule-reconcile' is only the after-change backstop for edits
+        ;; with no clean leave: delete, paste, undo).
+        (latex-to-svg-frontend--render-on-leave-element el)))))
 
 (defun latex-to-svg-frontend--handle-cursor ()
   "Reveal the preview point moved into, re-hide the one it left, and render
@@ -892,6 +918,117 @@ number, or `(??)' when the label is unknown), a numbered environment via
   "Return the numbered-equation overlay covering POS (one with enums), or nil."
   (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-enums))
             (overlays-in pos (min (point-max) (1+ pos)))))
+
+;;;; Incremental (overlay-driven) numbering
+;;
+;; The numbered overlays already form a document-ordered, marker-anchored
+;; structure that records each block's displayed number (`-enums') and raw
+;; source (`-source').  After a discrete cursor-leave render, everything above
+;; the edited block is already consistent, so we can renumber downward from it
+;; \=-- seeding the counter from the preceding overlay and stopping once numbers
+;; realign \=-- without scanning buffer text or running the exclusion pass.
+
+(defun latex-to-svg-frontend--numbered-overlays ()
+  "This package's numbered overlays (those with enums), ascending by position."
+  (sort (seq-filter (lambda (o) (overlay-get o 'latex-to-svg-frontend-enums))
+                    (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
+        (lambda (a b) (< (overlay-start a) (overlay-start b)))))
+
+(defun latex-to-svg-frontend--counter-before (pos)
+  "Equation counter just before POS, from the nearest preceding numbered overlay.
+That overlay's FINAL number is the running counter up to POS; 0 if none."
+  (let ((k 0))
+    (dolist (ov (latex-to-svg-frontend--numbered-overlays) k)
+      (when (< (overlay-start ov) pos)
+        (setq k (cdr (overlay-get ov 'latex-to-svg-frontend-enums)))))))
+
+(defun latex-to-svg-frontend--overlay-labels ()
+  "Build a label -> number hash from numbered overlays' source and enums.
+Mirrors `--scan-numbering' but reads the ordered overlays (ground-truth
+numbers) instead of re-scanning buffer text."
+  (let ((labels (make-hash-table :test 'equal)))
+    (dolist (ov (latex-to-svg-frontend--numbered-overlays))
+      (let* ((enums (overlay-get ov 'latex-to-svg-frontend-enums))
+             (base (car enums))
+             (value (overlay-get ov 'latex-to-svg-frontend-source))
+             (env (and value (latex-to-svg-frontend--environment-name value))))
+        (when (member env latex-to-svg-frontend--numbered-environments-all)
+          (cond
+           ((member env latex-to-svg-frontend--numbered-environments-single)
+            (when (= (latex-to-svg-frontend--count-numbered-equations value) 1)
+              (dolist (name (latex-to-svg-frontend--labels-in value))
+                (puthash name base labels))))
+           ((member env latex-to-svg-frontend--numbered-environments-multi)
+            (dolist (pair (latex-to-svg-frontend--multi-row-labels
+                           value env (1- base)))
+              (puthash (car pair) (cdr pair) labels)))))))
+    labels))
+
+(defun latex-to-svg-frontend--local-table (el)
+  "A (OFFSETS . LABELS) table numbering just element EL.
+When EL is a numbered environment, OFFSETS maps its begin to
+`--counter-before' it (so `--render-element' numbers it without a
+whole-buffer scan); otherwise OFFSETS is empty and EL renders verbatim,
+matching `--scan-numbering' which only records numbered environments.
+LABELS is `--overlay-labels', for an `\\eqref' / `\\ref' being rendered."
+  (let ((offsets (make-hash-table :test 'eql))
+        (begin (latex-to-svg-frontend--math-begin el)))
+    (when (and (eq (latex-to-svg-frontend--math-type el) 'environment)
+               (member (latex-to-svg-frontend--environment-name
+                        (latex-to-svg-frontend--math-value el))
+                       latex-to-svg-frontend--numbered-environments-all))
+      (puthash begin (latex-to-svg-frontend--counter-before begin) offsets))
+    (cons offsets (latex-to-svg-frontend--overlay-labels))))
+
+(defun latex-to-svg-frontend--renumber-overlay (ov k)
+  "Re-render numbered overlay OV at counter K, reusing its stored source."
+  (let* ((source (overlay-get ov 'latex-to-svg-frontend-source))
+         (value (latex-to-svg-frontend--setcounter-value k source))
+         (heuristic (latex-to-svg-frontend--count-numbered-equations source)))
+    (latex-to-svg-frontend--place
+     (current-buffer)
+     (copy-marker (overlay-start ov)) (copy-marker (overlay-end ov))
+     value source (cons (1+ k) (+ k heuristic))
+     (latex-to-svg-frontend--display-p source))))
+
+(defun latex-to-svg-frontend--reconcile-from (pos)
+  "Renumber from the just-rendered equation at POS downward, then re-resolve refs.
+Assumes overlays before POS are already consistent (true after a discrete
+cursor-leave render).  Walks numbered overlays from POS on, seeding the
+counter from the preceding overlay, re-rendering each whose number shifted,
+and stopping as soon as numbers realign.  Falls back to a full
+`--reconcile' on any structural surprise (a downstream overlay with no
+usable source).  No-op unless the mode and numbering are on."
+  (when (and (bound-and-true-p latex-to-svg-frontend-mode)
+             latex-to-svg-frontend-number-equations)
+    (if (not latex-to-svg-frontend-incremental-reconcile)
+        (latex-to-svg-frontend--reconcile)
+      (setq latex-to-svg-backend-metadata-prefix
+            latex-to-svg-frontend--metadata-prefix)
+      (let ((k (latex-to-svg-frontend--counter-before pos))
+            (fell-back nil))
+        (catch 'done
+          (dolist (ov (latex-to-svg-frontend--numbered-overlays))
+            (when (>= (overlay-start ov) pos)
+              (let* ((enums (overlay-get ov 'latex-to-svg-frontend-enums))
+                     (source (overlay-get ov 'latex-to-svg-frontend-source))
+                     (at-pos (= (overlay-start ov) pos)))
+                (unless source
+                  (setq fell-back t) (throw 'done nil))
+                ;; Past the edited block, an overlay already at its expected
+                ;; number means the shift is fully absorbed: stop.
+                (when (and (not at-pos) (equal (car enums) (1+ k)))
+                  (throw 'done nil))
+                ;; The block at POS was just rendered fresh; only renumber the
+                ;; ones after it whose base shifted.
+                (unless (or at-pos (equal (car enums) (1+ k)))
+                  (when (overlay-get ov 'display)
+                    (latex-to-svg-frontend--renumber-overlay ov k)))
+                (setq k (+ k (max 0 (- (cdr enums) (car enums) -1))))))))
+        (if fell-back
+            (latex-to-svg-frontend--reconcile)
+          (latex-to-svg-frontend--reconcile-references
+           (latex-to-svg-frontend--overlay-labels)))))))
 
 (defun latex-to-svg-frontend--reconcile-references (labels)
   "Re-resolve every reference preview against LABELS, patching its text.

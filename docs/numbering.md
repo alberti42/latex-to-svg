@@ -46,6 +46,32 @@ clean leave (delete, paste, undo), so numbers still self-heal a short while
 after such an edit. When cached ground truth disagrees with
 the heuristic, a reconcile is scheduled to propagate the correction downstream.
 
+### Incremental reconcile on cursor-leave (`--reconcile-from`)
+
+The full `--reconcile` scans the whole buffer (detect + exclusions). On the
+discrete cursor-leave event that is wasteful: everything **above** the edited
+block is already consistent. When `latex-to-svg-frontend-incremental-reconcile`
+is on (default), the leave path instead uses the **numbered overlays** as a
+document-ordered, marker-anchored structure that already records each block's
+displayed number (`-enums`) and raw source (`-source`):
+
+- the just-left block is numbered from `--counter-before` it (the preceding
+  overlay's final number) rather than by a full scan — `--local-table`;
+- `--reconcile-from POS` threads the counter from that overlay downward,
+  re-rendering only overlays whose base shifted and **stopping the moment
+  numbers realign** (an in-place edit that doesn't change a count touches
+  nothing downstream);
+- references re-resolve against `--overlay-labels` (the label→number map rebuilt
+  from the overlays, no buffer scan).
+
+This removes the buffer scan and the tree-sitter/Org exclusion pass from the
+leave path (≈7× faster at ~1000 equations; sub-ms on small edits). It still
+costs O(#equations) for the overlay walk + label-map rebuild — not the true
+O(#downstream) floor, which would need a persistent sorted index — and it falls
+back to the full `--reconcile` on any structural surprise (a downstream overlay
+with no usable source). The debounced backstop and explicit commands always use
+the full scan.
+
 ## The environment table (`consumed`)
 
 **Single-equation** (consume 1, or 0 if the block has `\nonumber` / `\notag` /
