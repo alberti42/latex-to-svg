@@ -1,9 +1,11 @@
 # Equation numbering — design & limitations
 
-How `org-latex-to-svg` numbers display math and resolves `\eqref` / `\ref`.
-This is the *shipped* design (0.3.0+); it is a **pure front-end** feature gated
-behind `org-latex-to-svg-number-equations` (on by default) — no Org/element
-awareness leaks into the `latex-to-svg` engine.
+How `latex-to-svg-frontend` numbers display math and resolves `\eqref` / `\ref`.
+It is a **pure front-end** feature gated behind
+`latex-to-svg-frontend-number-equations` (on by default) — no markup or equation
+awareness leaks into the `latex-to-svg-backend` engine.  It works the same for
+every adaptor (Org, Markdown, …): numbering operates on the markup-independent
+math records the scanner produces.
 
 The counting algorithm and environment lists are adapted from tecosaur's Org
 LaTeX preview (`org-latex-preview.el`; the `--environment-numbering-table` /
@@ -36,7 +38,7 @@ counter over the numbered environments. Two sources feed the per-block
 `--reconcile` threads the counter using ground truth where available (heuristic
 until a block's metadata exists) and re-renders only the previews whose first
 number changed. It runs on the render commands and, debounced via
-`org-latex-to-svg-reconcile-idle`, on `after-change-functions` — so numbers
+`latex-to-svg-frontend-reconcile-idle`, on `after-change-functions` — so numbers
 self-heal a short while after an edit. When cached ground truth disagrees with
 the heuristic, a reconcile is scheduled to propagate the correction downstream.
 
@@ -65,11 +67,13 @@ Row counting for the multi class: `rows = 1 + (top-level \\ separators)`, minus
 ## `\eqref` / `\ref`
 
 The same scan builds a `label → number` map (per-row for `align`). A reference
-fragment is rendered as **plain buffer text** — `(3)` for `\eqref`, `3` for
-`\ref`, in the `org-latex-to-svg-reference` face — *not* a LaTeX image, so it
-matches the surrounding prose font and tracks theme/zoom for free with no
-compile. Each reference preview is click-to-jump (`mouse-1` / `RET` →
-`org-latex-to-svg-goto-reference`) to the equation defining its label.  On every
+fragment (bare, or wrapped in `$…$` / `\(…\)`) is rendered as **plain buffer
+text** — `(3)` for `\eqref`, `3` for `\ref`, in the
+`latex-to-svg-frontend-reference` face — *not* a LaTeX image, so it matches the
+surrounding prose font and tracks theme/zoom for free with no compile.  It is
+found by the same scanner (gated by `latex-to-svg-frontend-detect-references`).
+Each reference preview is click-to-jump (`mouse-1` / `RET` →
+`latex-to-svg-frontend-goto-reference`) to the equation defining its label.  On every
 reconcile, `--reconcile-references` re-resolves each reference against the
 current label map and patches its text in place — covering all transitions: a
 shifted number, a target that was **deleted** (number -> `(??)`), and a target
@@ -82,11 +86,12 @@ unresolved one always reads `(??)` / `??`.
 ## Engine boundary
 
 The only engine capability numbering relies on is generic and
-equation-unaware: `latex-to-svg` (≥ 0.3.0) captures a caller-supplied number
+equation-unaware: `latex-to-svg-backend` captures a caller-supplied number
 (`:metadata`) paired with a number a compile emits on
-`latex-to-svg-metadata-prefix` lines, caches the pair in a `.eld` sidecar keyed
-by the content hash, and exposes it via `latex-to-svg-metadata`. Everything
-about equations lives in this front-end.
+`latex-to-svg-backend-metadata-prefix` lines, caches the pair in a `.eld`
+sidecar keyed by the content hash, and exposes it via
+`latex-to-svg-backend-metadata`. Everything about equations lives in this
+front-end.
 
 ## Limitations / out of scope
 

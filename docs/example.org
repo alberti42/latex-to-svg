@@ -1,12 +1,12 @@
-#+TITLE: org-latex-to-svg — feature demo
-#+AUTHOR: org-latex-to-svg
+#+TITLE: latex-to-svg — Org demo
+#+AUTHOR: latex-to-svg
 #+OPTIONS: toc:nil
 
 * Getting started
 
-Open this file and turn the previews on with =M-x org-latex-to-svg-mode= (or add =(add-hook 'org-mode-hook #'org-latex-to-svg-mode)= to your init).  It needs the [[https://github.com/alberti42/emacs-latex-to-svg][latex-to-svg]] engine on your ~load-path~, plus =latex= and =dvisvgm=.
+Open this file and turn the previews on with =M-x latex-to-svg-for-org-mode= (or add =(add-hook 'org-mode-hook #'latex-to-svg-for-org-mode)= to your init).  It needs the [[https://github.com/alberti42/latex-to-svg-backend][latex-to-svg-backend]] engine on your ~load-path~, plus =latex= and =dvisvgm=.
 
-While the mode is on, =C-c C-x C-l= (=org-latex-to-svg=) toggles the fragment at point, renders the region, or — failing both — the whole buffer.  =C-u C-c C-x C-l= re-renders the buffer from cache; =C-u C-u C-c C-x C-l= regenerates (recompiles) it.  =M-x org-latex-to-svg-refresh= re-tints / re-scales for the current theme and font size straight from cache (no LaTeX).
+While the mode is on, =C-c C-x C-l= (=latex-to-svg-frontend=) toggles the fragment at point, renders the region, or — failing both — the whole buffer.  =C-u C-c C-x C-l= re-renders the buffer from cache; =C-u C-u C-c C-x C-l= regenerates (recompiles) it.  =M-x latex-to-svg-frontend-refresh= re-tints / re-scales for the current theme and font size straight from cache (no LaTeX).
 
 Three things to try as you read:
 
@@ -31,7 +31,7 @@ A centered display equation with =\[ … \]= consumes no equation number:
 
 * Automatic equation numbering
 
-Numbering is on by default (=org-latex-to-svg-number-equations=).  The number is
+Numbering is on by default (=latex-to-svg-frontend-number-equations=).  The number is
 computed from the equations that precede each block and baked into the render,
 so these come out as =(1)=, =(2)=, … in document order:
 
