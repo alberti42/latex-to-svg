@@ -171,38 +171,38 @@ they never show a stale number. See [`docs/numbering.md`](docs/numbering.md).
 
 Two principles keep previews responsive on large documents:
 
-1. **LaTeX runs in the background.** The front-end never waits for a compile.
-   The engine returns a cached image *instantly* on a hit; on a miss it returns
-   nothing, compiles in a background queue, and slots the image in when ready.
-   So even renumbering a hundred equations just *schedules* the work and returns
-   — Emacs stays responsive.
-2. **Work is proportional to what changed, not to document size.** The heavy
-   passes only run when they must.
+1. **LaTeX runs in the background.** Emacs never waits for a compile. The
+   engine hands back a cached picture *instantly* if it has one; if not, it
+   returns nothing, draws the picture in the background, and drops it in when
+   ready. So even renumbering a hundred equations starts those pictures drawing
+   in the background and hands control straight back to you — no freeze.
+2. **The effort matches what you changed, not how big the document is.** The
+   expensive passes only run when they are actually needed.
 
-What actually happens, by action:
+What happens, action by action:
 
-| you… | the front-end… | cost |
-|------|----------------|------|
-| **type inside** an equation | does nothing (waits — half-typed math never compiles) | none |
-| **move the cursor out** of a *new or edited* equation | detects it by scanning just the **local paragraph**, renders it (LaTeX async), then renumbers downstream by walking the **pre-sorted list of equation previews**, stopping the moment numbers line up again | ≈ number of equations *below* the edit; usually sub-millisecond |
-| **move the cursor out** of an unchanged preview | re-shows its image | none |
-| **edit without changing any equation's number** (tweak a body, a label) | the downstream walk realigns immediately and stops | ~instant |
-| **paste / undo / delete** equations, or pause mid-edit without leaving | a debounced **full-buffer scan** catches whatever the cursor-leave path can't (the safety net) | one linear pass over the buffer |
-| **open the buffer / explicit render** | one full-buffer scan + render | one linear pass |
+| you… | Emacs… | cost |
+|------|--------|------|
+| **type inside** an equation | draws nothing (it waits — half-finished math is never sent to LaTeX) | none |
+| **move the cursor out** of a *new or just-edited* equation | notices this by looking at **only the one paragraph around the cursor**; draws that equation (LaTeX in the background); then fixes the numbers of the equations **below** it by reading the previews' own ordered list, and stops as soon as the numbers line up again | grows with the number of equations *below* the edit; usually under a millisecond |
+| **move the cursor out** of an equation you did *not* change | just shows its picture again | none |
+| **edit without changing any equation's number** (fix a body, a label) | the number check below the edit lines up immediately and stops | ~instant |
+| **paste / undo / delete** equations, or stop typing without stepping out | a fraction of a second later, one left-to-right pass over the whole buffer catches what stepping out didn't | one pass over the buffer |
+| **open the buffer / render on request** | one pass over the buffer, then draw | one pass over the buffer |
 
-The cursor-leave path (the common case) avoids the whole-buffer scan entirely:
-the equation previews are themselves a document-ordered list that already knows
-each equation's number, so renumbering reads that list instead of re-parsing the
-text. The full scan is itself linear in the buffer (a single regexp sweep, plus
-skipping code regions with a sorted-cursor merge — no quadratic blow-up), and
-runs only on the backstop, explicit renders, and buffer open.
+Stepping out of an equation — the everyday case — never re-reads the whole
+document: the equation previews are themselves a list, in document order, that
+already knows each equation's number, so fixing the numbering reads that list
+instead of parsing the text again. The whole-buffer pass, when it does run,
+reads the buffer once from left to right (skipping code regions efficiently),
+with no slow-down that grows faster than the document.
 
-On a synthetic 1000-equation / 17k-line Markdown buffer, the cost of settling
-numbers after leaving an edited equation dropped from **~1.1 s** (an early
-quadratic version) to **~6.5 ms** — and small everyday edits are well under a
-millisecond. (These measure the front-end bookkeeping; LaTeX compiles, when
-needed, happen in the background.) Repeated identical equations compile **once**
-(the cache is content-addressed and shared across all front-ends).
+On a made-up 1000-equation / 17,000-line Markdown file, the time to settle the
+numbers after leaving an edited equation went from **~1.1 s** (an early, much
+slower version) down to **~6.5 ms**, and ordinary small edits are well under a
+millisecond. (That time is Emacs's own work; the LaTeX pictures, when they need
+redrawing, are made in the background.) Two identical equations are compiled
+**once** — the on-disk cache is shared across every front-end.
 
 ## Writing an adaptor for another markup
 
@@ -227,9 +227,10 @@ numbering with ground-truth reconcile; `\eqref` / `\ref` resolution (incl.
 `(??)` for dangling / re-resolving on rename); reveal-on-cursor editing;
 render-on-leave.
 
-Not yet: **per-keystroke renumbering** (numbers settle synchronously the moment
-you leave an equation, and a debounced pass covers paste / undo / delete — but
-not on every keystroke while you are still inside); `\tag`-based references and
+Not yet: **per-keystroke renumbering** (numbers settle the moment you step out
+of an equation, and a pass a fraction of a second after you stop typing covers
+paste / undo / delete — but not on every keystroke while you are still inside);
+`\tag`-based references and
 `subequations` sub-lettering (see
 [`docs/numbering.md`](docs/numbering.md)); Org inline `~code~` / `=verbatim=`
 exclusion (use the toggles as a workaround).
