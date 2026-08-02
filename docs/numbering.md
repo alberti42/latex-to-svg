@@ -37,9 +37,13 @@ counter over the numbered environments. Two sources feed the per-block
 
 `--reconcile` threads the counter using ground truth where available (heuristic
 until a block's metadata exists) and re-renders only the previews whose first
-number changed. It runs on the render commands and, debounced via
-`latex-to-svg-frontend-reconcile-idle`, on `after-change-functions` — so numbers
-self-heal a short while after an edit. When cached ground truth disagrees with
+number changed. It runs on the render commands; **synchronously** on the
+cursor-leave event (a newly typed or edited equation renumbers downstream and
+re-resolves references the instant point leaves its span, via `--render-on-leave` /
+`--rerender-overlay`); and, debounced via `latex-to-svg-frontend-reconcile-idle`,
+on `after-change-functions` — the latter being the backstop for edits with no
+clean leave (delete, paste, undo), so numbers still self-heal a short while
+after such an edit. When cached ground truth disagrees with
 the heuristic, a reconcile is scheduled to propagate the correction downstream.
 
 ## The environment table (`consumed`)
@@ -104,6 +108,9 @@ front-end.
 - **`\numberwithin{equation}{section}`**, custom counters, and user
   `\setcounter` inside math — unsupported (the table would need the section
   counter too).
-- **Live per-keystroke renumbering** — numbers refresh after the debounced
-  reconcile (or an explicit render), not on every keystroke. A forward `\eqref`
-  above its target likewise updates on the next reconcile / full render.
+- **Live per-keystroke renumbering** — numbers refresh the instant point leaves
+  an equation (synchronous cursor-leave reconcile), on an explicit render, or,
+  for edits with no clean leave (delete, paste, undo), after the debounced
+  `after-change` reconcile — not on every keystroke while still inside. A
+  forward `\eqref` above its target likewise updates on the next leave /
+  reconcile / full render.

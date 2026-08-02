@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.1.0
+;; Version: 0.7.2
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.4.0"))
 ;; Keywords: tex, math, images
 
@@ -70,8 +70,11 @@
 ;;
 ;; Move point into a preview and it reveals its LaTeX source; leaving re-shows
 ;; the preview, or re-renders it if the text changed.  Newly typed math renders
-;; the moment the cursor leaves it (`--render-left', on `post-command-hook'),
-;; never while still inside — so half-typed equations are not compiled.
+;; the moment the cursor leaves it (`--render-on-leave', on `post-command-hook'),
+;; never while still inside — so half-typed equations are not compiled.  That
+;; same discrete leave event reconciles numbers and references synchronously;
+;; the debounced `after-change' pass is only the backstop for edits with no
+;; clean leave (delete, paste, undo).
 
 ;;; Code:
 
@@ -539,10 +542,12 @@ Both image previews and `\\eqref' / `\\ref' text previews qualify."
                         latex-to-svg-frontend--element-types))
           (progn
             (latex-to-svg-frontend--render-element el)
-            (latex-to-svg-frontend--schedule-reconcile))
+            ;; Cursor-leave is a discrete event: renumber + re-resolve
+            ;; references now, synchronously, not on the debounced backstop.
+            (latex-to-svg-frontend--reconcile))
         (delete-overlay ov)))))
 
-(defun latex-to-svg-frontend--render-left (from to)
+(defun latex-to-svg-frontend--render-on-leave (from to)
   "Render the math element FROM was inside, once TO has left its span.
 This is how newly typed math appears: a complete, not-yet-rendered
 element is compiled the moment the cursor leaves it (never while still
@@ -555,8 +560,11 @@ happens until it is closed and left."
       (when (and (or (< to b) (> to e))
                  (not (latex-to-svg-frontend--overlays-in b e)))
         (latex-to-svg-frontend--render-element el)
-        ;; A new equation can shift every number below it.
-        (latex-to-svg-frontend--schedule-reconcile)))))
+        ;; A new equation can shift every number below it.  Leaving it is a
+        ;; discrete event, so reconcile synchronously for an instant renumber
+        ;; (the debounced `--schedule-reconcile' is only the after-change
+        ;; backstop for edits with no clean leave: delete, paste, undo).
+        (latex-to-svg-frontend--reconcile)))))
 
 (defun latex-to-svg-frontend--handle-cursor ()
   "Reveal the preview point moved into, re-hide the one it left, and render
@@ -567,7 +575,7 @@ On `post-command-hook' while the mode is on."
                      (marker-position latex-to-svg-frontend--last-point))))
       ;; Render an equation the cursor just left (event-driven, no idle timer).
       (when (and last (/= last (point)))
-        (latex-to-svg-frontend--render-left last (point)))
+        (latex-to-svg-frontend--render-on-leave last (point)))
       (let* ((prev (and last (latex-to-svg-frontend--revealable-overlay-at last)))
              (cur (latex-to-svg-frontend--revealable-overlay-at (point))))
       (when (and prev (not (eq prev cur)))
@@ -920,7 +928,7 @@ No-op unless the mode and numbering are on."
 Hooked to `after-change-functions' (and fired when ground truth corrects a
 heuristic guess).  A backstop that re-renders any preview edited and left
 \(`--heal-modified') and renumbers downstream; the initial render of newly
-typed math is handled event-driven, on cursor leave (`--render-left'), not
+typed math is handled event-driven, on cursor leave (`--render-on-leave'), not
 here.  No-op unless the mode and the idle option are on."
   (when (and (bound-and-true-p latex-to-svg-frontend-mode)
              latex-to-svg-frontend-reconcile-idle)

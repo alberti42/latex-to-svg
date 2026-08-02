@@ -316,6 +316,34 @@ A plain buffer suffices — detection is a regexp scanner."
                                               'latex-to-svg-frontend-value)))
         (should (eq (overlay-get (car ovs) 'display) 'fake-image))))))
 
+(ert-deftest l2sf-leave-reconciles-downstream-synchronously ()
+  ;; Leaving a newly typed equation renumbers downstream previews right then,
+  ;; on the cursor-leave event itself — no debounced timer, no explicit
+  ;; `--reconcile' call (that path is now synchronous).
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text\n\n\\begin{equation}\nb\n\\end{equation}\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      ;; The lone equation is number 1.
+      (should (string-prefix-p
+               "\\setcounter{equation}{0}%"
+               (overlay-get (car (l2sf-tests--overlays))
+                            'latex-to-svg-frontend-value)))
+      ;; Type a new numbered equation above it and leave the new span.
+      (goto-char (point-min))
+      (insert "\\begin{equation}\na\n\\end{equation}\n\n")
+      (goto-char 20)                             ; inside the new block
+      (latex-to-svg-frontend--handle-cursor) ; register cursor inside
+      (goto-char (point-max))                    ; leave the span
+      (latex-to-svg-frontend--handle-cursor) ; renders + reconciles now
+      (let ((ovs (l2sf-tests--overlays)))
+        (should (= 2 (length ovs)))
+        ;; The pre-existing equation is now number 2, updated on leave.
+        (should (string-prefix-p
+                 "\\setcounter{equation}{1}%"
+                 (overlay-get (car (last ovs))
+                              'latex-to-svg-frontend-value)))))))
+
 (ert-deftest l2sf-no-render-while-inside-equation ()
   ;; While point is still inside a just-typed (complete) equation, nothing is
   ;; compiled — we wait until the cursor leaves.
