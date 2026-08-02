@@ -161,13 +161,23 @@ occurs in ordinary prose — prices, shell variables. The scanner already guards
 the common cases (pandoc-style: an opening `$` must be followed by a non-space
 character, a closing `$` preceded by one, and an escaped `\$` is ignored), so
 spaced currency like `$30 and $50` is **not** mistaken for math. What still
-slips through is a no-space range like `$100-$200`, where the hyphen touches
-both dollars — it gets read as the equation `100-`. If that bites you, turn
-**`latex-to-svg-frontend-detect-dollar-inline` off** and leave the other three
-families on: `$$…$$` still renders (a doubled `$$` almost never appears by
-accident), as do `\(…\)` / `\[…\]` and environments. The bracket forms are
-split the same way for symmetry. (“Dollar” is plain-TeX `$`/`$$`; “bracket” /
-parentheses is LaTeX `\(…\)` / `\[…\]`.)
+slips through is a no-space range like `$100-$200`: the hyphen touches both
+dollars, so it reads as the equation `100-` and the rest of the line is
+mangled. This case is *irreducible* — `$100-$200` is syntactically identical to
+legitimate math such as `$x$2`, so no local rule can reject one without the
+other.
+
+Two ways to deal with it:
+
+- **One-off:** escape the dollars — `\$100-\$200` — which the scanner ignores.
+- **Document-wide:** if a buffer is full of prices, turn
+  **`latex-to-svg-frontend-detect-dollar-inline` off** and write your math with
+  the unambiguous LaTeX parentheses form `\(…\)` instead. The other three
+  families keep working: `$$…$$` (a doubled `$$` almost never appears by
+  accident), `\(…\)` / `\[…\]`, and environments.
+
+The bracket forms are split the same way for symmetry. (“Dollar” is plain-TeX
+`$`/`$$`; “bracket” / parentheses is LaTeX `\(…\)` / `\[…\]`.)
 
 ### Numbering and cross-references
 

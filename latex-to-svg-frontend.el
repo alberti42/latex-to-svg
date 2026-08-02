@@ -148,8 +148,9 @@ opening `$' must be followed by a non-space, a closing `$' preceded by a
 non-space, and an escaped `\$' is ignored — so spaced currency like
 \"$30 and $50\" is not mistaken for math.  What still slips through is a
 no-space range such as \"$100-$200\" (the hyphen touches both dollars, so it
-reads as the equation `100-').  Turn this off (leaving the other three
-families on) in buffers where `$' is mostly currency."
+reads as the equation `100-'); escape it as \"\$100-\$200\" for a one-off, or
+turn this off (leaving the other three families on) and use `\(…\)' in
+buffers where `$' is mostly currency."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
