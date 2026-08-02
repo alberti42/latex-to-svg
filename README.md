@@ -167,6 +167,43 @@ unknown or was just deleted). Click a reference (`mouse-1`) or press `RET` to
 **jump** to the defining equation. References re-resolve on every reconcile, so
 they never show a stale number. See [`docs/numbering.md`](docs/numbering.md).
 
+## Performance — what happens when you edit
+
+Two principles keep previews responsive on large documents:
+
+1. **LaTeX runs in the background.** The front-end never waits for a compile.
+   The engine returns a cached image *instantly* on a hit; on a miss it returns
+   nothing, compiles in a background queue, and slots the image in when ready.
+   So even renumbering a hundred equations just *schedules* the work and returns
+   — Emacs stays responsive.
+2. **Work is proportional to what changed, not to document size.** The heavy
+   passes only run when they must.
+
+What actually happens, by action:
+
+| you… | the front-end… | cost |
+|------|----------------|------|
+| **type inside** an equation | does nothing (waits — half-typed math never compiles) | none |
+| **move the cursor out** of a *new or edited* equation | detects it by scanning just the **local paragraph**, renders it (LaTeX async), then renumbers downstream by walking the **pre-sorted list of equation previews**, stopping the moment numbers line up again | ≈ number of equations *below* the edit; usually sub-millisecond |
+| **move the cursor out** of an unchanged preview | re-shows its image | none |
+| **edit without changing any equation's number** (tweak a body, a label) | the downstream walk realigns immediately and stops | ~instant |
+| **paste / undo / delete** equations, or pause mid-edit without leaving | a debounced **full-buffer scan** catches whatever the cursor-leave path can't (the safety net) | one linear pass over the buffer |
+| **open the buffer / explicit render** | one full-buffer scan + render | one linear pass |
+
+The cursor-leave path (the common case) avoids the whole-buffer scan entirely:
+the equation previews are themselves a document-ordered list that already knows
+each equation's number, so renumbering reads that list instead of re-parsing the
+text. The full scan is itself linear in the buffer (a single regexp sweep, plus
+skipping code regions with a sorted-cursor merge — no quadratic blow-up), and
+runs only on the backstop, explicit renders, and buffer open.
+
+On a synthetic 1000-equation / 17k-line Markdown buffer, the cost of settling
+numbers after leaving an edited equation dropped from **~1.1 s** (an early
+quadratic version) to **~6.5 ms** — and small everyday edits are well under a
+millisecond. (These measure the front-end bookkeeping; LaTeX compiles, when
+needed, happen in the background.) Repeated identical equations compile **once**
+(the cache is content-addressed and shared across all front-ends).
+
 ## Writing an adaptor for another markup
 
 An adaptor is a small `define-minor-mode` that sets the buffer-local protocol
@@ -190,9 +227,10 @@ numbering with ground-truth reconcile; `\eqref` / `\ref` resolution (incl.
 `(??)` for dangling / re-resolving on rename); reveal-on-cursor editing;
 render-on-leave.
 
-Not yet: **per-keystroke renumbering** (a new preview renders as soon as you
-leave it, but downstream numbers / references settle on a short debounced pass);
-`\tag`-based references and `subequations` sub-lettering (see
+Not yet: **per-keystroke renumbering** (numbers settle synchronously the moment
+you leave an equation, and a debounced pass covers paste / undo / delete — but
+not on every keystroke while you are still inside); `\tag`-based references and
+`subequations` sub-lettering (see
 [`docs/numbering.md`](docs/numbering.md)); Org inline `~code~` / `=verbatim=`
 exclusion (use the toggles as a workaround).
 
