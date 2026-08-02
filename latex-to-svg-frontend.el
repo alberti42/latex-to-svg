@@ -272,7 +272,9 @@ Delegates to the buffer-local `latex-to-svg-frontend-exclude-function'
        (funcall latex-to-svg-frontend-exclude-function beg end)))
 
 (defun latex-to-svg-frontend--in-code-p (pos regions)
-  "Non-nil when POS falls inside one of the excluded REGIONS."
+  "Non-nil when POS falls inside one of the excluded REGIONS.
+Linear over REGIONS; `--scan' uses an advancing cursor instead (openers
+are swept in order), so this is kept only for ad-hoc / external callers."
   (seq-some (lambda (r) (and (>= pos (car r)) (< pos (cdr r)))) regions))
 
 (defun latex-to-svg-frontend--family-enabled-p (tok)
@@ -398,7 +400,17 @@ openers, and any delimiter family disabled by its `-detect-*' toggle.
 Passing a small BEG..END (e.g. one blank-line block) keeps scans cheap."
   (let* ((beg (or beg (point-min)))
          (end (or end (point-max)))
-         (codes (latex-to-svg-frontend--exclusions beg end))
+         ;; Exclusion regions sorted by start.  Since openers are swept in
+         ;; increasing position, a monotonic cursor (CI) over this vector
+         ;; decides "inside code?" in O(1) amortized, making the scan
+         ;; O(openers + regions) instead of O(openers * regions).  Sorting by
+         ;; start alone is enough even for nested / overlapping regions: the
+         ;; first region whose end is past MB is the only one that can cover MB
+         ;; (see the correctness note below).
+         (codes (vconcat (sort (latex-to-svg-frontend--exclusions beg end)
+                               (lambda (a b) (< (car a) (car b))))))
+         (ncodes (length codes))
+         (ci 0)
          (result '()))
     (save-excursion
       (save-restriction
@@ -408,8 +420,14 @@ Passing a small BEG..END (e.g. one blank-line block) keeps scans cheap."
           (let ((mb (match-beginning 0))
                 (me (match-end 0))
                 (tok (match-string 0)))
+            ;; Drop regions that end at or before MB; they cannot cover it or
+            ;; any later (rightward) opener.  Whatever remains at CI is the
+            ;; first region ending past MB — the sole candidate to contain MB.
+            (while (and (< ci ncodes) (<= (cdr (aref codes ci)) mb))
+              (setq ci (1+ ci)))
             (cond
-             ((latex-to-svg-frontend--in-code-p mb codes) (goto-char me))
+             ((and (< ci ncodes) (>= mb (car (aref codes ci)))) ; MB inside code
+              (goto-char me))
              ((latex-to-svg-frontend--escaped-p mb) (goto-char me))
              ((not (latex-to-svg-frontend--family-enabled-p tok)) (goto-char me))
              (t
@@ -708,14 +726,16 @@ ENV is the environment name; OFFSET the counter before the block."
             (cl-incf num)))
         (nreverse out)))))
 
-(defun latex-to-svg-frontend--scan-numbering ()
+(defun latex-to-svg-frontend--scan-numbering (&optional environments)
   "Scan the widened buffer; return the cons (OFFSETS . LABELS).
 OFFSETS maps a numbered environment's BEGIN to its counter offset; LABELS
-maps a `\\label' name to its resolved equation number."
+maps a `\\label' name to its resolved equation number.
+ENVIRONMENTS, when non-nil, is a pre-computed `--environments' list used
+in place of a fresh scan, so one scan can be shared across passes."
   (let ((offsets (make-hash-table :test 'eql))
         (labels (make-hash-table :test 'equal))
         (offset 0))
-    (dolist (el (latex-to-svg-frontend--environments))
+    (dolist (el (or environments (latex-to-svg-frontend--environments)))
       (let* ((value (latex-to-svg-frontend--math-value el))
              (env (latex-to-svg-frontend--environment-name value)))
         (when (member env latex-to-svg-frontend--numbered-environments-all)
@@ -900,8 +920,12 @@ No-op unless the mode and numbering are on."
     (when (and (bound-and-true-p latex-to-svg-frontend-mode)
                latex-to-svg-frontend-number-equations)
       (setq latex-to-svg-backend-metadata-prefix latex-to-svg-frontend--metadata-prefix)
-      (let ((k 0))
-        (dolist (el (latex-to-svg-frontend--environments))
+      ;; One environment scan feeds both the counter threading below and the
+      ;; reference re-resolution (via `--scan-numbering'), instead of scanning
+      ;; the whole buffer twice per reconcile.
+      (let ((envs (latex-to-svg-frontend--environments))
+            (k 0))
+        (dolist (el envs)
           (let ((env (latex-to-svg-frontend--environment-name
                       (latex-to-svg-frontend--math-value el))))
             (when (member env latex-to-svg-frontend--numbered-environments-all)
@@ -918,7 +942,7 @@ No-op unless the mode and numbering are on."
                   (latex-to-svg-frontend--render-numbered el k))
                 (setq k (+ k (max 0 consumed)))))))
         (latex-to-svg-frontend--reconcile-references
-         (cdr (latex-to-svg-frontend--scan-numbering)))))))
+         (cdr (latex-to-svg-frontend--scan-numbering envs)))))))
 
 (defvar-local latex-to-svg-frontend--reconcile-timer nil
   "Pending debounced reconcile timer for this buffer.")

@@ -114,6 +114,42 @@ A plain buffer suffices — detection is a regexp scanner."
                            (latex-to-svg-frontend--elements (point-min) (point-max)))
                    '("$a$")))))
 
+(ert-deftest l2sf-scan-advancing-cursor-multiple-regions ()
+  ;; The sorted-region advancing cursor must exclude openers inside every code
+  ;; region and keep the ones between/after them, across many regions and with
+  ;; a nested region (start-sorted, overlapping) thrown in.
+  (l2sf-tests--md
+      (concat "$a$ CODE1 $skip1$ END "      ; region 1
+              "$b$ "                          ; kept, between regions
+              "CODE2 $skip2$ NEST $skip3$ END " ; region 2, with a nested region
+              "$c$\n")                        ; kept, after all regions
+    (setq-local latex-to-svg-frontend-exclude-function
+                (lambda (_beg _end)
+                  (save-excursion
+                    (let (regions)
+                      ;; Intentionally return them out of order and with one
+                      ;; region nested inside another to exercise the sort +
+                      ;; overlap-correctness of the cursor.
+                      (goto-char (point-min))
+                      (when (search-forward "CODE2" nil t)
+                        (let ((b (match-beginning 0)))
+                          (search-forward "END" nil t)
+                          (push (cons b (point)) regions)))
+                      (goto-char (point-min))
+                      (when (search-forward "NEST" nil t)
+                        (let ((b (match-beginning 0)))
+                          (search-forward "skip3$" nil t)
+                          (push (cons b (point)) regions))) ; nested in CODE2
+                      (goto-char (point-min))
+                      (when (search-forward "CODE1" nil t)
+                        (let ((b (match-beginning 0)))
+                          (search-forward "END" nil t)
+                          (push (cons b (point)) regions)))
+                      regions))))
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("$a$" "$b$" "$c$")))))
+
 (ert-deftest l2sf-markdown-adaptor-skips-code ()
   ;; The Markdown adaptor's exclude-function skips inline code spans (always)
   ;; and fenced code blocks (when the `markdown' grammar is available).
@@ -563,6 +599,23 @@ A plain buffer suffices — detection is a regexp scanner."
         (should (string-prefix-p
                  "\\setcounter{equation}{0}%"
                  (overlay-get (car (last ovs)) 'latex-to-svg-frontend-value)))))))
+
+(ert-deftest l2sf-scan-numbering-accepts-precomputed-environments ()
+  ;; Passing a pre-computed environment list (so one scan feeds both the
+  ;; reconcile counter threading and the reference re-resolution) must yield
+  ;; the exact same LABELS map as a fresh internal scan.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\n\\label{a}\nx\n\\end{equation}\n\n"
+                "\\begin{equation}\n\\label{b}\ny\n\\end{equation}\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (let* ((envs (latex-to-svg-frontend--environments))
+             (fresh (cdr (latex-to-svg-frontend--scan-numbering)))
+             (shared (cdr (latex-to-svg-frontend--scan-numbering envs))))
+        (should (= 1 (gethash "a" shared)))
+        (should (= 2 (gethash "b" shared)))
+        (should (equal (gethash "a" fresh) (gethash "a" shared)))
+        (should (equal (gethash "b" fresh) (gethash "b" shared)))))))
 
 (ert-deftest l2sf-reconcile-uses-ground-truth-consumed ()
   (l2sf-tests--with-stub
