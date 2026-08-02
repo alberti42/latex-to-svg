@@ -158,13 +158,15 @@ form:
 
 **Why inline dollar is split out.** A lone `$` is the one delimiter that also
 occurs in ordinary prose — prices, shell variables — so `$…$` detection can
-misfire on a sentence like *“the cost varies between 30\$ and 50\$”*, turning
-the text between the two dollar signs into a (broken) equation. If that bites
-you, turn **`latex-to-svg-frontend-detect-dollar-inline` off** and leave the
-other three families on: `$$…$$` still renders (a doubled `$$` almost never
-appears by accident), as do `\(…\)` / `\[…\]` and environments. The bracket
-forms are split the same way for symmetry. (“Dollar” is plain-TeX `$`/`$$`;
-“bracket” / parentheses is LaTeX `\(…\)` / `\[…\]`.)
+misfire on a sentence like `the cost varies between 30$ and 50$`, turning the
+span between the two dollar signs into a (broken) equation. An **escaped** `\$`
+is always ignored, but neither Markdown nor Org *requires* escaping `$`, so
+loose prose dollars still trip it. If that bites you, turn
+**`latex-to-svg-frontend-detect-dollar-inline` off** and leave the other three
+families on: `$$…$$` still renders (a doubled `$$` almost never appears by
+accident), as do `\(…\)` / `\[…\]` and environments. The bracket forms are
+split the same way for symmetry. (“Dollar” is plain-TeX `$`/`$$`; “bracket” /
+parentheses is LaTeX `\(…\)` / `\[…\]`.)
 
 ### Numbering and cross-references
 
