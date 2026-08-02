@@ -179,6 +179,22 @@ A plain buffer suffices — detection is a regexp scanner."
                            (latex-to-svg-frontend--elements (point-min) (point-max)))
                    '("$a$" "$b$")))))
 
+(ert-deftest l2sf-inline-dollar-currency-guards ()
+  ;; pandoc-style guards on inline `$…$': an opener must be followed by a
+  ;; non-space, a closer preceded by one, and `\$' is escaped.  So spaced
+  ;; currency is not math, while real math (and adjacent no-space ranges,
+  ;; which is the residual the toggle is for) behave as documented.
+  (dolist (case '(("I have $30 and you have $50" . ())      ; rule 2: closer after space
+                  ("cost 30$ and 50$ each"       . ())      ; rule 1: opener before space
+                  ("escaped \\$5 and \\$9 here"   . ())      ; escaped \$
+                  ("some $\\alpha$ inline"        . ("$\\alpha$"))
+                  ("real $x+y$ math"             . ("$x+y$"))
+                  ("a range $100-$200 wide"      . ("$100-$")))) ; residual misfire
+    (l2sf-tests--md (concat (car case) "\n")
+      (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                             (latex-to-svg-frontend--elements (point-min) (point-max)))
+                     (cdr case))))))
+
 (ert-deftest l2sf-toggle-dollar-inline-off ()
   ;; Disabling inline `$…$' leaves display `$$…$$' (and brackets) detected —
   ;; the point of the split: kill the currency-prone inline dollar only.

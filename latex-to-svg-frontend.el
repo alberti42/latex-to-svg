@@ -142,10 +142,14 @@ changing it, run `latex-to-svg-frontend-refresh' to apply."
 
 (defcustom latex-to-svg-frontend-detect-dollar-inline t
   "Whether to detect inline TeX dollar math `$…$'.
-This is the least reliable delimiter: a lone `$' is also ordinary prose
-(prices, shell variables), so detection can misfire on text such as
-\"the cost varies between 30$ and 50$\".  Turn this off (leaving the other
-three families on) in buffers where `$' is mostly currency."
+`$' is the least reliable delimiter, since it also occurs in prose (prices,
+shell variables).  The scanner already applies pandoc-style guards — an
+opening `$' must be followed by a non-space, a closing `$' preceded by a
+non-space, and an escaped `\$' is ignored — so spaced currency like
+\"$30 and $50\" is not mistaken for math.  What still slips through is a
+no-space range such as \"$100-$200\" (the hyphen touches both dollars, so it
+reads as the equation `100-').  Turn this off (leaving the other three
+families on) in buffers where `$' is mostly currency."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
