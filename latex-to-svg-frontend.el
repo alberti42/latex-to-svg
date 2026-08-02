@@ -579,7 +579,15 @@ below it are re-threaded (`--reconcile-from'); otherwise a full scan."
         (latex-to-svg-frontend--render-element
          el (latex-to-svg-frontend--local-table el))
         (latex-to-svg-frontend--reconcile-from
-         (latex-to-svg-frontend--math-begin el)))
+         (latex-to-svg-frontend--math-begin el))
+        ;; This incremental pass covered the left equation and everything
+        ;; below it.  If no text changed outside its span, the pending
+        ;; whole-buffer catch-up is redundant, so drop it.
+        (latex-to-svg-frontend--maybe-cancel-reconcile
+         (latex-to-svg-frontend--math-begin el)
+         (latex-to-svg-frontend--math-end el)))
+    ;; The full reconcile is comprehensive and already cancelled the pending
+    ;; pass; nothing more to do.
     (latex-to-svg-frontend--render-element el)
     (latex-to-svg-frontend--reconcile)))
 
@@ -1050,9 +1058,46 @@ edited in place.  Skips a reference revealed for editing (`display' nil)."
               (overlay-put ov 'display disp))
             (overlay-put ov 'latex-to-svg-frontend-ref-num want)))))))
 
+(defvar-local latex-to-svg-frontend--reconcile-timer nil
+  "Pending debounced reconcile timer for this buffer.")
+
+(defvar-local latex-to-svg-frontend--dirty nil
+  "Cons (BEG . END) bounding buffer text changed since the last full reconcile.
+Accumulated from `after-change-functions'; nil when nothing is pending.  A
+clean cursor-leave cancels the pending debounced pass only when this range
+lies wholly inside the equation it just reconciled (`--maybe-cancel-reconcile').")
+
+(defun latex-to-svg-frontend--mark-dirty (beg end)
+  "Grow the pending-change range to cover BEG..END."
+  (setq latex-to-svg-frontend--dirty
+        (if latex-to-svg-frontend--dirty
+            (cons (min beg (car latex-to-svg-frontend--dirty))
+                  (max end (cdr latex-to-svg-frontend--dirty)))
+          (cons beg end))))
+
+(defun latex-to-svg-frontend--cancel-reconcile ()
+  "Cancel any pending debounced reconcile and clear the pending-change range."
+  (when (timerp latex-to-svg-frontend--reconcile-timer)
+    (cancel-timer latex-to-svg-frontend--reconcile-timer))
+  (setq latex-to-svg-frontend--reconcile-timer nil
+        latex-to-svg-frontend--dirty nil))
+
+(defun latex-to-svg-frontend--maybe-cancel-reconcile (beg end)
+  "Cancel the pending debounced pass if all pending changes are within BEG..END.
+Called after a clean cursor-leave has reconciled the equation spanning
+BEG..END: if nothing changed outside it, the whole-buffer catch-up pass is
+moot.  When changes also happened elsewhere (e.g. a paste), the range is
+wider and the pass is kept \=-- the incremental leave cannot see undrawn
+equations, so the full scan is still needed."
+  (when (and latex-to-svg-frontend--dirty
+             (>= (car latex-to-svg-frontend--dirty) beg)
+             (<= (cdr latex-to-svg-frontend--dirty) end))
+    (latex-to-svg-frontend--cancel-reconcile)))
+
 (defun latex-to-svg-frontend--reconcile (&optional buffer)
   "Recompute equation numbers and re-render previews whose number changed.
-No-op unless the mode and numbering are on."
+A comprehensive pass: also cancels any pending debounced reconcile and clears
+the pending-change range.  No-op unless the mode and numbering are on."
   (with-current-buffer (or buffer (current-buffer))
     (when (and (bound-and-true-p latex-to-svg-frontend-mode)
                latex-to-svg-frontend-number-equations)
@@ -1079,20 +1124,26 @@ No-op unless the mode and numbering are on."
                   (latex-to-svg-frontend--render-numbered el k))
                 (setq k (+ k (max 0 consumed)))))))
         (latex-to-svg-frontend--reconcile-references
-         (cdr (latex-to-svg-frontend--scan-numbering envs)))))))
+         (cdr (latex-to-svg-frontend--scan-numbering envs))))
+      (latex-to-svg-frontend--cancel-reconcile))))
 
-(defvar-local latex-to-svg-frontend--reconcile-timer nil
-  "Pending debounced reconcile timer for this buffer.")
-
-(defun latex-to-svg-frontend--schedule-reconcile (&rest _)
+(defun latex-to-svg-frontend--schedule-reconcile (&optional beg end _len)
   "Debounce a numbering reconcile of the current buffer (see `--reconcile').
-Hooked to `after-change-functions' (and fired when ground truth corrects a
-heuristic guess).  A backstop that re-renders any preview edited and left
-\(`--heal-modified') and renumbers downstream; the initial render of newly
-typed math is handled event-driven, on cursor leave (`--render-on-leave'), not
-here.  No-op unless the mode and the idle option are on."
+Hooked to `after-change-functions' (which passes BEG END _LEN) and also
+fired with no arguments when ground truth corrects a heuristic guess.  A
+backstop that re-renders any preview edited and left (`--heal-modified')
+and renumbers downstream; the initial render of newly typed math is handled
+event-driven, on cursor leave (`--render-on-leave'), not here.  Records the
+changed range so a clean leave can cancel this pass when it covered
+everything (`--maybe-cancel-reconcile').  No-op unless the mode and the idle
+option are on."
   (when (and (bound-and-true-p latex-to-svg-frontend-mode)
              latex-to-svg-frontend-reconcile-idle)
+    ;; A region-less call (ground-truth correction) marks the whole buffer
+    ;; dirty, so a single-equation leave never cancels it.
+    (if (and beg end)
+        (latex-to-svg-frontend--mark-dirty beg end)
+      (latex-to-svg-frontend--mark-dirty (point-min) (point-max)))
     (when (timerp latex-to-svg-frontend--reconcile-timer)
       (cancel-timer latex-to-svg-frontend--reconcile-timer))
     (let ((buf (current-buffer)))

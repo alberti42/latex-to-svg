@@ -454,6 +454,50 @@ A plain buffer suffices — detection is a regexp scanner."
                (overlay-get (car (last (l2sf-tests--overlays)))
                             'latex-to-svg-frontend-value))))))
 
+(ert-deftest l2sf-clean-leave-cancels-redundant-scan ()
+  ;; When every pending edit is inside the equation we just left, the
+  ;; incremental leave has already brought numbers up to date, so the pending
+  ;; whole-buffer catch-up pass is cancelled.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text\n\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (goto-char (point-max))
+      (insert "\\begin{equation}\nx=1\n\\end{equation}")
+      (goto-char (- (point) 3))                  ; inside the new block
+      (latex-to-svg-frontend--handle-cursor)     ; seed last-point inside
+      (let ((el (latex-to-svg-frontend--element-at (point))))
+        ;; Simulate the edit's after-change over the equation's own span.
+        (latex-to-svg-frontend--schedule-reconcile
+         (latex-to-svg-frontend--math-begin el)
+         (latex-to-svg-frontend--math-end el)))
+      (should (timerp latex-to-svg-frontend--reconcile-timer))
+      (should latex-to-svg-frontend--dirty)
+      (goto-char (point-min))                    ; leave
+      (latex-to-svg-frontend--handle-cursor)     ; render + reconcile + maybe-cancel
+      (should (null latex-to-svg-frontend--reconcile-timer))
+      (should (null latex-to-svg-frontend--dirty)))))
+
+(ert-deftest l2sf-leave-keeps-scan-when-edit-outside ()
+  ;; If text also changed outside the left equation (e.g. a paste elsewhere the
+  ;; incremental walk cannot see), the pending catch-up pass is kept.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text\n\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (goto-char (point-max))
+      (insert "\\begin{equation}\nx=1\n\\end{equation}")
+      (goto-char (- (point) 3))
+      (latex-to-svg-frontend--handle-cursor)
+      ;; Pending change reaches back to the buffer start, outside the equation.
+      (latex-to-svg-frontend--schedule-reconcile (point-min) (1+ (point-min)))
+      (should (timerp latex-to-svg-frontend--reconcile-timer))
+      (goto-char (point-min))
+      (latex-to-svg-frontend--handle-cursor)
+      (should (timerp latex-to-svg-frontend--reconcile-timer)) ; kept
+      (should latex-to-svg-frontend--dirty)
+      (latex-to-svg-frontend--cancel-reconcile)))) ; cleanup
+
 (ert-deftest l2sf-no-render-while-inside-equation ()
   ;; While point is still inside a just-typed (complete) equation, nothing is
   ;; compiled — we wait until the cursor leaves.

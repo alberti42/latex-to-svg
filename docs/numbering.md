@@ -72,6 +72,19 @@ back to the full `--reconcile` on any structural surprise (a downstream overlay
 with no usable source). The debounced backstop and explicit commands always use
 the full scan.
 
+**Cancelling the redundant catch-up pass.** `after-change-functions` arms a
+single buffer-wide debounced `--reconcile` on every edit; it is the catch-all
+for edits that produce no clean cursor-leave (paste, undo, delete). After an
+ordinary type-then-leave, the incremental leave has already reconciled, so that
+pending pass is wasted work. But it cannot be cancelled blindly: the incremental
+walk only sees *drawn* equations, so an **undrawn** one (e.g. a pasted block)
+would be miscounted, and only the full scan catches it. So `--schedule-reconcile`
+accumulates a **dirty range** (`--dirty`, the union of changed regions since the
+last full pass), and a clean leave cancels the pending pass only when that range
+lies wholly inside the equation it just reconciled (`--maybe-cancel-reconcile`).
+Edits elsewhere widen the range and keep the pass. Any full `--reconcile` is
+comprehensive and clears both the timer and the range (`--cancel-reconcile`).
+
 ## The environment table (`consumed`)
 
 **Single-equation** (consume 1, or 0 if the block has `\nonumber` / `\notag` /
