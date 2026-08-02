@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/org-latex-to-svg
-;; Version: 0.7.0
+;; Version: 0.7.1
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg "0.3.1"))
 ;; Keywords: tex, org, math, images
 
@@ -62,7 +62,9 @@
 ;; engine's content hash (see docs/numbering.md).  `\\eqref' / `\\ref' are resolved
 ;; against a `\\label' -> number map built in the same scan and shown as plain
 ;; buffer text (e.g. `(3)', in the `org-latex-to-svg-reference' face — not a
-;; LaTeX image, so it matches the surrounding font); their previews are
+;; LaTeX image, so it matches the surrounding font; `(??)' when the target is
+;; unknown or was just deleted); they re-resolve on every reconcile, so they
+;; never show a stale number.  Their previews are
 ;; click-to-jump (mouse-1 / RET) to the equation defining the label.  Like an
 ;; image preview, a reference reveals its `\eqref' / `\ref' source on cursor
 ;; entry so you can edit the label, then re-renders on leave.
@@ -608,6 +610,16 @@ nil when SOURCE isn't such a reference or the label is unknown.  See
               (num (gethash (cdr parsed) labels)))
     (if (equal (car parsed) "eqref") (format "(%d)" num) (number-to-string num))))
 
+(defun org-latex-to-svg--reference-display-text (kind num)
+  "Return the buffer-text display for a KIND (\"eqref\"/\"ref\") reference to NUM.
+NUM nil (an unknown or just-deleted target) shows \"(??)\" / \"??\" so a
+dangling reference is visibly broken rather than stale."
+  (propertize
+   (cond ((null num) (if (equal kind "eqref") "(??)" "??"))
+         ((equal kind "eqref") (format "(%d)" num))
+         (t (number-to-string num)))
+   'face 'org-latex-to-svg-reference))
+
 (defun org-latex-to-svg--label-position (label)
   "Return the `:begin' of the math element defining LABEL, or nil.
 Searches the widened buffer for `\\label{LABEL}' inside a math element."
@@ -685,9 +697,10 @@ before ground-truth `.eld' metadata is available."
   "Render math element EL in the current buffer.
 TABLE is a (OFFSETS . LABELS) numbering scan; when omitted one is built
 on demand so single-element renders still number / resolve correctly.
-A resolvable `\\eqref' / `\\ref' is drawn as clickable buffer text, a
-numbered environment via `org-latex-to-svg--render-numbered'; everything
-else is typeset verbatim by the engine."
+An `\\eqref' / `\\ref' is drawn as clickable buffer text (its number, or
+`(??)' when the label is unknown), a numbered environment via
+`org-latex-to-svg--render-numbered'; everything else is typeset verbatim
+by the engine."
   (let* ((bounds (org-latex-to-svg--element-bounds el))
          (source (org-element-property :value el))
          (table (or table (org-latex-to-svg--maybe-table)))
@@ -695,16 +708,14 @@ else is typeset verbatim by the engine."
          (labels (cdr-safe table))
          (parsed (and labels (eq (org-element-type el) 'latex-fragment)
                       (org-latex-to-svg--reference-parse source)))
-         (refnum (and parsed (gethash (cdr parsed) labels)))
          (k (and offsets (gethash (org-element-property :begin el) offsets))))
     (cond
-     (refnum
-      (org-latex-to-svg--set-reference-overlay
-       (copy-marker (car bounds)) (copy-marker (cdr bounds))
-       (cdr parsed) refnum
-       (propertize (if (equal (car parsed) "eqref")
-                       (format "(%d)" refnum) (number-to-string refnum))
-                   'face 'org-latex-to-svg-reference)))
+     (parsed
+      (let ((num (gethash (cdr parsed) labels)))
+        (org-latex-to-svg--set-reference-overlay
+         (copy-marker (car bounds)) (copy-marker (cdr bounds))
+         (cdr parsed) num
+         (org-latex-to-svg--reference-display-text (car parsed) num))))
      (k (org-latex-to-svg--render-numbered el k))
      (t (org-latex-to-svg--place (current-buffer)
                                  (copy-marker (car bounds))
@@ -723,19 +734,20 @@ else is typeset verbatim by the engine."
   (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-enums))
             (overlays-in pos (min (point-max) (1+ pos)))))
 
-(defun org-latex-to-svg--refresh-references (labels)
-  "Update every reference preview whose resolved number changed under LABELS.
-Rewrites the overlay's displayed `(N)' / `N' in place (no LaTeX)."
+(defun org-latex-to-svg--reconcile-references (labels)
+  "Re-resolve every reference preview against LABELS, patching its text.
+Covers all transitions: a shifted number, a deleted target (number ->
+`(??)'), and a target that became defined (`(??)' -> a number).  Uses the
+reference's current buffer text for the label, so it also follows a label
+edited in place.  Skips a reference revealed for editing (`display' nil)."
   (dolist (ov (org-latex-to-svg--overlays-in (point-min) (point-max)))
     (when-let* ((name (overlay-get ov 'org-latex-to-svg-ref))
-                (want (gethash name labels)))
-      (unless (eql want (overlay-get ov 'org-latex-to-svg-ref-num))
-        (when-let* ((parsed (org-latex-to-svg--reference-parse
-                             (buffer-substring-no-properties
-                              (overlay-start ov) (overlay-end ov)))))
-          (let ((disp (propertize (if (equal (car parsed) "eqref")
-                                      (format "(%d)" want) (number-to-string want))
-                                  'face 'org-latex-to-svg-reference)))
+                (parsed (org-latex-to-svg--reference-parse
+                         (buffer-substring-no-properties
+                          (overlay-start ov) (overlay-end ov)))))
+      (let ((want (gethash (cdr parsed) labels)))
+        (unless (eql want (overlay-get ov 'org-latex-to-svg-ref-num))
+          (let ((disp (org-latex-to-svg--reference-display-text (car parsed) want)))
             (overlay-put ov 'org-latex-to-svg-ref-display disp)
             ;; Don't clobber an overlay revealed for editing (display nil).
             (when (overlay-get ov 'display)
@@ -777,7 +789,7 @@ and numbering are on."
                              (not (equal (car enums) (1+ k))))
                     (org-latex-to-svg--render-numbered el k))
                   (setq k (+ k (max 0 consumed)))))))
-          (org-latex-to-svg--refresh-references
+          (org-latex-to-svg--reconcile-references
            (cdr (org-latex-to-svg--scan-numbering))))))))
 
 (defvar-local org-latex-to-svg--reconcile-timer nil

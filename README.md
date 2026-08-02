@@ -99,7 +99,10 @@ Numbered environments (`equation`, `align`, …) are numbered in document order
 `org-latex-to-svg-number-equations`. `\eqref` / `\ref` are resolved against the
 document's `\label`s and drawn as plain buffer text (`(3)` / `3`, in the
 surrounding font — not a LaTeX image). Click a reference (`mouse-1`) or press
-`RET` on it to **jump** to the equation defining its label.
+`RET` on it to **jump** to the equation defining its label. References
+re-resolve automatically as you add, delete, or reorder equations — a shifted
+target updates its number, and a reference whose target is unknown or was just
+deleted shows `(??)`.
 
 ### Cache note
 

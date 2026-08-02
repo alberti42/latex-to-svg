@@ -69,8 +69,12 @@ fragment is rendered as **plain buffer text** — `(3)` for `\eqref`, `3` for
 `\ref`, in the `org-latex-to-svg-reference` face — *not* a LaTeX image, so it
 matches the surrounding prose font and tracks theme/zoom for free with no
 compile. Each reference preview is click-to-jump (`mouse-1` / `RET` →
-`org-latex-to-svg-goto-reference`) to the equation defining its label, and is
-refreshed in place by `--reconcile` when the target renumbers.
+`org-latex-to-svg-goto-reference`) to the equation defining its label.  On every
+reconcile, `--reconcile-references` re-resolves each reference against the
+current label map and patches its text in place — covering all transitions: a
+shifted number, a target that was **deleted** (number -> `(??)`), and a target
+that became **defined** (`(??)` -> a number).  A reference thus never shows a
+stale number: an unresolved one always reads `(??)` / `??`.
 
 ## Engine boundary
 

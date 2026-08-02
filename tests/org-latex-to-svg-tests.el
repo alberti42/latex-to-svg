@@ -662,6 +662,50 @@ change to simulate a theme/font change."
                       (overlay-get (car (last (org-latex-to-svg-tests--overlays)))
                                    'display)))))))
 
+(ert-deftest org-latex-to-svg-reference-dangles-when-target-deleted ()
+  ;; Deleting the equation that defines a label makes every reference to it
+  ;; visibly broken: `(1)' -> `(??)' after a reconcile.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "See \\eqref{eq:a}.\n")
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (should (equal "(1)"
+                     (substring-no-properties
+                      (overlay-get (car (last (org-latex-to-svg-tests--overlays))) 'display))))
+      (goto-char (point-min))
+      (search-forward "\\begin{equation}")
+      (let ((b (match-beginning 0)))
+        (search-forward "\\end{equation}")
+        (delete-region b (point)))
+      (org-latex-to-svg--reconcile)
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        (should ref)
+        (should (equal "(??)" (substring-no-properties (overlay-get ref 'display))))
+        (should (null (overlay-get ref 'org-latex-to-svg-ref-num)))))))
+
+(ert-deftest org-latex-to-svg-reference-resolves-when-target-added ()
+  ;; A reference to a not-yet-defined label renders as `(??)', then resolves to
+  ;; a number once the labelled equation is added and reconciled.
+  (org-latex-to-svg-tests--with-stub
+    (org-latex-to-svg-tests--org "See \\eqref{eq:a}.\n"
+      (setq-local org-latex-to-svg-mode t)
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        (should ref)
+        (should (equal "(??)" (substring-no-properties (overlay-get ref 'display)))))
+      (goto-char (point-min))
+      (insert "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n")
+      (org-latex-to-svg--render-region (point-min) (point-max))
+      (org-latex-to-svg--reconcile)
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'org-latex-to-svg-ref))
+                           (org-latex-to-svg-tests--overlays))))
+        (should (equal "(1)" (substring-no-properties (overlay-get ref 'display))))
+        (should (= 1 (overlay-get ref 'org-latex-to-svg-ref-num)))))))
+
 (ert-deftest org-latex-to-svg-reference-reveals-under-cursor ()
   ;; Point entering a reference preview reveals its `\eqref' source; leaving
   ;; (unmodified) restores the `(N)' text.
