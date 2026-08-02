@@ -89,7 +89,8 @@ about equations lives in this front-end.
 
 - **`\eqref` / `\ref` to a `\tag`ged equation** — the tag suppresses the
   counter (numbers stay correct), but its literal tag text isn't harvested, so
-  the reference doesn't resolve.
+  the reference doesn't resolve and shows `(??)` (a plain-text overlay, as any
+  unresolved reference does — never LaTeX-typeset).
 - **`subequations` sub-lettering** (`N.a`, `N.b`) isn't modelled; inner
   environments are counted, best-effort.
 - **`\numberwithin{equation}{section}`**, custom counters, and user
