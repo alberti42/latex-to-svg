@@ -21,6 +21,8 @@ This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 You install an **adaptor**; it pulls in the frontend core and the backend
 engine as dependencies.
 
+![`docs/example.md` in `markdown-ts-mode`: rendered display equations, per-line equation numbers, click-to-jump `\ref`/`\eqref` links, and reveal-on-cursor showing the `\label` source at point.](Screenshot.png)
+
 ## Why
 
 The engine compiles each unique equation **once** (content-addressed on disk),
