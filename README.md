@@ -244,22 +244,14 @@ and toggles the core:
 See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` (~40 lines each)
 as templates.
 
-## Status
+## Limitations
 
-Implemented: universal scanner with per-mode exclusions and per-kind delimiter
-toggles (inline / display dollar and bracket, plus environments and references);
-one overlay per element; theme / zoom refresh from cache; equation
-numbering with ground-truth reconcile; `\eqref` / `\ref` resolution (incl.
-`(??)` for dangling / re-resolving on rename); reveal-on-cursor editing;
-render-on-leave.
-
-Not yet: **per-keystroke renumbering** (numbers settle the moment you step out
-of an equation, and a pass a fraction of a second after you stop typing covers
-paste / undo / delete — but not on every keystroke while you are still inside);
-`\tag`-based references and
-`subequations` sub-lettering (see
-[`docs/numbering.md`](docs/numbering.md)); Org inline `~code~` / `=verbatim=`
-exclusion (use the toggles as a workaround).
+- **`\tag`-based references and `subequations` sub-lettering** aren't modelled
+  (see [`docs/numbering.md`](docs/numbering.md)).
+- **Org inline `~code~` / `=verbatim=` aren't excluded** — a math delimiter
+  written inside them is still detected and previewed (Org block code —
+  `#+begin_src` / `example` / … — and comment lines *are* excluded; only
+  inline code / verbatim isn't yet).
 
 ## Tests
 
