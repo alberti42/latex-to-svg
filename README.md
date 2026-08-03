@@ -58,14 +58,20 @@ from running away.
 The *only* markup-specific thing is **which regions to skip** (code, verbatim).
 Each adaptor supplies that as a buffer-local `exclude-function`:
 
-- Markdown: fenced / indented code blocks (via the `markdown` tree-sitter
-  parser when present) + inline code spans.
+- Markdown: inline code spans (a backtick regexp) plus, when the `markdown`
+  tree-sitter grammar is installed, fenced / indented code blocks. The adaptor
+  runs the same in `markdown-ts-mode` **or** classic `markdown-mode` /
+  `gfm-mode` — it uses the `markdown` grammar directly (reusing the buffer's
+  parser if there is one, else creating its own), so the grammar is an optional
+  accelerator for block code, not a dependency on the major mode.
 - Org: `#+begin_src` / `example` / `export` / `comment` blocks + comment lines.
 
 ## Requirements
 
-- Emacs 29.1+ with SVG image support (`markdown-ts-mode` needs Emacs 31.1+; the
-  Org adaptor and classic `markdown-mode` work on older Emacs).
+- Emacs 29.1+ with SVG image support. The Markdown adaptor works under
+  `markdown-ts-mode` (Emacs 31.1+) **or** classic `markdown-mode` / `gfm-mode`;
+  the `markdown` tree-sitter grammar is optional (it adds fenced/indented
+  code-block exclusion — inline code is handled without it).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
   0.4.0+ (the engine).
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution).
@@ -103,7 +109,8 @@ share this one (select files per package).
 
 ## Usage
 
-Turn on the adaptor mode for your major mode:
+Turn on the adaptor mode for your major mode (the Markdown adaptor also works
+in classic `markdown-mode` / `gfm-mode` — hook whichever you use):
 
 ```elisp
 (add-hook 'markdown-ts-mode-hook #'latex-to-svg-for-markdown-mode)
@@ -231,8 +238,10 @@ redrawing, are made in the background.) Two identical equations are compiled
 
 ## Writing an adaptor for another markup
 
-An adaptor is a small `define-minor-mode` that sets the buffer-local protocol
-and toggles the core:
+To add math previews for a major mode that isn't covered yet, write an adaptor.
+The math logic lives in the core; an adaptor only supplies what counts as
+"code" in that markup. It's a small `define-minor-mode` that sets the
+buffer-local protocol and toggles the core:
 
 - `latex-to-svg-frontend-exclude-function` — `(fn BEG END)` → list of
   `(beg . end)` regions to ignore (code / verbatim). **The one required piece.**
@@ -243,6 +252,8 @@ and toggles the core:
 
 See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` (~40 lines each)
 as templates.
+
+Pull requests adding adaptors for other major modes are welcome.
 
 ## Limitations
 
