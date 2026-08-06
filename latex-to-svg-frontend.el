@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.9.0
+;; Version: 0.9.1
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.4.0"))
 ;; Keywords: tex, math, images
 
@@ -211,6 +211,17 @@ These are shown as ordinary buffer text (e.g. `(3)') in this face, not
 typeset by LaTeX, so they match the surrounding prose font.  Set it to
 `default' for a plain, unlinked look."
   :group 'latex-to-svg-frontend)
+
+(defconst latex-to-svg-frontend--neutralize-face
+  '(:strike-through nil :underline nil :overline nil)
+  "Overlay face that neutralizes decoration drawn over a preview.
+Markup font-lock (e.g. Org's emphasis fontifier) has no LaTeX awareness
+and paints `:strike-through' / `:underline' onto math that merely
+resembles emphasis (`(+)', `_i', `/x/', ...).  A `display' image or
+string inherits those line attributes from the buffer text beneath it, so
+the line is drawn across the preview.  Applied as the overlay's own
+`face' (with a `priority'), this explicitly turns those attributes off,
+leaving every other attribute to fall through.")
 
 ;;;; Math element model
 ;;
@@ -545,6 +556,10 @@ in the span."
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'help-echo (or source value))
         (overlay-put ov 'display image)
+        ;; Keep markup font-lock (Org emphasis, ...) from drawing a
+        ;; strike-through / underline across the rendered image.
+        (overlay-put ov 'face latex-to-svg-frontend--neutralize-face)
+        (overlay-put ov 'priority 1)
         (overlay-put ov 'latex-to-svg-frontend-display-math display-p)
         (overlay-put ov 'latex-to-svg-frontend-image image)
         (when enums-fallback
@@ -689,6 +704,8 @@ defining LABEL."
         (overlay-put ov 'latex-to-svg-frontend-ref-display display)
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'display display)
+        (overlay-put ov 'face latex-to-svg-frontend--neutralize-face)
+        (overlay-put ov 'priority 1)
         (overlay-put ov 'keymap latex-to-svg-frontend--reference-keymap)
         (overlay-put ov 'mouse-face 'highlight)
         (overlay-put ov 'help-echo

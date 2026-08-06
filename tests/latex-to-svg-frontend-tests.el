@@ -289,6 +289,22 @@ A plain buffer suffices — detection is a regexp scanner."
                         (overlay-start (car ovs)) (overlay-end (car ovs)))
                        "$a$"))))))
 
+(ert-deftest l2sf-overlay-neutralizes-strike-through ()
+  "Preview overlays carry a face that turns off strike-through/underline,
+so markup font-lock (e.g. Org emphasis) never draws a line across the image."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$ and \\[b\\]\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (dolist (ov (l2sf-tests--overlays))
+        (let ((face (overlay-get ov 'face)))
+          (should (eq (plist-get face :strike-through) nil))
+          (should (eq (plist-get face :underline) nil))
+          (should (eq (plist-get face :overline) nil))
+          ;; Explicitly present (not merely absent) so it overrides the
+          ;; text-property face beneath.
+          (should (plist-member face :strike-through))
+          (should (overlay-get ov 'priority)))))))
+
 (ert-deftest l2sf-clears-overlays ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ $b$\n"
