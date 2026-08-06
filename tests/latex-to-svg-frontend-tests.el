@@ -305,6 +305,32 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
           (should (plist-member face :strike-through))
           (should (overlay-get ov 'priority)))))))
 
+(ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
+  "The font-lock pass prepends the neutralizing face over detected math,
+so emphasis decoration set on the raw source (no overlay) is overridden."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[a^{(+)} + b^{(+)}\\]\n"
+      ;; Simulate a markup emphasis fontifier having struck part of the math.
+      (put-text-property (+ (point-min) 3) (- (point-max) 3)
+                         'face '(:strike-through t))
+      (goto-char (point-min))
+      (latex-to-svg-frontend--suppress-emphasis (point-max))
+      (let ((face (get-text-property (+ (point-min) 5) 'face)))
+        ;; Prepended, so our neutralizer is first and wins the merge.
+        (should (equal (car face) latex-to-svg-frontend--neutralize-face))
+        (should (member '(:strike-through t) face))))))
+
+(ert-deftest l2sf-suppress-emphasis-respects-toggle ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[a^{(+)} + b^{(+)}\\]\n"
+      (let ((latex-to-svg-frontend-suppress-emphasis nil))
+        (put-text-property (+ (point-min) 3) (- (point-max) 3)
+                           'face '(:strike-through t))
+        (goto-char (point-min))
+        (latex-to-svg-frontend--suppress-emphasis (point-max))
+        (should (equal (get-text-property (+ (point-min) 5) 'face)
+                       '(:strike-through t)))))))
+
 (ert-deftest l2sf-clears-overlays ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ $b$\n"

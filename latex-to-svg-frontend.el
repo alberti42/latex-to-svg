@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.9.1
+;; Version: 0.9.2
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.4.0"))
 ;; Keywords: tex, math, images
 
@@ -181,6 +181,17 @@ off: a doubled `$$' is unlikely to occur by accident in prose."
 Only meaningful with `latex-to-svg-frontend-number-equations' on, since the
 number comes from the document's `\\label' map.  When off, `\\eqref' / `\\ref'
 are left as literal source."
+  :type 'boolean
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-suppress-emphasis t
+  "Whether to strip markup emphasis decoration from math source text.
+Markup font-lock (Org's `+…+' / `_…_' / `/…/', Markdown's `*…*', ...) has no
+LaTeX awareness and paints `:strike-through' / `:underline' onto math that
+merely resembles emphasis (`(+)', `_i', `/x/', ...).  A live preview overlay
+already masks this, but freshly typed or currently-edited math has none.  When
+non-nil, a font-lock pass neutralizes that decoration over every detected math
+span (see `latex-to-svg-frontend--suppress-emphasis')."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
@@ -1367,6 +1378,31 @@ the whole buffer: a fresh recompile bypassing the cache (see
   "Keymap for `latex-to-svg-frontend-mode'.")
 
 ;;;###autoload
+;;;; Emphasis suppression (font-lock)
+
+(defun latex-to-svg-frontend--suppress-emphasis (limit)
+  "Font-lock keyword: neutralize markup emphasis decoration over math.
+Runs after the markup's own emphasis fontifier (added with `append').  Over
+every detected math span in POINT..LIMIT it prepends
+`latex-to-svg-frontend--neutralize-face' onto the `face' text property, so the
+front-most spec wins the merge and `:strike-through' / `:underline' /
+`:overline' are turned off for math that only looks like emphasis.  Other
+attributes fall through untouched.  Does its own fontification and matches no
+region, so it always returns nil (font-lock calls it once per chunk)."
+  (when latex-to-svg-frontend-suppress-emphasis
+    (dolist (el (latex-to-svg-frontend--scan (point) limit))
+      (let ((b (max (point) (latex-to-svg-frontend--math-begin el)))
+            (e (min limit (latex-to-svg-frontend--math-end el))))
+        (when (< b e)
+          (font-lock-prepend-text-property
+           b e 'face latex-to-svg-frontend--neutralize-face)))))
+  (goto-char limit)
+  nil)
+
+(defconst latex-to-svg-frontend--font-lock-keywords
+  '((latex-to-svg-frontend--suppress-emphasis))
+  "Font-lock keywords added while the mode is on (appended, so they run last).")
+
 (define-minor-mode latex-to-svg-frontend-mode
   "Minor mode previewing LaTeX math as SVG images via `latex-to-svg-backend'.
 
@@ -1383,10 +1419,16 @@ When enabled, all detected math is rendered; disabling clears it.  See
                   #'latex-to-svg-frontend--schedule-reconcile nil t)
         (add-hook 'post-command-hook
                   #'latex-to-svg-frontend--handle-cursor nil t)
+        (font-lock-add-keywords
+         nil latex-to-svg-frontend--font-lock-keywords 'append)
+        (when font-lock-mode (font-lock-flush))
         (latex-to-svg-frontend--render-region (point-min) (point-max)))
     (remove-hook 'after-change-functions
                  #'latex-to-svg-frontend--schedule-reconcile t)
     (remove-hook 'post-command-hook #'latex-to-svg-frontend--handle-cursor t)
+    (font-lock-remove-keywords
+     nil latex-to-svg-frontend--font-lock-keywords)
+    (when font-lock-mode (font-lock-flush))
     (when (markerp latex-to-svg-frontend--last-point)
       (set-marker latex-to-svg-frontend--last-point nil))
     (setq latex-to-svg-frontend--last-point nil)
