@@ -300,6 +300,9 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
           (should (eq (plist-get face :strike-through) nil))
           (should (eq (plist-get face :underline) nil))
           (should (eq (plist-get face :overline) nil))
+          ;; Bold / italic emphasis is spurious inside math too.
+          (should (eq (plist-get face :weight) 'normal))
+          (should (eq (plist-get face :slant) 'normal))
           ;; Explicitly present (not merely absent) so it overrides the
           ;; text-property face beneath.
           (should (plist-member face :strike-through))

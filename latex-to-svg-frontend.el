@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.9.2
+;; Version: 0.9.3
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.4.0"))
 ;; Keywords: tex, math, images
 
@@ -224,15 +224,20 @@ typeset by LaTeX, so they match the surrounding prose font.  Set it to
   :group 'latex-to-svg-frontend)
 
 (defconst latex-to-svg-frontend--neutralize-face
-  '(:strike-through nil :underline nil :overline nil)
-  "Overlay face that neutralizes decoration drawn over a preview.
+  '(:strike-through nil :underline nil :overline nil
+    :weight normal :slant normal :box nil)
+  "Face that neutralizes spurious markup emphasis over math.
 Markup font-lock (e.g. Org's emphasis fontifier) has no LaTeX awareness
-and paints `:strike-through' / `:underline' onto math that merely
-resembles emphasis (`(+)', `_i', `/x/', ...).  A `display' image or
-string inherits those line attributes from the buffer text beneath it, so
-the line is drawn across the preview.  Applied as the overlay's own
-`face' (with a `priority'), this explicitly turns those attributes off,
-leaving every other attribute to fall through.")
+and fontifies math that merely resembles emphasis: `(+)' / `_i' as
+strike-through / underline, `*x*' as bold, `/x/' as italic.  Inside an
+equation `*', `/', `_', `+' are LaTeX syntax, never prose emphasis, so all
+of it is spurious.  This spec explicitly turns those attributes off; every
+other attribute (colours, etc.) falls through untouched.
+
+Used two ways, both scoped to detected math only: as a preview overlay's
+own `face' (with a `priority'), so a `display' image or string is not
+decorated by the buffer text beneath it; and prepended to the `face' text
+property of raw math source by `latex-to-svg-frontend--suppress-emphasis'.")
 
 ;;;; Math element model
 ;;
