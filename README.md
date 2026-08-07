@@ -37,6 +37,15 @@ what a browser/pandoc pipeline can't:
 - **Numbered equations + working `\ref` / `\eqref`** — numbered in document
   order and kept correct as you edit; references resolve to `(N)` / `N` (or
   `(??)` when the target is missing), as plain buffer text.
+- **Math source is shielded from stray emphasis fontifying** — markup
+  font-lock has no idea what LaTeX is, so it happily reads `(+)` as
+  strike-through, `_i` as underline, `*x*` as bold, `/x/` as italic and
+  decorates your equation (a line struck clean through the rendered SVG, even).
+  Stock Org LaTeX preview has no defense against this. Here the same detector
+  that finds math also neutralizes those attributes over it — on the rendered
+  overlay **and** on the raw source while you edit — so `*`, `/`, `_`, `+` are
+  treated as the LaTeX syntax they are. Prose emphasis outside math is
+  untouched; toggle with `latex-to-svg-frontend-suppress-emphasis`.
 
 The engine cache is shared across every front-end (Org, Markdown,
 `agent-shell-math-renderer`), so an equation compiles once across all of them.
