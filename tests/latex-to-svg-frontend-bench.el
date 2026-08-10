@@ -1,5 +1,12 @@
 ;;; latex-to-svg-frontend-bench.el --- Scan/exclusion/reconcile timings  -*- lexical-binding: t; -*-
 
+;; Copyright (C) 2026 Andrea Alberti
+
+;; Author: Andrea Alberti <a.alberti82@gmail.com>
+;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
+;; Assisted-by: Claude:claude-opus-4-8
+;; URL: https://github.com/alberti42/latex-to-svg
+
 ;; Not part of the test suite.  Load into a live Emacs that has the
 ;; Markdown tree-sitter grammar and the adaptors, then call
 ;; `l2sf-bench-run' (Markdown) or `l2sf-bench-run-org'.

@@ -4,6 +4,7 @@
 
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
+;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.11.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.8.0"))
