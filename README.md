@@ -87,28 +87,45 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
 
 ## Installation
 
-Neither repo is on MELPA yet. Register the engine and the core, then the
-adaptor(s) you want — the backend is a separate repo; the frontend and adaptors
-share this one (select files per package).
+Neither repo is on MELPA yet. The stack has three layers, installed bottom-up:
+
+- **`latex-to-svg-backend`** — the LaTeX → SVG compile engine, in its own repo.
+- **`latex-to-svg-frontend`** — the shared preview core (detection, overlays,
+  numbering, refresh), markup-agnostic.
+- **`latex-to-svg-for-markdown`** / **`latex-to-svg-for-org`** — the per-mode
+  adaptors. Install whichever you use; both are optional.
+
+The frontend and the two adaptors live in one repo (this one), so their recipes
+select a single file each; the backend is a separate repo.
+
+### Straight
 
 ```elisp
-;; straight
+;; Backend — the LaTeX -> SVG engine (separate repo)
 (use-package latex-to-svg-backend
   :straight (latex-to-svg-backend :type git :host github
                                   :repo "alberti42/latex-to-svg-backend"))
+
+;; Frontend — the shared preview core
 (use-package latex-to-svg-frontend
   :straight (latex-to-svg-frontend :type git :host github
                                    :repo "alberti42/latex-to-svg"
-                                   :files ("latex-to-svg-frontend.el")))
+                                   :files ("latex-to-svg-frontend.el"))
+  ;; Optional: re-tint previews the instant you switch themes.
+  ;; See "Refreshing on appearance changes" below; omit if you never
+  ;; change themes at runtime.
+  :config
+  (add-hook 'enable-theme-functions
+            #'latex-to-svg-frontend-on-theme-change))
 
-;; Markdown
+;; Markdown adaptor
 (use-package latex-to-svg-for-markdown
   :straight (latex-to-svg-for-markdown :type git :host github
                                        :repo "alberti42/latex-to-svg"
                                        :files ("latex-to-svg-for-markdown.el"))
   :hook (markdown-ts-mode . latex-to-svg-for-markdown-mode))
 
-;; Org
+;; Org adaptor
 (use-package latex-to-svg-for-org
   :straight (latex-to-svg-for-org :type git :host github
                                   :repo "alberti42/latex-to-svg"
