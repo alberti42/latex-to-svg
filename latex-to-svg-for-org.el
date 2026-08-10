@@ -5,8 +5,8 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.9.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.1.0"))
+;; Version: 0.9.3
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.9.3"))
 ;; Keywords: tex, org, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -46,8 +46,8 @@
 
 (require 'latex-to-svg-frontend)
 
-(defun latex-to-svg-for-org--exclusions (beg end)
-  "Return Org code / comment regions within BEG..END to skip.
+(defun latex-to-svg-for-org--exclusions (_beg end)
+  "Return Org code / comment regions up to END to skip.
 Covers `#+begin_src' / `example' / `export' / `comment' blocks and whole
 comment lines (`# …').  This is the buffer's
 `latex-to-svg-frontend-exclude-function'."
@@ -78,8 +78,7 @@ comment lines (`# …').  This is the buffer's
 Installs the Org code/comment exclusions and `org-fold-show-context' as
 the jump-reveal, then turns on `latex-to-svg-frontend-mode', which does
 the rendering.  Enable it from `org-mode-hook'.  While on, its
-\\[latex-to-svg-frontend] shadows Org's classic `org-latex-preview' on
-`C-c C-x C-l'."
+\\[latex-to-svg-frontend] shadows Org's classic `org-latex-preview'."
   :lighter nil
   (if latex-to-svg-for-org-mode
       (if (derived-mode-p 'org-mode)

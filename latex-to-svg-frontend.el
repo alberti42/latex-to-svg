@@ -594,7 +594,9 @@ in the span."
   "Marker at point after the previous command (for cursor reveal tracking).")
 
 (defun latex-to-svg-frontend--on-modify (ov after &rest _)
-  "Modification hook for preview OV: reveal its source, flag it for re-render."
+  "Modification hook for preview overlay OV.
+AFTER is non-nil after the change; reveal OV's source and flag it for
+re-render."
   (when after
     (overlay-put ov 'latex-to-svg-frontend-modified t)
     (overlay-put ov 'display nil)))
@@ -673,7 +675,8 @@ happens until it is closed and left."
         (latex-to-svg-frontend--render-on-leave-element el)))))
 
 (defun latex-to-svg-frontend--handle-cursor ()
-  "Reveal the preview point moved into, re-hide the one it left, and render
+  "Handle a cursor move around math previews.
+Reveal the preview point moved into, re-hide the one it left, and render
 any newly finished equation the cursor just left.
 On `post-command-hook' while the mode is on."
   (when latex-to-svg-frontend-mode
@@ -870,6 +873,7 @@ wrapped in `$…$' / `\\(…\\)'."
 
 (defun latex-to-svg-frontend--reference-display (source labels)
   "If SOURCE is a resolvable `\\eqref' / `\\ref' fragment, return its display text.
+The number is looked up in LABELS.
 `\\eqref' -> \"(N)\", `\\ref' -> \"N\" — plain buffer text — or nil."
   (when-let* ((parsed (latex-to-svg-frontend--reference-parse source))
               (num (gethash (cdr parsed) labels)))
@@ -916,7 +920,7 @@ TABLE is a (OFFSETS . LABELS) scan."
 ;;;; Rendering
 
 (defun latex-to-svg-frontend--place (buffer beg end value &optional source enums-fallback display-p)
-  "Ensure BUFFER's BEG..END shows the current image for render VALUE.
+  "Ensure BEG..END in BUFFER shows the current image for render VALUE.
 Overlays immediately on a cache hit, else schedules an async compile and
 overlays when it finishes.  BEG / END should be markers."
   (when (buffer-live-p buffer)
@@ -1152,6 +1156,7 @@ equations, so the full scan is still needed."
 
 (defun latex-to-svg-frontend--reconcile (&optional buffer)
   "Recompute equation numbers and re-render previews whose number changed.
+Operate in BUFFER (default the current buffer).
 A comprehensive pass: also cancels any pending debounced reconcile and clears
 the pending-change range.  No-op unless the mode and numbering are on."
   (with-current-buffer (or buffer (current-buffer))
@@ -1283,6 +1288,7 @@ option are on."
 
 (defun latex-to-svg-frontend-goto-reference (&optional event)
   "Jump to the equation defining the label of the reference preview at point.
+EVENT is the triggering input event.
 Bound in `\\eqref' / `\\ref' preview overlays to `mouse-1' and `RET'."
   (interactive (list last-command-event))
   (when (and (consp event) (eventp event))
