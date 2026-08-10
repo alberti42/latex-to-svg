@@ -9,6 +9,27 @@ This repository ships three packages that share one version/tag stream:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-08-10
+
+### Added
+
+- `latex-to-svg-frontend-foreground-color`,
+  `latex-to-svg-frontend-background-color`, and
+  `latex-to-svg-frontend-background-padding`: customize the preview tint, paint
+  an optional box color behind previews (e.g. a light-gray background), and pad
+  that box beyond the ink. All default to nil (follow the buffer foreground /
+  transparent / cropped to the ink, unchanged behavior) and are passed to
+  `latex-to-svg-backend` as `:color` / `:background` / `:padding`, so they
+  re-tint / re-box / re-pad from cache without a LaTeX recompile; run
+  `latex-to-svg-frontend-refresh` after changing them.
+
+### Changed
+
+- Measure the buffer font height against the buffer's actual display frame and
+  pass it to the engine as `:font-height`, so previews size correctly even when
+  an async render/callback fires while a TTY/daemon frame is selected, and the
+  engine never has to guess a frame. Requires `latex-to-svg-backend` 0.8.0.
+
 ## [0.9.3] - 2026-08-10
 
 ### Changed
@@ -149,6 +170,7 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
+[0.10.0]: https://github.com/alberti42/latex-to-svg/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/alberti42/latex-to-svg/compare/v0.9.0...v0.9.3
 [0.9.0]: https://github.com/alberti42/latex-to-svg/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/alberti42/latex-to-svg/compare/v0.7.2...v0.8.0

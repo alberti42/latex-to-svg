@@ -5,8 +5,8 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.9.3
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.9.3"))
+;; Version: 0.10.0
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.10.0"))
 ;; Keywords: tex, markdown, math, images
 
 ;; This package is free software; you can redistribute it and/or modify

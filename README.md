@@ -147,8 +147,9 @@ half-typed equations aren't compiled.
 
 ### Per-mode configuration
 
-The size multipliers, numbering, and detection toggles are ordinary variables
-you set **buffer-locally in the mode hook** — so Org and Markdown can differ:
+The size multipliers, colors, numbering, and detection toggles are ordinary
+variables you set **buffer-locally in the mode hook** — so Org and Markdown can
+differ:
 
 ```elisp
 (defun my/latex-to-svg-markdown-setup ()
@@ -157,6 +158,19 @@ you set **buffer-locally in the mode hook** — so Org and Markdown can differ:
   (latex-to-svg-for-markdown-mode 1))
 (add-hook 'markdown-ts-mode-hook #'my/latex-to-svg-markdown-setup)
 ```
+
+### Colors and box
+
+By default previews use the buffer foreground (so they track your theme) on a
+transparent background. You can override any of three appearance options — they
+apply instantly from cache (no recompiling); after changing one, run `M-x
+latex-to-svg-frontend-refresh`:
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `latex-to-svg-frontend-foreground-color` | `nil` | Fixed ink color; `nil` follows the buffer foreground (tracks the theme). |
+| `latex-to-svg-frontend-background-color` | `nil` | Box color behind previews; `nil` is transparent. A very light gray reads best (e.g. `gray97` / `#f7f7f7`). |
+| `latex-to-svg-frontend-background-padding` | `nil` | Padding (pt) between the equation and the box edge; only visible with a background color. `nil`/`0` crops to the ink. |
 
 ### Delimiter toggles
 

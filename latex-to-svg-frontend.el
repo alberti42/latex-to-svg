@@ -5,8 +5,8 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.9.3
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.4.0"))
+;; Version: 0.10.0
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.8.0"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -140,6 +140,46 @@ changing it, run `latex-to-svg-frontend-refresh' to apply."
   :type 'number
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-foreground-color nil
+  "Color equation previews are tinted with, or nil to follow the buffer.
+
+When nil (the default) previews use the buffer foreground and track
+the theme (see `latex-to-svg-backend-foreground-color').  Set to a
+color — a `#rrggbb' string or any name `color-name-to-rgb'
+understands (e.g. \"black\", \"#1a1a1a\") — to tint every preview
+with that fixed color regardless of theme.  Passed to
+`latex-to-svg-backend' as `:color'; re-tints from cache (no recompile),
+so run `latex-to-svg-frontend-refresh' after changing it."
+  :type '(choice (const :tag "Follow buffer foreground" nil)
+                 (color :tag "Fixed color"))
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-background-color nil
+  "Box color painted behind equation previews, or nil for transparent.
+
+When nil (the default) previews are transparent and blend into the
+buffer.  Set to a color — a `#rrggbb' string or any name
+`color-name-to-rgb' understands — to paint that color behind every
+preview.  A very light gray reads best (e.g. \"gray97\" / \"#f7f7f7\");
+keep it subtle so it doesn't fight the buffer background.  Passed to
+`latex-to-svg-backend' as `:background'; re-boxes from cache (no
+recompile), so run `latex-to-svg-frontend-refresh' after changing it."
+  :type '(choice (const :tag "Transparent" nil)
+                 (color :tag "Box color"))
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-background-padding nil
+  "Padding (in pt) around previews inside the background box.
+
+Has a visible effect only when `latex-to-svg-frontend-background-color'
+is set: it grows the colored box beyond the equation ink on all
+sides.  A number of pt (e.g. 3) that scales with the equation; nil or
+0 crops the box to the ink.  Passed to `latex-to-svg-backend' as
+`:padding'; applies from cache (no recompile), so run
+`latex-to-svg-frontend-refresh' after changing it."
+  :type '(choice (const :tag "None" nil) number)
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-detect-dollar-inline t
   "Whether to detect inline TeX dollar math `$…$'.
 `$' is the least reliable delimiter, since it also occurs in prose (prices,
@@ -268,6 +308,24 @@ Inline `$…$' / `\\(…\\)' return nil."
   (if display-p
       latex-to-svg-frontend-display-rescale
     latex-to-svg-frontend-inline-rescale))
+
+(defun latex-to-svg-frontend--font-height (&optional buffer)
+  "Return BUFFER's font pixel height in a graphical frame showing it, or nil.
+
+Measured against the frame that actually displays BUFFER, so previews
+size correctly even when the selected frame is a TTY/daemon frame (an
+async compile callback firing while a terminal frame is current).
+Uses `with-selected-frame' — a temporary, non-raising, non-focus-stealing
+selection — so it never makes a parked child frame appear.  Returns nil
+when BUFFER is shown in no graphical window, in which case the engine
+defers sizing to display time and the refresh hook redraws it then."
+  (let ((buffer (or buffer (current-buffer))))
+    (when-let* ((win (get-buffer-window buffer t))
+                (frame (window-frame win))
+                ((display-graphic-p frame)))
+      (with-selected-frame frame
+        (with-current-buffer buffer
+          (ignore-errors (default-font-height)))))))
 
 (defconst latex-to-svg-frontend--numbered-environments-single
   '("equation" "math" "displaymath" "multline" "dmath" "empheq")
@@ -585,7 +643,9 @@ in the span."
               (latex-to-svg-frontend--schedule-reconcile))))
         (overlay-put ov 'modification-hooks
                      (list #'latex-to-svg-frontend--on-modify))
-        (setq latex-to-svg-frontend--rendered-appearance (latex-to-svg-backend-appearance))
+        (setq latex-to-svg-frontend--rendered-appearance
+              (latex-to-svg-backend-appearance
+               (latex-to-svg-frontend--font-height (current-buffer))))
         ov))))
 
 ;;;; Reveal on cursor entry
@@ -928,6 +988,10 @@ overlays when it finishes.  BEG / END should be markers."
       (let ((image (latex-to-svg-backend
                     value
                     :rescale-by (latex-to-svg-frontend--rescale-for display-p)
+                    :color latex-to-svg-frontend-foreground-color
+                    :background latex-to-svg-frontend-background-color
+                    :padding latex-to-svg-frontend-background-padding
+                    :font-height (latex-to-svg-frontend--font-height buffer)
                     :metadata (car enums-fallback)
                     :callback (lambda ()
                                 (latex-to-svg-frontend--place
@@ -1225,16 +1289,22 @@ option are on."
   "Re-tint / re-scale BUFFER's previews for the current appearance."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
-      (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
-        (when-let* ((value (overlay-get ov 'latex-to-svg-frontend-value))
-                    (image (latex-to-svg-backend
-                            value :rescale-by
-                            (latex-to-svg-frontend--rescale-for
-                             (overlay-get ov 'latex-to-svg-frontend-display-math)))))
-          (overlay-put ov 'latex-to-svg-frontend-image image)
-          (when (overlay-get ov 'display)
-            (overlay-put ov 'display image))))
-      (setq latex-to-svg-frontend--rendered-appearance (latex-to-svg-backend-appearance)))))
+      (let ((font-height (latex-to-svg-frontend--font-height (current-buffer))))
+        (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
+          (when-let* ((value (overlay-get ov 'latex-to-svg-frontend-value))
+                      (image (latex-to-svg-backend
+                              value
+                              :rescale-by (latex-to-svg-frontend--rescale-for
+                                           (overlay-get ov 'latex-to-svg-frontend-display-math))
+                              :color latex-to-svg-frontend-foreground-color
+                              :background latex-to-svg-frontend-background-color
+                              :padding latex-to-svg-frontend-background-padding
+                              :font-height font-height)))
+            (overlay-put ov 'latex-to-svg-frontend-image image)
+            (when (overlay-get ov 'display)
+              (overlay-put ov 'display image))))
+        (setq latex-to-svg-frontend--rendered-appearance
+              (latex-to-svg-backend-appearance font-height))))))
 
 ;;;###autoload
 (defun latex-to-svg-frontend-refresh (&optional buffer)
@@ -1250,7 +1320,8 @@ option are on."
 (defun latex-to-svg-frontend--refresh-if-changed ()
   "Refresh the current buffer's previews if its appearance changed."
   (when (and (latex-to-svg-frontend--present-p)
-             (not (equal (latex-to-svg-backend-appearance)
+             (not (equal (latex-to-svg-backend-appearance
+                          (latex-to-svg-frontend--font-height (current-buffer)))
                          latex-to-svg-frontend--rendered-appearance)))
     (latex-to-svg-frontend-refresh (current-buffer))))
 

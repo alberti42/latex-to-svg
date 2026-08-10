@@ -50,13 +50,15 @@
          (l2sf-tests--invalidated nil)
          (l2sf-tests--metadata nil)
          (l2sf-tests--last-rescale nil)
+         (l2sf-tests--last-args nil)
          (latex-to-svg-backend-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
                 (lambda (_latex &rest args)
-                  (setq l2sf-tests--last-rescale (plist-get args :rescale-by))
+                  (setq l2sf-tests--last-rescale (plist-get args :rescale-by)
+                        l2sf-tests--last-args args)
                   l2sf-tests--image))
                ((symbol-function 'latex-to-svg-backend-appearance)
-                (lambda () l2sf-tests--appearance))
+                (lambda (&optional _font-height) l2sf-tests--appearance))
                ((symbol-function 'latex-to-svg-backend-metadata)
                 (lambda (value) (cdr (assoc value l2sf-tests--metadata))))
                ((symbol-function 'latex-to-svg-backend-invalidate)
@@ -850,6 +852,26 @@ so emphasis decoration set on the raw source (no overlay) is overridden."
       (l2sf-tests--md "\\[b\\]\n"
         (latex-to-svg-frontend--render-region (point-min) (point-max))
         (should (equal l2sf-tests--last-rescale 1.4))))))
+
+(ert-deftest l2sf-passes-color-background-padding ()
+  ;; The three appearance defcustoms are threaded to the engine as
+  ;; :color / :background / :padding (both on first render and on refresh).
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-foreground-color "red")
+          (latex-to-svg-frontend-background-color "gray97")
+          (latex-to-svg-frontend-background-padding 6)
+          (latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--md "\\[b\\]\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (equal (plist-get l2sf-tests--last-args :color) "red"))
+        (should (equal (plist-get l2sf-tests--last-args :background) "gray97"))
+        (should (equal (plist-get l2sf-tests--last-args :padding) 6))
+        ;; Refresh re-threads them too.
+        (setq l2sf-tests--last-args nil)
+        (latex-to-svg-frontend-refresh)
+        (should (equal (plist-get l2sf-tests--last-args :color) "red"))
+        (should (equal (plist-get l2sf-tests--last-args :background) "gray97"))
+        (should (equal (plist-get l2sf-tests--last-args :padding) 6))))))
 
 (ert-deftest l2sf-refresh-rescales-by-kind ()
   (l2sf-tests--with-stub
