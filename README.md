@@ -172,6 +172,26 @@ latex-to-svg-frontend-refresh`:
 | `latex-to-svg-frontend-background-color` | `nil` | Box color behind previews; `nil` is transparent. A very light gray reads best (e.g. `gray97` / `#f7f7f7`). |
 | `latex-to-svg-frontend-background-padding` | `nil` | Padding (pt) between the equation and the box edge; only visible with a background color. `nil`/`0` crops to the ink. |
 
+### Refreshing on appearance changes
+
+Previews track the buffer colors and font and re-render automatically when they
+change. `latex-to-svg-frontend-mode` installs its refresh triggers
+**buffer-locally** when enabled (never merely by loading the package):
+redisplay (`window-buffer-change-functions`) and zoom (`text-scale-mode-hook`),
+so an inactive buffer costs nothing and they are removed when the mode is off.
+
+A theme switch is a *global* event, with no per-buffer hook, so the package
+installs nothing global on your behalf. If you want previews to re-tint the
+instant you switch themes, add the provided function to `enable-theme-functions`
+yourself — the same way you enable the mode:
+
+```elisp
+(add-hook 'enable-theme-functions #'latex-to-svg-frontend-on-theme-change)
+```
+
+Without it, previews re-tint on their next redisplay. You can always force a
+refresh with `M-x latex-to-svg-frontend-refresh`.
+
 ### Delimiter toggles
 
 Each delimiter kind can be turned off independently (all default on) —

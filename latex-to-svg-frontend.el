@@ -5,7 +5,7 @@
 ;; Author: Andrea Alberti <a.alberti82@gmail.com>
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.10.0
+;; Version: 0.11.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.8.0"))
 ;; Keywords: tex, math, images
 
@@ -770,8 +770,8 @@ On `post-command-hook' while the mode is on."
   "Overlay BEG..END with plain-text DISPLAY for a reference to LABEL.
 NUM is the resolved number, recorded so a reconcile can detect when the
 target renumbered.  Draws ordinary buffer text (matching the prose font)
-and makes the span click-to-jump (`mouse-1' / `RET') to the equation
-defining LABEL."
+and makes the span jump, on a left click or the return key, to the
+equation defining LABEL."
   (let ((b (if (markerp beg) (marker-position beg) beg))
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
@@ -1335,8 +1335,17 @@ option are on."
                        (with-current-buffer buf
                          (latex-to-svg-frontend--refresh-if-changed))))))))
 
-(defun latex-to-svg-frontend--on-theme-change (&rest _)
-  "Refresh every preview buffer whose appearance changed after a theme switch."
+;;;###autoload
+(defun latex-to-svg-frontend-on-theme-change (&rest _)
+  "Refresh every preview buffer whose appearance changed after a theme switch.
+
+Add this to `enable-theme-functions' for instant re-tinting when you
+switch themes, mirroring how the mode itself is enabled:
+
+  (add-hook \\='enable-theme-functions
+            #\\='latex-to-svg-frontend-on-theme-change)
+
+Previews otherwise re-tint on their next redisplay, so this is optional."
   (run-at-time
    0 nil
    (lambda ()
@@ -1344,10 +1353,6 @@ option are on."
        (when (buffer-local-value 'latex-to-svg-frontend-mode buf)
          (with-current-buffer buf
            (latex-to-svg-frontend--refresh-if-changed)))))))
-
-(add-hook 'enable-theme-functions #'latex-to-svg-frontend--on-theme-change)
-(add-hook 'text-scale-mode-hook #'latex-to-svg-frontend--maybe-refresh)
-(add-hook 'window-buffer-change-functions #'latex-to-svg-frontend--maybe-refresh)
 
 ;;;; Command and mode
 
@@ -1360,7 +1365,8 @@ option are on."
 (defun latex-to-svg-frontend-goto-reference (&optional event)
   "Jump to the equation defining the label of the reference preview at point.
 EVENT is the triggering input event.
-Bound in `\\eqref' / `\\ref' preview overlays to `mouse-1' and `RET'."
+Bound in `\\eqref' / `\\ref' preview overlays to a left click and the
+return key."
   (interactive (list last-command-event))
   (when (and (consp event) (eventp event))
     (let ((posn (event-start event)))
@@ -1497,6 +1503,10 @@ When enabled, all detected math is rendered; disabling clears it.  See
   :keymap latex-to-svg-frontend-mode-map
   (if latex-to-svg-frontend-mode
       (progn
+        (add-hook 'window-buffer-change-functions
+                  #'latex-to-svg-frontend--maybe-refresh nil t)
+        (add-hook 'text-scale-mode-hook
+                  #'latex-to-svg-frontend--maybe-refresh nil t)
         (add-hook 'after-change-functions
                   #'latex-to-svg-frontend--schedule-reconcile nil t)
         (add-hook 'post-command-hook
@@ -1505,6 +1515,10 @@ When enabled, all detected math is rendered; disabling clears it.  See
          nil latex-to-svg-frontend--font-lock-keywords 'append)
         (when font-lock-mode (font-lock-flush))
         (latex-to-svg-frontend--render-region (point-min) (point-max)))
+    (remove-hook 'window-buffer-change-functions
+                 #'latex-to-svg-frontend--maybe-refresh t)
+    (remove-hook 'text-scale-mode-hook
+                 #'latex-to-svg-frontend--maybe-refresh t)
     (remove-hook 'after-change-functions
                  #'latex-to-svg-frontend--schedule-reconcile t)
     (remove-hook 'post-command-hook #'latex-to-svg-frontend--handle-cursor t)

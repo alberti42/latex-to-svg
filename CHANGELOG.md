@@ -9,6 +9,26 @@ This repository ships three packages that share one version/tag stream:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-08-10
+
+### Added
+
+- `latex-to-svg-frontend-on-theme-change`: a function you can add to
+  `enable-theme-functions` for instant re-tinting when you switch themes:
+
+      (add-hook 'enable-theme-functions
+                #'latex-to-svg-frontend-on-theme-change)
+
+### Changed
+
+- Previews no longer add any hooks merely by loading the package.
+  `latex-to-svg-frontend-mode` installs its appearance-refresh hooks
+  **buffer-locally** on activation (`window-buffer-change-functions` for
+  redisplay, `text-scale-mode-hook` for zoom) and removes them on
+  deactivation.  The package installs no global hooks: theme re-tinting is
+  opt-in via the function above (previews otherwise re-tint on their next
+  redisplay).  Loading is now side-effect-free.
+
 ## [0.10.0] - 2026-08-10
 
 ### Added
@@ -170,6 +190,7 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
+[0.11.0]: https://github.com/alberti42/latex-to-svg/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/alberti42/latex-to-svg/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/alberti42/latex-to-svg/compare/v0.9.0...v0.9.3
 [0.9.0]: https://github.com/alberti42/latex-to-svg/compare/v0.8.0...v0.9.0
