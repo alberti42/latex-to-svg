@@ -1507,22 +1507,47 @@ the whole buffer: a fresh recompile bypassing the cache (see
 ;;;###autoload
 ;;;; Emphasis suppression (font-lock)
 
+(defun latex-to-svg-frontend--pos-in-span-p (pos spans)
+  "Non-nil when POS is strictly inside one of SPANS (each a (BEG . END) cons).
+Strict (BEG < POS < END) so a marker *inside* math matches while the span's
+own delimiters do not."
+  (seq-some (lambda (s) (and (< (car s) pos) (< pos (cdr s)))) spans))
+
 (defun latex-to-svg-frontend--suppress-emphasis (limit)
   "Font-lock keyword: neutralize markup emphasis decoration over math.
-Runs after the markup's own emphasis fontifier (added with `append').  Over
-every detected math span in POINT..LIMIT it prepends
-`latex-to-svg-frontend--neutralize-face' onto the `face' text property, so the
-front-most spec wins the merge and `:strike-through' / `:underline' /
-`:overline' are turned off for math that only looks like emphasis.  Other
-attributes fall through untouched.  Does its own fontification and matches no
-region, so it always returns nil (font-lock calls it once per chunk)."
+Runs after the markup's own emphasis fontifier (added with `append').
+
+Markup font-lock has no LaTeX awareness, so a stray marker *inside* an
+equation (the `=' in `\\(\\Delta{=}0\\)', the `+' in `(+)', ...) gets read as
+an emphasis/verbatim delimiter.  It may pair with its partner inside the same
+equation, or with one inside the *next* equation -- and org then paints the
+whole run, including any prose caught in between (a real annoyance stock Org
+preview has no defense against).
+
+So rather than blanket-covering each math span, we walk the `face' runs in
+POINT..LIMIT and, for any run whose first or last character falls strictly
+inside a detected math span (i.e. a run anchored to a marker that lives in
+math), prepend `latex-to-svg-frontend--neutralize-face' over the *entire* run.
+That clears the decoration on the bridged prose too, while a legitimate prose
+emphasis that merely *contains* inline math (its markers in prose, endpoints
+outside every span) is left untouched.  Returns nil (own fontification, one
+call per chunk)."
   (when latex-to-svg-frontend-suppress-emphasis
-    (dolist (el (latex-to-svg-frontend--scan (point) limit))
-      (let ((b (max (point) (latex-to-svg-frontend--math-begin el)))
-            (e (min limit (latex-to-svg-frontend--math-end el))))
-        (when (< b e)
-          (font-lock-prepend-text-property
-           b e 'face latex-to-svg-frontend--neutralize-face)))))
+    (let ((spans (mapcar (lambda (el)
+                           (cons (latex-to-svg-frontend--math-begin el)
+                                 (latex-to-svg-frontend--math-end el)))
+                         (latex-to-svg-frontend--scan (point) limit))))
+      (when spans
+        (let ((p (point)))
+          (while (< p limit)
+            (let ((q (or (next-single-property-change p 'face nil limit)
+                         limit)))
+              (when (and (get-text-property p 'face)
+                         (or (latex-to-svg-frontend--pos-in-span-p p spans)
+                             (latex-to-svg-frontend--pos-in-span-p (1- q) spans)))
+                (font-lock-prepend-text-property
+                 p q 'face latex-to-svg-frontend--neutralize-face))
+              (setq p q)))))))
   (goto-char limit)
   nil)
 

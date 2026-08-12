@@ -332,6 +332,41 @@ so emphasis decoration set on the raw source (no overlay) is overridden."
         (should (equal (car face) latex-to-svg-frontend--neutralize-face))
         (should (member '(:strike-through t) face))))))
 
+(ert-deftest l2sf-suppress-emphasis-clears-cross-equation-bridge ()
+  "A verbatim/emphasis run opened by a marker inside one equation and closed
+inside the next paints the prose in between; the whole run is neutralized."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "XX \\(\\Delta{=}0\\)\nIso \\(\\Delta{=}1\\)\n"
+      ;; Emulate org: verbatim face from the `=' in line 1 to the `=' in line 2,
+      ;; spanning the prose "Iso " between the two equations.
+      (let* ((eq1= (1+ (string-match "{=}" (buffer-string))))
+             (eq2= (1+ (string-match "{=}" (buffer-string) (1+ eq1=)))))
+        (put-text-property eq1= (1+ eq2=) 'face 'org-verbatim)
+        (goto-char (point-min))
+        (latex-to-svg-frontend--suppress-emphasis (point-max))
+        ;; The prose "Iso" between the equations must be neutralized.
+        (let* ((iso (1+ (string-match "Iso" (buffer-string))))
+               (face (get-text-property iso 'face)))
+          (should (equal (car-safe face) latex-to-svg-frontend--neutralize-face))
+          (should (member 'org-verbatim face)))))))
+
+(ert-deftest l2sf-suppress-emphasis-keeps-prose-emphasis-around-math ()
+  "Legitimate prose emphasis whose markers are outside every math span (it
+merely *contains* inline math) is left untouched."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "a *bold with \\(x\\) inside* b\n"
+      ;; Emphasis run spans the whole `*...*', markers in prose, math nested in.
+      (let ((beg (string-match "\\*" (buffer-string))))
+        (put-text-property (1+ beg)
+                           (1+ (string-match "\\* b" (buffer-string)))
+                           'face 'bold)
+        (goto-char (point-min))
+        (latex-to-svg-frontend--suppress-emphasis (point-max))
+        ;; "bold" (prose, before the math) keeps its bold face untouched.
+        (let ((face (get-text-property
+                     (1+ (string-match "bold" (buffer-string))) 'face)))
+          (should (eq face 'bold)))))))
+
 (ert-deftest l2sf-suppress-emphasis-respects-toggle ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\[a^{(+)} + b^{(+)}\\]\n"
