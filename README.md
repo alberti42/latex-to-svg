@@ -255,8 +255,19 @@ and stay correct as you edit (toggle with
 `latex-to-svg-frontend-number-equations`). `\eqref` / `\ref` — bare or wrapped
 in `$…$` — resolve against the document's `\label`s and render as **plain
 buffer text** (`(3)` / `3`, in the surrounding font; `(??)` when the target is
-unknown or was just deleted). Click a reference (`mouse-1`) or press `RET` to
-**jump** to the defining equation. References re-resolve on every reconcile, so
+unknown or was just deleted). Click a reference (`mouse-1`, or `mouse-2`) or
+press `C-c C-o` to **jump** to the defining equation — the standard Emacs link
+gesture, honouring `mouse-1-click-follows-link`. Move point in with the
+*keyboard* to see the `\eqref{…}` source instead.
+
+`RET` is left alone, because the buffer is editable and the preview's keymap is
+already active with point at the reference's *first* character — binding it
+there would make a line like `  \eqref{eq:test}  ` impossible to break before
+the reference. Set `latex-to-svg-frontend-return-follows-reference` to `t` if
+you want it anyway; it is the markup-agnostic analogue of Org's
+`org-return-follows-link` (also `nil` by default), and applies in every markup.
+
+References re-resolve on every reconcile, so
 they never show a stale number. See [`docs/numbering.md`](docs/numbering.md).
 
 ## Performance — what happens when you edit

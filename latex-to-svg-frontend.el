@@ -6,7 +6,7 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.11.0
+;; Version: 0.12.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.8.0"))
 ;; Keywords: tex, math, images
 
@@ -222,6 +222,15 @@ off: a doubled `$$' is unlikely to occur by accident in prose."
 Only meaningful with `latex-to-svg-frontend-number-equations' on, since the
 number comes from the document's `\\label' map.  When off, `\\eqref' / `\\ref'
 are left as literal source."
+  :type 'boolean
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-return-follows-reference nil
+  "Non-nil means `RET' on an `\\eqref' / `\\ref' preview follows it.
+Off by default, mirroring `org-return-follows-link': the buffer is
+editable, so `RET' should insert a newline -- including with point at the
+very start of a reference, where the preview's keymap is already active.
+`C-c C-o' follows a reference regardless."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
@@ -750,6 +759,16 @@ On `post-command-hook' while the mode is on."
              (cur (latex-to-svg-frontend--revealable-overlay-at (point))))
       (when (and prev (not (eq prev cur)))
         (latex-to-svg-frontend--close-overlay prev))
+      ;; A reference reached by *mouse* is never revealed: a click there is a
+      ;; jump, not an edit.  This is not just taste -- it is required for
+      ;; `follow-link' to work at all.  Emacs classifies a button press+release
+      ;; as a click only if the pixel movement is under `double-click-fuzz'
+      ;; *and* the buffer position under the pointer is unchanged (keyboard.c,
+      ;; `make_lispy_event').  Revealing on the press replaces the "(1)" glyph
+      ;; with the wider `\eqref{...}' source, so the same pixel maps to a
+      ;; different position and the release is reported as `drag-mouse-1' --
+      ;; which never follows a link.  Point-motion reveal stays for the
+      ;; keyboard, which is where editing intent actually comes from.
       (when (and cur (not (eq cur prev))
                  (not (and (overlay-get cur 'latex-to-svg-frontend-ref)
                            (mouse-event-p last-command-event))))
@@ -771,8 +790,8 @@ On `post-command-hook' while the mode is on."
   "Overlay BEG..END with plain-text DISPLAY for a reference to LABEL.
 NUM is the resolved number, recorded so a reconcile can detect when the
 target renumbered.  Draws ordinary buffer text (matching the prose font)
-and makes the span jump, on a left click or the return key, to the
-equation defining LABEL."
+and makes the span jump, on `mouse-2' (or a short `mouse-1' click, via
+`follow-link') or `C-c C-o', to the equation defining LABEL."
   (let ((b (if (markerp beg) (marker-position beg) beg))
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
@@ -788,8 +807,11 @@ equation defining LABEL."
         (overlay-put ov 'priority 1)
         (overlay-put ov 'keymap latex-to-svg-frontend--reference-keymap)
         (overlay-put ov 'mouse-face 'highlight)
+        ;; Phrased as mouse-2: `mouse-fixup-help-message' rewrites it to
+        ;; "mouse-1" / "double-mouse-1" / "Long mouse-1" to match the user's
+        ;; `mouse-1-click-follows-link' setting.
         (overlay-put ov 'help-echo
-                     (format "mouse-1: jump to the equation labelled %s" label))
+                     (format "mouse-2: jump to the equation labelled %s" label))
         (overlay-put ov 'modification-hooks
                      (list #'latex-to-svg-frontend--on-modify))
         ov))))
@@ -1366,8 +1388,10 @@ Previews otherwise re-tint on their next redisplay, so this is optional."
 (defun latex-to-svg-frontend-goto-reference (&optional event)
   "Jump to the equation defining the label of the reference preview at point.
 EVENT is the triggering input event.
-Bound in `\\eqref' / `\\ref' preview overlays to a left click and the
-return key."
+Bound in `\\eqref' / `\\ref' preview overlays to `mouse-2' and `C-c C-o'
+\(and to `RET' when `latex-to-svg-frontend-return-follows-reference' is
+on); a short `mouse-1' click gets here too, translated to `mouse-2' by
+Emacs' `follow-link' mechanism (see `mouse-1-click-follows-link')."
   (interactive (list last-command-event))
   (when (and (consp event) (eventp event))
     (let ((posn (event-start event)))
@@ -1388,8 +1412,22 @@ return key."
 
 (defvar latex-to-svg-frontend--reference-keymap
   (let ((map (make-sparse-keymap)))
-    (define-key map [mouse-1] #'latex-to-svg-frontend-goto-reference)
-    (define-key map (kbd "RET") #'latex-to-svg-frontend-goto-reference)
+    (define-key map [mouse-2] #'latex-to-svg-frontend-goto-reference)
+    ;; Declare the span a link, so Emacs' generic mouse-1 translation applies:
+    ;; a short mouse-1 click (see `mouse-1-click-follows-link') is rewritten to
+    ;; mouse-2 and jumps, while a long click falls through to `mouse-set-point'
+    ;; and reveals the source, and a drag still selects.  Same idiom as Org's
+    ;; `org-mouse-map'; the `mouse-face' value pairs with the `mouse-face'
+    ;; property set in `latex-to-svg-frontend--set-reference-overlay'.
+    (define-key map [follow-link] 'mouse-face)
+    ;; `C-c C-o' is the keyboard gesture, as in Org (`org-open-at-point').
+    (define-key map (kbd "C-c C-o") #'latex-to-svg-frontend-goto-reference)
+    ;; RET only when opted in; a `:filter' keeps the defcustom live-toggleable.
+    (define-key map (kbd "RET")
+                `(menu-item "" latex-to-svg-frontend-goto-reference
+                            :filter ,(lambda (cmd)
+                                       (and latex-to-svg-frontend-return-follows-reference
+                                            cmd))))
     map)
   "Keymap installed on `\\eqref' / `\\ref' preview overlays for click-to-jump.")
 

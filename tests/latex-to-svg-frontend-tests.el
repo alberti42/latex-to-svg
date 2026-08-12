@@ -1073,6 +1073,62 @@ so emphasis decoration set on the raw source (no overlay) is overridden."
         (latex-to-svg-frontend--handle-cursor)
         (should (equal "(1)" (substring-no-properties (overlay-get ref 'display))))))))
 
+(ert-deftest l2sf-reference-keymap-follows-link ()
+  ;; References are clickable the Emacs way: mouse-2 jumps, and the span is
+  ;; declared a link via `follow-link' so a short mouse-1 click is translated
+  ;; to mouse-2 (a long one falls through and reveals the source instead).
+  (should (eq #'latex-to-svg-frontend-goto-reference
+              (lookup-key latex-to-svg-frontend--reference-keymap [mouse-2])))
+  (should (null (lookup-key latex-to-svg-frontend--reference-keymap [mouse-1])))
+  (should (eq 'mouse-face
+              (lookup-key latex-to-svg-frontend--reference-keymap
+                          [follow-link])))
+  (should (eq #'latex-to-svg-frontend-goto-reference
+              (lookup-key latex-to-svg-frontend--reference-keymap
+                          (kbd "C-c C-o")))))
+
+(ert-deftest l2sf-reference-ret-is-opt-in ()
+  ;; RET must stay `newline' by default (the buffer is editable, and the
+  ;; keymap is already active with point at the reference's first character),
+  ;; mirroring `org-return-follows-link'.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "  \\eqref{eq:a}  \n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let* ((ref (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                            (l2sf-tests--overlays)))
+             (beg (overlay-start ref)))
+        (let ((latex-to-svg-frontend-return-follows-reference nil))
+          (should-not (eq #'latex-to-svg-frontend-goto-reference
+                          (key-binding (kbd "RET") nil nil beg))))
+        (let ((latex-to-svg-frontend-return-follows-reference t))
+          (should (eq #'latex-to-svg-frontend-goto-reference
+                      (key-binding (kbd "RET") nil nil beg))))
+        ;; C-c C-o follows either way, and neither binding leaks outside.
+        (should (eq #'latex-to-svg-frontend-goto-reference
+                    (key-binding (kbd "C-c C-o") nil nil beg)))
+        (should-not (eq #'latex-to-svg-frontend-goto-reference
+                        (key-binding (kbd "C-c C-o") nil nil (1- beg))))))))
+
+(ert-deftest l2sf-reference-overlay-is-a-link ()
+  ;; `follow-link' => `mouse-face' only works if the overlay carries a
+  ;; `mouse-face' property, and the help-echo must start with "mouse-2" for
+  ;; `mouse-fixup-help-message' to adapt it to the user's setting.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "As in \\eqref{eq:a}.\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((ref (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                           (l2sf-tests--overlays))))
+        (should (overlay-get ref 'mouse-face))
+        (should (eq latex-to-svg-frontend--reference-keymap
+                    (overlay-get ref 'keymap)))
+        (should (string-prefix-p "mouse-2" (overlay-get ref 'help-echo)))))))
+
 (ert-deftest l2sf-reference-mouse-entry-does-not-reveal ()
   (l2sf-tests--with-stub
     (l2sf-tests--md
@@ -1082,10 +1138,15 @@ so emphasis decoration set on the raw source (no overlay) is overridden."
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (let ((ref (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
                            (l2sf-tests--overlays))))
+        ;; Mouse entry keeps the number shown.  Revealing on the button press
+        ;; would reflow the line and make Emacs report the release as
+        ;; `drag-mouse-1' (keyboard.c requires the buffer position under the
+        ;; pointer to be unchanged), which would defeat `follow-link'.
         (goto-char (1+ (overlay-start ref)))
         (let ((last-command-event 'mouse-1))
           (latex-to-svg-frontend--handle-cursor))
         (should (equal "(1)" (substring-no-properties (overlay-get ref 'display))))
+        ;; Keyboard entry still reveals.
         (goto-char (point-min))
         (let ((last-command-event 'right)) (latex-to-svg-frontend--handle-cursor))
         (goto-char (1+ (overlay-start ref)))

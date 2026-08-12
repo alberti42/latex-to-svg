@@ -16,8 +16,9 @@ Three things to try as you read:
 
 - **Move point into any preview** — it reveals the LaTeX source for editing;
   move out and it re-shows the image (or re-renders if you changed the text).
-- **Click a reference** like the `(1)` below (`mouse-1` or `RET`) — it jumps to
-  the equation that defines the label.
+- **Click a reference** like the `(1)` below (`mouse-1`, `mouse-2` or `C-c C-o`) —
+  it jumps to the equation that defines the label. To see its `\eqref{…}`
+  source, move point into it with the keyboard.
 - **Edit a numbered equation** (e.g. delete one, or turn `equation` into
   `equation*`) — every number below, and every reference, updates a moment
   later on its own.
@@ -80,6 +81,6 @@ is \eqref{eq:gauss-e}; the Schrödinger equation is \eqref{eq:schrodinger}. A
 bare `\ref` gives just the number: see \ref{eq:newton}. References work wrapped
 in math too, e.g. $\eqref{eq:schrodinger}$.
 
-Click any of those numbers (or press `RET` on one) to jump to the equation it
+Click any of those numbers (or press `C-c C-o` on one) to jump to the equation it
 names. Then try turning `\begin{equation}` at `eq:newton` into `equation*` and
 watch the later numbers — and these references — renumber on their own.

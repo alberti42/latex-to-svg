@@ -9,6 +9,37 @@ This repository ships three packages that share one version/tag stream:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-08-12
+
+### Added
+
+- `latex-to-svg-frontend-return-follows-reference` (default `nil`): whether
+  `RET` on an `\eqref` / `\ref` preview follows it.
+
+### Changed
+
+- References no longer steal `RET`. The keyboard gesture is now `C-c C-o`, as
+  in Org (`org-open-at-point`); `RET` inserts a newline again — it previously
+  followed the reference even with point at its first character, so a line like
+  `  \eqref{eq:test}  ` could not be broken there. Set
+  `latex-to-svg-frontend-return-follows-reference` to `t` for the old binding
+  (the analogue of `org-return-follows-link`, also `nil` by default).
+
+- `\eqref` / `\ref` previews are now clickable the standard Emacs way instead
+  of hard-binding `mouse-1`. `latex-to-svg-frontend--reference-keymap` binds
+  `mouse-2` (as Org's `org-mouse-map` does) and declares the span a link with
+  `[follow-link]` -> `mouse-face`, so `mouse-1-click-follows-link` (default
+  450 ms) applies: a **short** `mouse-1` click jumps, a **long** press falls
+  through to `mouse-set-point` and reveals the LaTeX source, and dragging from
+  inside a reference selects text again instead of jumping. `RET` still jumps.
+- Reference reveal-on-cursor still ignores mouse events (a click is a jump, not
+  an edit) — now for a hard reason as well as a stylistic one: revealing on the
+  button press reflows the line, so Emacs sees a different buffer position at
+  release and reports `drag-mouse-1`, which never follows a link.
+- Reference `help-echo` now reads `"mouse-2: jump to the equation labelled …"`,
+  which `mouse-fixup-help-message` rewrites to `mouse-1` / `double-mouse-1` /
+  `Long mouse-1` according to the user's `mouse-1-click-follows-link`.
+
 ## [0.11.0] - 2026-08-10
 
 ### Added
@@ -190,6 +221,7 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
+[0.12.0]: https://github.com/alberti42/latex-to-svg/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/alberti42/latex-to-svg/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/alberti42/latex-to-svg/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/alberti42/latex-to-svg/compare/v0.9.0...v0.9.3

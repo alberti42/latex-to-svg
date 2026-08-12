@@ -115,8 +115,34 @@ text** — `(3)` for `\eqref`, `3` for `\ref`, in the
 `latex-to-svg-frontend-reference` face — *not* a LaTeX image, so it matches the
 surrounding prose font and tracks theme/zoom for free with no compile.  It is
 found by the same scanner (gated by `latex-to-svg-frontend-detect-references`).
-Each reference preview is click-to-jump (`mouse-1` / `RET` →
-`latex-to-svg-frontend-goto-reference`) to the equation defining its label.  On every
+Each reference preview is click-to-jump (`mouse-2` / `C-c C-o` →
+`latex-to-svg-frontend-goto-reference`) to the equation defining its label.
+The span is declared a link the standard Emacs way — `[follow-link]` →
+`mouse-face` in `--reference-keymap`, plus the `mouse-face` overlay property —
+so `mouse-1-click-follows-link` (default 450 ms) applies: a **short** `mouse-1`
+click is translated to `mouse-2` and jumps, a **long** one just sets point, and
+a drag still selects.  `RET` is bound only when
+`latex-to-svg-frontend-return-follows-reference` is on (a `:filter` binding, so
+the defcustom is live-toggleable) — the markup-agnostic analogue of Org's
+`org-return-follows-link`, `nil` for the same reason: the buffer is editable
+and the keymap is active at the reference's first character, so a bound `RET`
+would make `  \eqref{eq:a}  ` unbreakable before the reference.
+
+`--handle-cursor` deliberately does **not** reveal a reference reached by a
+mouse event.  That is a hard requirement, not a preference: `make_lispy_event`
+(`src/keyboard.c`) reports a press+release as a *click* only when the pointer
+moved less than `double-click-fuzz` **and** the buffer position under it is
+unchanged; otherwise it synthesises `drag-mouse-1`, which never follows a link.
+Revealing on the press swaps the narrow `(1)` glyph for the wider
+`\eqref{...}` source, so the same pixel maps to a different position and every
+click degrades into a drag — the observable symptom being "the first click only
+reveals, a second click jumps".  Reveal therefore stays a keyboard affordance
+for references, which is also what plain Org does with links.  It matches
+`org-mouse-map`
+(`mouse-2` + `[follow-link] 'mouse-face`), so references feel like Org links.
+The `help-echo` is phrased `"mouse-2: …"` on purpose: `mouse-fixup-help-message`
+rewrites it to `mouse-1` / `double-mouse-1` / `Long mouse-1` to match whatever
+the user has configured.  On every
 reconcile, `--reconcile-references` re-resolves each reference against the
 current label map and patches its text in place — covering all transitions: a
 shifted number, a target that was **deleted** (number -> `(??)`), and a target

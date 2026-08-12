@@ -11,7 +11,7 @@ While the mode is on, =C-c C-x C-l= (=latex-to-svg-frontend=) toggles the fragme
 Three things to try as you read:
 
 - *Move point into any preview* — it reveals the LaTeX source for editing; move out and it re-shows the image (or re-renders if you changed the text).
-- *Click a reference* like the =(1)= below (=mouse-1= or =RET=) — it jumps to the equation that defines the label.
+- *Click a reference* like the =(1)= below (=mouse-1=, =mouse-2= or =C-c C-o=) — it jumps to the equation that defines the label. To see its =\eqref{...}= source, move point into it with the keyboard.
 - *Edit a numbered equation* (e.g. delete one, or turn =equation= into =equation*=) — every number below, and every reference, updates a moment later on its own.
 
 * Inline math
