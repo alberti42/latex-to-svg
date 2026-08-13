@@ -9,7 +9,7 @@ This repository ships three packages that share one version/tag stream:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.12.0] - 2026-08-12
+## [0.12.0] - 2026-08-13
 
 ### Added
 
@@ -39,6 +39,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Reference `help-echo` now reads `"mouse-2: jump to the equation labelled …"`,
   which `mouse-fixup-help-message` rewrites to `mouse-1` / `double-mouse-1` /
   `Long mouse-1` according to the user's `mouse-1-click-follows-link`.
+
+### Fixed
+
+- Emphasis suppression now handles markup that **bridges across equations**. A
+  stray marker inside one equation (the `=` in `\(\Delta{=}0\)`, the `+` in
+  `(+)`, ...) can pair with a marker inside the *next* equation, and the markup
+  fontifier then decorates everything in between — including the prose caught
+  between the two (`Isotropic model ...`). The suppression pass now walks the
+  font-lock face runs and clears any run anchored to a marker that lives inside
+  a detected math span, over its whole extent, so the bridged prose is fixed
+  too. A legitimate prose emphasis that merely *contains* inline math (markers
+  in prose) is left untouched.
+- Over math *source text* the spurious face is now **removed outright** rather
+  than masked, so the emphasis colour (e.g. the `org-verbatim` tint) is cleared
+  as well, not just the strike-through / underline. Preview overlays keep using
+  the masking face (an image hides the text, so only drawn-over decoration
+  matters).
 
 ## [0.11.0] - 2026-08-10
 
