@@ -318,8 +318,8 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
           (should (overlay-get ov 'priority)))))))
 
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
-  "The font-lock pass prepends the neutralizing face over detected math,
-so emphasis decoration set on the raw source (no overlay) is overridden."
+  "The font-lock pass removes spurious emphasis face from raw math source
+(no overlay), colour and all."
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\[a^{(+)} + b^{(+)}\\]\n"
       ;; Simulate a markup emphasis fontifier having struck part of the math.
@@ -327,10 +327,8 @@ so emphasis decoration set on the raw source (no overlay) is overridden."
                          'face '(:strike-through t))
       (goto-char (point-min))
       (latex-to-svg-frontend--suppress-emphasis (point-max))
-      (let ((face (get-text-property (+ (point-min) 5) 'face)))
-        ;; Prepended, so our neutralizer is first and wins the merge.
-        (should (equal (car face) latex-to-svg-frontend--neutralize-face))
-        (should (member '(:strike-through t) face))))))
+      ;; The spurious face is gone entirely.
+      (should (null (get-text-property (+ (point-min) 5) 'face))))))
 
 (ert-deftest l2sf-suppress-emphasis-clears-cross-equation-bridge ()
   "A verbatim/emphasis run opened by a marker inside one equation and closed
@@ -344,11 +342,10 @@ inside the next paints the prose in between; the whole run is neutralized."
         (put-text-property eq1= (1+ eq2=) 'face 'org-verbatim)
         (goto-char (point-min))
         (latex-to-svg-frontend--suppress-emphasis (point-max))
-        ;; The prose "Iso" between the equations must be neutralized.
+        ;; The prose "Iso" between the equations must be fully cleared.
         (let* ((iso (1+ (string-match "Iso" (buffer-string))))
                (face (get-text-property iso 'face)))
-          (should (equal (car-safe face) latex-to-svg-frontend--neutralize-face))
-          (should (member 'org-verbatim face)))))))
+          (should (null face)))))))
 
 (ert-deftest l2sf-suppress-emphasis-keeps-prose-emphasis-around-math ()
   "Legitimate prose emphasis whose markers are outside every math span (it

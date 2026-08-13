@@ -1524,14 +1524,19 @@ equation, or with one inside the *next* equation -- and org then paints the
 whole run, including any prose caught in between (a real annoyance stock Org
 preview has no defense against).
 
-So rather than blanket-covering each math span, we walk the `face' runs in
-POINT..LIMIT and, for any run whose first or last character falls strictly
-inside a detected math span (i.e. a run anchored to a marker that lives in
-math), prepend `latex-to-svg-frontend--neutralize-face' over the *entire* run.
-That clears the decoration on the bridged prose too, while a legitimate prose
-emphasis that merely *contains* inline math (its markers in prose, endpoints
-outside every span) is left untouched.  Returns nil (own fontification, one
-call per chunk)."
+Such a face is entirely spurious (the markers are LaTeX syntax, not prose
+markup), so rather than blanket-covering each math span we walk the `face'
+runs in POINT..LIMIT and, for any run whose first or last character falls
+strictly inside a detected math span (i.e. a run anchored to a marker that
+lives in math), *remove* the `face' over the whole run.  Removing rather than
+masking clears the run's colour too, so bridged prose (`org-verbatim' tint and
+all) is fully restored, not merely un-struck.  A legitimate prose emphasis that
+merely *contains* inline math (its markers in prose, endpoints outside every
+span) is left untouched.  Returns nil (own fontification, one call per chunk).
+
+\(The masking `latex-to-svg-frontend--neutralize-face' is still used on preview
+overlays, where an image covers the text and only drawn-over decoration --
+not colour -- matters.)"
   (when latex-to-svg-frontend-suppress-emphasis
     (let ((spans (mapcar (lambda (el)
                            (cons (latex-to-svg-frontend--math-begin el)
@@ -1545,8 +1550,7 @@ call per chunk)."
               (when (and (get-text-property p 'face)
                          (or (latex-to-svg-frontend--pos-in-span-p p spans)
                              (latex-to-svg-frontend--pos-in-span-p (1- q) spans)))
-                (font-lock-prepend-text-property
-                 p q 'face latex-to-svg-frontend--neutralize-face))
+                (remove-text-properties p q '(face nil)))
               (setq p q)))))))
   (goto-char limit)
   nil)
