@@ -20,6 +20,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `-background-padding`, or the rescales. Without it the command keeps its
   current-buffer-only behavior.
 
+### Fixed
+
+- Org adaptor: `latex-to-svg-for-org--exclusions` signalled *"Invalid search
+  bound (wrong side of point)"* when a bounded scan ended inside a
+  `#+begin_src`/`example`/`export`/`comment` block — the unbounded `#+end_…`
+  search left point past END, breaking the next bounded search. Since the
+  failure happened on `post-command-hook`, Emacs silently removed
+  `latex-to-svg-frontend--handle-cursor` from the hook and reveal-on-cursor /
+  render-on-leave stopped working for the rest of the session.
+
 ## [0.12.0] - 2026-08-13
 
 ### Added

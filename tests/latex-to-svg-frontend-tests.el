@@ -188,6 +188,26 @@ A plain buffer suffices — detection is a regexp scanner."
                            (latex-to-svg-frontend--elements (point-min) (point-max)))
                    '("$a$" "$b$")))))
 
+(ert-deftest l2sf-org-adaptor-block-straddling-end ()
+  ;; A bounded scan (as `--element-at' does) whose END falls *inside* a
+  ;; `#+begin_src' block must not signal: the unbounded `#+end_src' search
+  ;; leaves point past END, and the next bounded search would then complain
+  ;; "Invalid search bound (wrong side of point)".
+  (l2sf-tests--md
+      "#+begin_src python\nprint($skip$)\n#+end_src\n\nmore $b$\n"
+    (setq-local latex-to-svg-frontend-exclude-function
+                #'latex-to-svg-for-org--exclusions)
+    (let ((end (save-excursion (goto-char (point-min)) (line-end-position 2))))
+      (should (equal (latex-to-svg-for-org--exclusions (point-min) end)
+                     (list (cons (point-min)
+                                 (save-excursion
+                                   (goto-char (point-min))
+                                   (line-end-position 3)))))))
+    ;; And the scanner itself survives such a region.
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("$b$")))))
+
 (ert-deftest l2sf-inline-dollar-currency-guards ()
   ;; pandoc-style guards on inline `$…$': an opener must be followed by a
   ;; non-space, a closer preceded by one, and `\$' is escaped.  So spaced

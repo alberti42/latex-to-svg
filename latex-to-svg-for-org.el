@@ -6,7 +6,7 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.12.0
+;; Version: 0.12.1
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.11.0"))
 ;; Keywords: tex, org, math, images
 
@@ -59,8 +59,14 @@ comment lines (`# …').  This is the buffer's
         (widen)
         ;; #+begin_… … #+end_… blocks (src / example / export / comment).
         (goto-char (point-min))
-        (while (re-search-forward
-                "^[ \t]*#\\+begin_\\(src\\|example\\|export\\|comment\\)\\_>" end t)
+        ;; The closing `#+end_…' search is deliberately unbounded (a block
+        ;; straddling END must be excluded whole), so it can leave point past
+        ;; END -- guard the loop, or the next bounded search signals
+        ;; "Invalid search bound (wrong side of point)".
+        (while (and (<= (point) end)
+                    (re-search-forward
+                     "^[ \t]*#\\+begin_\\(src\\|example\\|export\\|comment\\)\\_>"
+                     end t))
           (let ((b (match-beginning 0))
                 (kind (match-string 1)))
             (when (re-search-forward
