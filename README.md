@@ -82,7 +82,12 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
   the `markdown` tree-sitter grammar is optional (it adds fenced/indented
   code-block exclusion — inline code is handled without it).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.4.0+ (the engine).
+  0.8.0+ (the engine) — the floor is set by the display-time `:color` /
+  `:background` / `:padding` overrides behind
+  `latex-to-svg-frontend-foreground-color`, `-background-color` and
+  `-background-padding`, and by `:font-height`, which lets the front-end measure
+  the buffer font against the frame that actually displays it instead of the
+  engine guessing.
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution).
 
 ## Installation
