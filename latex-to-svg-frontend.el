@@ -128,7 +128,8 @@ full pass.  Set to nil to force the full scan everywhere."
   "Size multiplier for inline math previews (`$…$', `\\(…\\)').
 Applied on top of the engine's global `latex-to-svg-font-scale' via
 `latex-to-svg-backend's `:rescale-by'.  Re-scales from cache (no recompile);
-after changing it, run `latex-to-svg-frontend-refresh' to apply."
+after changing it, run `latex-to-svg-frontend-refresh' to apply (with a
+prefix argument to apply in every buffer at once)."
   :type 'number
   :group 'latex-to-svg-frontend)
 
@@ -137,7 +138,8 @@ after changing it, run `latex-to-svg-frontend-refresh' to apply."
 Applied on top of the engine's global `latex-to-svg-font-scale' via
 `latex-to-svg-backend's `:rescale-by' — e.g. set to 1.1 for display equations a
 touch larger than inline.  Re-scales from cache (no recompile); after
-changing it, run `latex-to-svg-frontend-refresh' to apply."
+changing it, run `latex-to-svg-frontend-refresh' to apply (with a prefix
+argument to apply in every buffer at once)."
   :type 'number
   :group 'latex-to-svg-frontend)
 
@@ -150,7 +152,8 @@ color — a `#rrggbb' string or any name `color-name-to-rgb'
 understands (e.g. \"black\", \"#1a1a1a\") — to tint every preview
 with that fixed color regardless of theme.  Passed to
 `latex-to-svg-backend' as `:color'; re-tints from cache (no recompile),
-so run `latex-to-svg-frontend-refresh' after changing it."
+so run `latex-to-svg-frontend-refresh' after changing it (with a prefix
+argument to apply in every buffer at once)."
   :type '(choice (const :tag "Follow buffer foreground" nil)
                  (color :tag "Fixed color"))
   :group 'latex-to-svg-frontend)
@@ -164,7 +167,8 @@ buffer.  Set to a color — a `#rrggbb' string or any name
 preview.  A very light gray reads best (e.g. \"gray97\" / \"#f7f7f7\");
 keep it subtle so it doesn't fight the buffer background.  Passed to
 `latex-to-svg-backend' as `:background'; re-boxes from cache (no
-recompile), so run `latex-to-svg-frontend-refresh' after changing it."
+recompile), so run `latex-to-svg-frontend-refresh' after changing it (with
+a prefix argument to apply in every buffer at once)."
   :type '(choice (const :tag "Transparent" nil)
                  (color :tag "Box color"))
   :group 'latex-to-svg-frontend)
@@ -177,7 +181,8 @@ is set: it grows the colored box beyond the equation ink on all
 sides.  A number of pt (e.g. 3) that scales with the equation; nil or
 0 crops the box to the ink.  Passed to `latex-to-svg-backend' as
 `:padding'; applies from cache (no recompile), so run
-`latex-to-svg-frontend-refresh' after changing it."
+`latex-to-svg-frontend-refresh' after changing it (with a prefix argument
+to apply in every buffer at once)."
   :type '(choice (const :tag "None" nil) number)
   :group 'latex-to-svg-frontend)
 
@@ -1330,10 +1335,19 @@ option are on."
               (latex-to-svg-backend-appearance font-height))))))
 
 ;;;###autoload
-(defun latex-to-svg-frontend-refresh (&optional buffer)
-  "Re-render previews in BUFFER (default current) for the current theme and font."
-  (interactive)
-  (latex-to-svg-frontend--refresh-buffer (or buffer (current-buffer))))
+(defun latex-to-svg-frontend-refresh (&optional buffer all)
+  "Re-render previews in BUFFER (default current) for the current theme and font.
+With ALL non-nil (interactively, a prefix argument), re-render every
+buffer with previews instead \=-- for a global change no appearance check
+can see, such as setting `latex-to-svg-frontend-foreground-color'."
+  (interactive (list nil current-prefix-arg))
+  (dolist (buf (if all
+                   (seq-filter (lambda (b)
+                                 (buffer-local-value
+                                  'latex-to-svg-frontend-mode b))
+                               (buffer-list))
+                 (list (or buffer (current-buffer)))))
+    (latex-to-svg-frontend--refresh-buffer buf)))
 
 (defun latex-to-svg-frontend--present-p ()
   "Return non-nil if the current buffer has preview overlays."

@@ -153,9 +153,12 @@ for ready-to-open demos.
 - `C-u C-c C-x C-l` — **re-render** the buffer from cache (fixes a stale
   display); `C-u C-u C-c C-x C-l` — **regenerate** (recompile, bypass cache).
 - `M-x latex-to-svg-frontend-clear` — clear previews (region or buffer).
-- `M-x latex-to-svg-frontend-refresh` — re-tint / re-scale for the current
-  theme / font from cache (also happens lazily on theme, buffer-display, and
-  zoom changes).
+- `M-x latex-to-svg-frontend-refresh` — re-tint / re-scale the current buffer
+  for the current theme / font from cache (also happens lazily on theme,
+  buffer-display, and zoom changes). With a prefix argument
+  (`C-u M-x latex-to-svg-frontend-refresh`) it refreshes **every** buffer with
+  previews — useful after changing a global setting such as
+  `latex-to-svg-frontend-foreground-color`, which no lazy check detects.
 
 Move point into a preview to reveal its LaTeX source for editing; leaving
 re-shows the image, or re-renders if you changed the text. **Newly typed math
@@ -180,8 +183,9 @@ differ:
 
 By default previews use the buffer foreground (so they track your theme) on a
 transparent background. You can override any of three appearance options — they
-apply instantly from cache (no recompiling); after changing one, run `M-x
-latex-to-svg-frontend-refresh`:
+apply instantly from cache (no recompiling); after changing one, run `C-u M-x
+latex-to-svg-frontend-refresh` (the prefix argument covers every preview
+buffer, not just the current one):
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -207,7 +211,8 @@ yourself — the same way you enable the mode:
 ```
 
 Without it, previews re-tint on their next redisplay. You can always force a
-refresh with `M-x latex-to-svg-frontend-refresh`.
+refresh with `M-x latex-to-svg-frontend-refresh` (current buffer) or `C-u M-x
+latex-to-svg-frontend-refresh` (every preview buffer).
 
 ### Delimiter toggles
 

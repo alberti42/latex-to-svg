@@ -9,6 +9,17 @@ This repository ships three packages that share one version/tag stream:
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `latex-to-svg-frontend-refresh` takes a prefix argument (non-nil ALL from
+  Lisp) to refresh **every** buffer with previews, not just the current one —
+  for a global change no appearance check can see, such as setting
+  `latex-to-svg-frontend-foreground-color`, `-background-color`,
+  `-background-padding`, or the rescales. Without it the command keeps its
+  current-buffer-only behavior.
+
 ## [0.12.0] - 2026-08-13
 
 ### Added
@@ -238,6 +249,7 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.12.0...HEAD
 [0.12.0]: https://github.com/alberti42/latex-to-svg/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/alberti42/latex-to-svg/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/alberti42/latex-to-svg/compare/v0.9.3...v0.10.0
