@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-08-14
+
 ### Added
 
 - `latex-to-svg-frontend-refresh` takes a prefix argument (non-nil ALL from
@@ -259,7 +261,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/alberti42/latex-to-svg/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/alberti42/latex-to-svg/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/alberti42/latex-to-svg/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/alberti42/latex-to-svg/compare/v0.9.3...v0.10.0
