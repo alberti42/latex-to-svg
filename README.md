@@ -50,6 +50,33 @@ what a browser/pandoc pipeline can't:
 The engine cache is shared across every front-end (Org, Markdown,
 `agent-shell-math-renderer`), so an equation compiles once across all of them.
 
+## Related packages
+
+This repo is one layer of a three-part stack, and one of two front-ends built
+on the same engine:
+
+- [**`latex-to-svg-backend`**](https://github.com/alberti42/latex-to-svg-backend)
+  — the rendering engine: one LaTeX string in, one image out, with the
+  content-addressed on-disk cache, `--currentcolor` tinting, display scaling and
+  the compile-metadata sidecar that numbering reads.
+- **`latex-to-svg`** (this repo) — the markup front-end: detection, overlays,
+  numbering, `\ref` / `\eqref`, refresh. For Org it is a drop-in replacement for
+  the built-in `org-latex-preview`.
+- [**`agent-shell-math-renderer`**](https://github.com/alberti42/agent-shell-math-renderer)
+  — the sibling front-end, rendering math in
+  [`agent-shell`](https://github.com/xenodium/agent-shell)'s streamed markdown
+  output. Same engine, same cache: an equation that appears both in your Org
+  notes and in an agent's reply compiles only once.
+
+Several other Emacs packages preview LaTeX math — the built-in Org
+`org-latex-preview` and the tecosaur/karthink fork of it, AUCTeX's
+`preview-latex`, `texfrag`, `org-latex-impatient`, `org-xlatex`,
+`latex-math-preview`. A **detailed comparison** of how they render, what they
+are tied to, and which of them recolor from cache or support numbering and
+cross-references lives in the engine's README, under
+[Related packages](https://github.com/alberti42/latex-to-svg-backend#related-packages)
+— rather than repeat it here.
+
 ## How detection works (and why it's markup-agnostic)
 
 The core finds math with one **regexp scanner** — the LaTeX math delimiters are
