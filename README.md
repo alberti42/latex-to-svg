@@ -143,12 +143,15 @@ select a single file each; the backend is a separate repo.
   :straight (latex-to-svg-frontend :type git :host github
                                    :repo "alberti42/latex-to-svg"
                                    :files ("latex-to-svg-frontend.el"))
-  ;; Optional: re-tint previews the instant you switch themes.
-  ;; See "Refreshing on appearance changes" below; omit if you never
-  ;; change themes at runtime.
+  ;; Optional: re-tint previews the instant you switch themes, and
+  ;; rescale them when the frame font changes.  See "Refreshing on
+  ;; appearance changes" below; omit if you never change themes or
+  ;; font sizes at runtime.
   :config
   (add-hook 'enable-theme-functions
-            #'latex-to-svg-frontend-on-theme-change))
+            #'latex-to-svg-frontend-on-appearance-change)
+  (add-hook 'after-setting-font-hook
+            #'latex-to-svg-frontend-on-appearance-change))
 
 ;; Markdown adaptor
 (use-package latex-to-svg-for-markdown
@@ -233,16 +236,23 @@ change. `latex-to-svg-frontend-mode` installs its refresh triggers
 redisplay (`window-buffer-change-functions`) and zoom (`text-scale-mode-hook`),
 so an inactive buffer costs nothing and they are removed when the mode is off.
 
-A theme switch is a *global* event, with no per-buffer hook, so the package
-installs nothing global on your behalf. If you want previews to re-tint the
-instant you switch themes, add the provided function to `enable-theme-functions`
-yourself — the same way you enable the mode:
+A theme switch and a *frame* font change are *global* events, with no per-buffer
+hook, so the package installs nothing global on your behalf. If you want
+previews to follow them instantly, add the provided handler —
+`latex-to-svg-frontend-on-appearance-change`, one function for both hooks — the
+same way you enable the mode:
 
 ```elisp
-(add-hook 'enable-theme-functions #'latex-to-svg-frontend-on-theme-change)
+(add-hook 'enable-theme-functions  #'latex-to-svg-frontend-on-appearance-change)
+(add-hook 'after-setting-font-hook #'latex-to-svg-frontend-on-appearance-change)
 ```
 
-Without it, previews re-tint on their next redisplay. You can always force a
+The font hook is what makes `set-frame-font`, `doom/increase-font-size` and
+`doom-big-font-mode` rescale previews right away (`text-scale-mode-hook` only
+covers *buffer-local* zoom). The handler appearance-checks each buffer
+individually, so buffers on an untouched frame cost nothing.
+
+Without it, previews re-tint / rescale on their next redisplay. You can always force a
 refresh with `M-x latex-to-svg-frontend-refresh` (current buffer) or `C-u M-x
 latex-to-svg-frontend-refresh` (every preview buffer).
 

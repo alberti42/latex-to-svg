@@ -11,6 +11,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-19
+
+### Added
+
+- Previews now follow a **frame** font change (`set-frame-font`,
+  `doom/increase-font-size`, `doom-big-font-mode`, …): add the handler to
+  `after-setting-font-hook`. `text-scale-mode-hook`, which the mode installs
+  itself, only covers buffer-local zoom, so previews previously rescaled only
+  on their next redisplay. As with the theme hook, nothing is installed on
+  your behalf. Thanks to @howsiwei (#1).
+
+### Changed
+
+- One handler for both global appearance hooks:
+  `latex-to-svg-frontend-on-appearance-change`. Theme switch and frame font
+  change need the exact same work (an appearance-checked sweep of the mode's
+  buffers), so there is one function to add to both hooks:
+
+  ```elisp
+  (add-hook 'enable-theme-functions
+            #'latex-to-svg-frontend-on-appearance-change)
+  (add-hook 'after-setting-font-hook
+            #'latex-to-svg-frontend-on-appearance-change)
+  ```
+
+### Deprecated
+
+- `latex-to-svg-frontend-on-theme-change` is now an obsolete alias of
+  `latex-to-svg-frontend-on-appearance-change`. Existing configurations keep
+  working; update them at your convenience.
+
 ## [0.13.0] - 2026-08-14
 
 ### Added
@@ -261,7 +292,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/alberti42/latex-to-svg/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/alberti42/latex-to-svg/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/alberti42/latex-to-svg/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/alberti42/latex-to-svg/compare/v0.10.0...v0.11.0

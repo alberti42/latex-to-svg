@@ -760,6 +760,51 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend--refresh-if-changed)
         (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display) 'applied))))))
 
+(ert-deftest l2sf-on-appearance-change-refreshes-changed-buffers ()
+  ;; A frame font change is global: the handler sweeps every mode buffer,
+  ;; but still only refreshes the ones whose appearance actually changed.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((l2sf-tests--image 'should-not-apply))
+        (latex-to-svg-frontend-on-appearance-change)
+        (sit-for 0.1)
+        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                    'fake-image)))
+      ;; Same font, bigger frame font -> new measured height.
+      (setq l2sf-tests--appearance '("#000" "#fff" 40))
+      (let ((l2sf-tests--image 'rescaled))
+        (latex-to-svg-frontend-on-appearance-change)
+        (sit-for 0.1)
+        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                    'rescaled))))))
+
+(ert-deftest l2sf-on-appearance-change-skips-buffers-without-the-mode ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (setq-local latex-to-svg-frontend-mode nil)
+      (setq l2sf-tests--appearance '("#000" "#fff" 40))
+      (let ((l2sf-tests--image 'should-not-apply))
+        (latex-to-svg-frontend-on-appearance-change)
+        (sit-for 0.1)
+        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                    'fake-image))))))
+
+(ert-deftest l2sf-installs-no-global-hooks ()
+  ;; Policy: theme / frame-font tracking is opt-in.  Loading the package
+  ;; (and enabling the mode) must never touch a global hook.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n"
+      (latex-to-svg-frontend-mode 1)
+      (should-not (memq 'latex-to-svg-frontend-on-appearance-change
+                        (default-value 'after-setting-font-hook)))
+      (should-not (memq 'latex-to-svg-frontend-on-appearance-change
+                        (default-value 'enable-theme-functions)))
+      (should-not (memq 'latex-to-svg-frontend--maybe-refresh
+                        (default-value 'window-buffer-change-functions))))))
+
 ;;;; Numbering
 
 (ert-deftest l2sf-counts-single-environments ()

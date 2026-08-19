@@ -6,7 +6,7 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.13.0
+;; Version: 0.14.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.8.0"))
 ;; Keywords: tex, math, images
 
@@ -1373,16 +1373,27 @@ can see, such as setting `latex-to-svg-frontend-foreground-color'."
                          (latex-to-svg-frontend--refresh-if-changed))))))))
 
 ;;;###autoload
-(defun latex-to-svg-frontend-on-theme-change (&rest _)
-  "Refresh every preview buffer whose appearance changed after a theme switch.
+(defun latex-to-svg-frontend-on-appearance-change (&rest _)
+  "Refresh every preview buffer whose appearance changed.
 
-Add this to `enable-theme-functions' for instant re-tinting when you
-switch themes, mirroring how the mode itself is enabled:
+The mode tracks per-buffer changes itself (redisplay and buffer-local
+zoom), but a theme switch and a *frame* font change are global events
+with no per-buffer hook, so the package installs nothing on your behalf.
+For previews to follow them immediately, add this one function to both
+global hooks, mirroring how the mode itself is enabled:
 
   (add-hook \\='enable-theme-functions
-            #\\='latex-to-svg-frontend-on-theme-change)
+            #\\='latex-to-svg-frontend-on-appearance-change)
+  (add-hook \\='after-setting-font-hook
+            #\\='latex-to-svg-frontend-on-appearance-change)
 
-Previews otherwise re-tint on their next redisplay, so this is optional."
+The second covers `set-frame-font', `doom/increase-font-size' and
+`doom-big-font-mode'.  Both are optional: previews otherwise re-tint and
+rescale on their next redisplay.
+
+Each buffer is appearance-checked individually (colors + measured font
+height), so buffers on a frame the change did not touch cost nothing,
+and nothing is recompiled \=-- previews are re-fetched from the cache."
   (run-at-time
    0 nil
    (lambda ()
@@ -1390,6 +1401,10 @@ Previews otherwise re-tint on their next redisplay, so this is optional."
        (when (buffer-local-value 'latex-to-svg-frontend-mode buf)
          (with-current-buffer buf
            (latex-to-svg-frontend--refresh-if-changed)))))))
+
+;;;###autoload
+(define-obsolete-function-alias 'latex-to-svg-frontend-on-theme-change
+  #'latex-to-svg-frontend-on-appearance-change "0.14.0")
 
 ;;;; Command and mode
 
