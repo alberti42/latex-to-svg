@@ -272,6 +272,29 @@ form:
 | `latex-to-svg-frontend-detect-environments`     | `\begin{env}…\end{env}` |
 | `latex-to-svg-frontend-detect-references`       | `\eqref` / `\ref`   |
 
+**Which environments.** `latex-to-svg-frontend-detect-environments` is the
+on/off switch for the whole family; *which* environments it then covers is
+`latex-to-svg-frontend-environments`, a list you can extend (or set to `t` for
+any environment). It defaults to the standalone math environments —
+`equation`, `align`, `gather`, `multline`, `eqnarray`, `alignat`, `flalign`,
+`displaymath`, `math`, `subequations`, and the `breqn` / `empheq` displays —
+matched ignoring a trailing `*`, so `equation` covers `equation*` too.
+
+Two things follow from the engine compiling each preview's source **verbatim**
+in a `standalone` document:
+
+- Nothing is wrapped in `\[…\]`. An environment renders as whatever it
+  typesets on its own — which is why `equation` gives you display math and, if
+  you add it, `tikzpicture` gives you a picture.
+- An environment that is only valid *inside* a display (`cases`, `matrix`,
+  `pmatrix`, `array`, `aligned`, …) cannot be a preview on its own, so it is
+  not in the default list. Those still render normally when they appear inside
+  a detected span.
+
+An environment opener is also only recognised when nothing but whitespace
+precedes it on its line, so prose that mentions `\begin{equation}`
+mid-sentence stays prose. The closing `\end{env}` has no such rule.
+
 **Why inline dollar is split out.** A lone `$` is the one delimiter that also
 occurs in ordinary prose — prices, shell variables. The scanner already guards
 the common cases (pandoc-style: an opening `$` must be followed by a non-space

@@ -264,6 +264,95 @@ A plain buffer suffices — detection is a regexp scanner."
                              (latex-to-svg-frontend--elements (point-min) (point-max)))
                      '("$a$"))))))
 
+(ert-deftest l2sf-environment-must-start-its-line ()
+  ;; `\begin{ENV}' opens a block-level environment, so it is only an opener
+  ;; when nothing but whitespace precedes it on its line.  Prose that merely
+  ;; mentions `\begin{...}' mid-sentence stays prose — and the scan resumes
+  ;; after it, so later math on the same line is still found.
+  (l2sf-tests--md
+      (concat "Type \\begin{equation} to open one, as in $a$\n\n"
+              "\\begin{equation}\nx\n\\end{equation}\n\n"
+              "  \t\\begin{align}\ny&=1\n\\end{align}\n")
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("$a$"
+                     "\\begin{equation}\nx\n\\end{equation}"
+                     ;; Indentation (spaces and tabs) is allowed.
+                     "\\begin{align}\ny&=1\n\\end{align}")))))
+
+(ert-deftest l2sf-environment-mid-line-close-still-closes ()
+  ;; The line-start rule applies to the *opener* only: the matching
+  ;; `\end{ENV}' may sit anywhere, including after content on its line.
+  (l2sf-tests--md "\\begin{equation}\nx=1 \\end{equation}\n"
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("\\begin{equation}\nx=1 \\end{equation}")))))
+
+(ert-deftest l2sf-environments-list-filters-by-name ()
+  ;; Only environments named in `latex-to-svg-frontend-environments' are
+  ;; rendered; anything else is left as literal source even at line start.
+  (l2sf-tests--md
+      (concat "\\begin{equation}\nx\n\\end{equation}\n\n"
+              "\\begin{itemize}\n\\item a\n\\end{itemize}\n\n"
+              "\\begin{tikzpicture}\n\\draw (0,0);\n\\end{tikzpicture}\n")
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("\\begin{equation}\nx\n\\end{equation}")))
+    ;; Extending the list opts an environment in.
+    (let ((latex-to-svg-frontend-environments
+           (cons "tikzpicture" latex-to-svg-frontend-environments)))
+      (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                             (latex-to-svg-frontend--elements (point-min) (point-max)))
+                     '("\\begin{equation}\nx\n\\end{equation}"
+                       "\\begin{tikzpicture}\n\\draw (0,0);\n\\end{tikzpicture}"))))
+    ;; t means any environment.
+    (let ((latex-to-svg-frontend-environments t))
+      (should (= 3 (length (latex-to-svg-frontend--elements
+                            (point-min) (point-max))))))))
+
+(ert-deftest l2sf-environments-list-ignores-trailing-star ()
+  ;; A starred form is enabled by its unstarred name (the common case), and an
+  ;; explicitly starred entry matches as written.
+  (l2sf-tests--md
+      (concat "\\begin{equation*}\nx\n\\end{equation*}\n\n"
+              "\\begin{align*}\ny&=1\n\\end{align*}\n")
+    (should (= 2 (length (latex-to-svg-frontend--elements (point-min) (point-max)))))
+    (let ((latex-to-svg-frontend-environments '("align*")))
+      (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                             (latex-to-svg-frontend--elements (point-min) (point-max)))
+                     '("\\begin{align*}\ny&=1\n\\end{align*}"))))))
+
+(ert-deftest l2sf-environments-list-subordinate-to-toggle ()
+  ;; `-detect-environments' nil switches the whole family off, whatever the
+  ;; name list says.
+  (l2sf-tests--md "\\begin{equation}\nx\n\\end{equation}\n"
+    (let ((latex-to-svg-frontend-detect-environments nil)
+          (latex-to-svg-frontend-environments t))
+      (should (null (latex-to-svg-frontend--elements (point-min) (point-max)))))))
+
+(ert-deftest l2sf-environments-default-matches-numbered-set ()
+  ;; Drift guard: the default render list is exactly the set of environments
+  ;; the numbering code knows how to count.
+  (should (equal (sort (copy-sequence
+                        (default-value 'latex-to-svg-frontend-environments))
+                       #'string<)
+                 (sort (copy-sequence
+                        latex-to-svg-frontend--numbered-environments-all)
+                       #'string<))))
+
+(ert-deftest l2sf-inner-environment-not-a-top-level-opener ()
+  ;; Environments that are only valid inside a display (`pmatrix', `cases')
+  ;; are not top-level previews, but still render as part of the span that
+  ;; encloses them.
+  (l2sf-tests--md
+      (concat "\\begin{equation}\n"
+              "A=\\begin{pmatrix}a\\\\b\\end{pmatrix}\n"
+              "\\end{equation}\n\n"
+              "\\begin{pmatrix}a\\\\b\\end{pmatrix}\n")
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("\\begin{equation}\nA=\\begin{pmatrix}a\\\\b\\end{pmatrix}\n\\end{equation}")))))
+
 (ert-deftest l2sf-toggle-references-off ()
   (l2sf-tests--md "see \\eqref{eq:a} and $x$\n"
     (let ((latex-to-svg-frontend-detect-references nil))

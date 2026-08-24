@@ -11,6 +11,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-24
+
+### Added
+
+- `latex-to-svg-frontend-environments`: the list of LaTeX environments to
+  render, extendable (`tikzpicture`, a package's own display, …) or `t` for
+  any environment. A trailing `*` is ignored when matching, so `equation`
+  covers `equation*`. `latex-to-svg-frontend-detect-environments` remains the
+  on/off switch for the family; this says which names it covers.
+
+### Changed
+
+- An environment opener is now only recognised when nothing but whitespace
+  precedes it on its line. Prose that mentions `\begin{equation}`
+  mid-sentence is no longer turned into a preview. The matching `\end{env}`
+  is unrestricted.
+- `\begin{env}` is no longer detected for *every* environment name, only for
+  those in `latex-to-svg-frontend-environments`. Previously any name was
+  compiled — including non-math ones like `itemize` or an inner-only
+  `pmatrix`, which is not valid as a standalone document. Add a name back to
+  the list to restore it.
+
 ## [0.14.0] - 2026-08-19
 
 ### Added
@@ -292,7 +314,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/alberti42/latex-to-svg/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/alberti42/latex-to-svg/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/alberti42/latex-to-svg/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/alberti42/latex-to-svg/compare/v0.11.0...v0.12.0

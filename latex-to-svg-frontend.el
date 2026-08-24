@@ -6,7 +6,7 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.14.0
+;; Version: 0.15.0
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.8.0"))
 ;; Keywords: tex, math, images
 
@@ -222,6 +222,32 @@ off: a doubled `$$' is unlikely to occur by accident in prose."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-environments
+  '("equation" "math" "displaymath" "multline" "dmath" "empheq"
+    "eqnarray" "align" "alignat" "flalign" "gather"
+    "xalignat" "xxalignat" "subequations" "dseries" "dgroup" "darray")
+  "LaTeX environments to render, or t for any environment.
+A trailing `*' is ignored when matching, so \"equation\" also covers
+`equation*'.  Add a name to render other standalone environments — e.g.
+`tikzpicture', `tabular', or a package's own display — and remove one to
+leave it as literal source.
+
+Only environments that are valid on their own are useful here: the engine
+compiles each preview's source verbatim in a `standalone' document, so an
+environment that must sit inside a display (`cases', `matrix', `pmatrix',
+`array', …) cannot be a top-level preview.  Those still render fine
+*inside* a detected span, which is why they are absent from the default.
+
+Whether the environment then typesets as math is up to the environment
+itself; nothing here wraps the source in `\\[…\\]'.  The whole family can be
+switched off with `latex-to-svg-frontend-detect-environments'.
+
+An environment opener is also only recognised when nothing but whitespace
+precedes it on its line, so a `\\begin' mid-sentence stays prose."
+  :type '(choice (const :tag "Any environment" t)
+                 (repeat :tag "Environment names" string))
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-detect-references t
   "Whether to detect `\\eqref' / `\\ref' and show them as resolved numbers.
 Only meaningful with `latex-to-svg-frontend-number-equations' on, since the
@@ -411,6 +437,28 @@ Linear over REGIONS; `--scan' uses an advancing cursor instead (openers
 are swept in order), so this is kept only for ad-hoc / external callers."
   (seq-some (lambda (r) (and (>= pos (car r)) (< pos (cdr r)))) regions))
 
+(defun latex-to-svg-frontend--opener-environment (tok)
+  "Return the environment name in a `\\begin{ENV}' opener TOK, or nil."
+  (and (string-match "\\`\\\\begin{\\([A-Za-z0-9*]+\\)}\\'" tok)
+       (match-string 1 tok)))
+
+(defun latex-to-svg-frontend--environment-enabled-p (env)
+  "Non-nil when ENV is one of `latex-to-svg-frontend-environments'.
+A trailing `*' is ignored, so listing \"equation\" also enables `equation*';
+an explicitly starred entry in the list still matches as written."
+  (and env
+       (or (eq latex-to-svg-frontend-environments t)
+           (member env latex-to-svg-frontend-environments)
+           (member (replace-regexp-in-string "\\*\\'" "" env)
+                   latex-to-svg-frontend-environments))))
+
+(defun latex-to-svg-frontend--indentation-only-before-p (pos)
+  "Non-nil when nothing but whitespace precedes POS on its line."
+  (save-excursion
+    (goto-char pos)
+    (skip-chars-backward " \t")
+    (bolp)))
+
 (defun latex-to-svg-frontend--family-enabled-p (tok)
   "Non-nil when opener TOK's delimiter family is enabled by its `-detect-*' toggle."
   (cond
@@ -418,7 +466,10 @@ are swept in order), so this is kept only for ad-hoc / external callers."
    ((equal tok "$") latex-to-svg-frontend-detect-dollar-inline)
    ((equal tok "\\[") latex-to-svg-frontend-detect-bracket-display)
    ((equal tok "\\(") latex-to-svg-frontend-detect-bracket-inline)
-   ((string-prefix-p "\\begin{" tok) latex-to-svg-frontend-detect-environments)
+   ((string-prefix-p "\\begin{" tok)
+    (and latex-to-svg-frontend-detect-environments
+         (latex-to-svg-frontend--environment-enabled-p
+          (latex-to-svg-frontend--opener-environment tok))))
    ((or (string-prefix-p "\\eqref{" tok) (string-prefix-p "\\ref{" tok))
     latex-to-svg-frontend-detect-references)
    (t t)))
@@ -565,6 +616,12 @@ Passing a small BEG..END (e.g. one blank-line block) keeps scans cheap."
              ((and (< ci ncodes) (>= mb (car (aref codes ci)))) ; MB inside code
               (goto-char me))
              ((latex-to-svg-frontend--escaped-p mb) (goto-char me))
+             ;; `\begin{ENV}' opens a block-level environment, so it must start
+             ;; its own line (indentation allowed).  A `\begin' after prose on
+             ;; the same line is text about LaTeX, not a preview.
+             ((and (string-prefix-p "\\begin{" tok)
+                   (not (latex-to-svg-frontend--indentation-only-before-p mb)))
+              (goto-char me))
              ((not (latex-to-svg-frontend--family-enabled-p tok)) (goto-char me))
              (t
               (let ((span (latex-to-svg-frontend--match-span mb me tok)))
