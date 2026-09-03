@@ -45,28 +45,45 @@
 (require 'latex-to-svg-frontend)
 (require 'treesit nil t)
 
+(defvar-local latex-to-svg-for-markdown--treesit-warned nil
+  "Non-nil once a tree-sitter failure has been reported in this buffer.")
+
 (defun latex-to-svg-for-markdown--exclusions (beg end)
   "Return Markdown code / verbatim regions within BEG..END to skip.
 Fenced / indented code blocks via a `markdown' tree-sitter parser when
 available, plus inline code spans (`` `…` ``) via regexp so it works with
 no grammar installed.  This is the buffer's
-`latex-to-svg-frontend-exclude-function'."
+`latex-to-svg-frontend-exclude-function'.
+
+A tree-sitter failure is reported once per buffer and then tolerated: the
+inline-code pass still runs, but fenced and indented blocks are no longer
+excluded, so math inside them renders.  Node names vary between `markdown'
+grammars, so a grammar that does not know this query signals rather than
+matching nothing."
   (let ((regions '()))
     (when (and (fboundp 'treesit-available-p) (treesit-available-p)
                (fboundp 'treesit-language-available-p)
                (treesit-language-available-p 'markdown))
-      (ignore-errors
-        (let ((parser (or (car (treesit-parser-list (current-buffer) 'markdown))
-                          (treesit-parser-create 'markdown))))
-          (when parser
-            (dolist (cap (treesit-query-capture
-                          (treesit-parser-root-node parser)
-                          '((fenced_code_block) @c
-                            (indented_code_block) @c)
-                          beg end))
-              (let ((n (cdr cap)))
-                (push (cons (treesit-node-start n) (treesit-node-end n))
-                      regions)))))))
+      (condition-case err
+          (let ((parser (or (car (treesit-parser-list (current-buffer) 'markdown))
+                            (treesit-parser-create 'markdown))))
+            (when parser
+              (dolist (cap (treesit-query-capture
+                            (treesit-parser-root-node parser)
+                            '((fenced_code_block) @c
+                              (indented_code_block) @c)
+                            beg end))
+                (let ((n (cdr cap)))
+                  (push (cons (treesit-node-start n) (treesit-node-end n))
+                        regions)))))
+        (treesit-error
+         (unless latex-to-svg-for-markdown--treesit-warned
+           (setq latex-to-svg-for-markdown--treesit-warned t)
+           (display-warning
+            'latex-to-svg-for-markdown
+            (format "Cannot exclude Markdown code blocks: %s"
+                    (error-message-string err))
+            :warning)))))
     (save-excursion
       (save-restriction
         (widen)

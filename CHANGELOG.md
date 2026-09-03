@@ -13,6 +13,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- A tree-sitter failure while excluding Markdown code blocks is now reported
+  once per buffer instead of passed over. Node names vary between `markdown`
+  grammars, so a grammar that does not know the query signals rather than
+  matching nothing -- and the silent recovery left fenced and indented blocks
+  unexcluded, rendering math inside them with no hint why.
 - A buffer font the frame cannot measure is now reported once per buffer,
   instead of being passed over silently. The height stays unknown either way,
   so the engine still defers sizing to display time; the difference is that a
