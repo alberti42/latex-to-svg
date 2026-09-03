@@ -350,6 +350,9 @@ Inline `$…$' / `\\(…\\)' return nil."
       latex-to-svg-frontend-display-rescale
     latex-to-svg-frontend-inline-rescale))
 
+(defvar-local latex-to-svg-frontend--font-warned nil
+  "Non-nil once an unmeasurable buffer font has been reported in this buffer.")
+
 (defun latex-to-svg-frontend--font-height (&optional buffer)
   "Return BUFFER's font pixel height in a graphical frame showing it, or nil.
 
@@ -359,14 +362,29 @@ async compile callback firing while a terminal frame is current).
 Uses `with-selected-frame' — a temporary, non-raising, non-focus-stealing
 selection — so it never makes a parked child frame appear.  Returns nil
 when BUFFER is shown in no graphical window, in which case the engine
-defers sizing to display time and the refresh hook redraws it then."
+defers sizing to display time and the refresh hook redraws it then.
+
+A font the frame cannot measure yields nil as well, but is reported once
+per buffer rather than passed over: `default-font-height' reads
+`font-info', which returns nil for a font it cannot open, and then signals
+`wrong-type-argument'."
   (let ((buffer (or buffer (current-buffer))))
     (when-let* ((win (get-buffer-window buffer t))
                 (frame (window-frame win))
                 ((display-graphic-p frame)))
       (with-selected-frame frame
         (with-current-buffer buffer
-          (ignore-errors (default-font-height)))))))
+          (condition-case err
+              (default-font-height)
+            (wrong-type-argument
+             (unless latex-to-svg-frontend--font-warned
+               (setq latex-to-svg-frontend--font-warned t)
+               (display-warning
+                'latex-to-svg-frontend
+                (format "Cannot measure the buffer font: %s"
+                        (error-message-string err))
+                :warning))
+             nil)))))))
 
 (defconst latex-to-svg-frontend--numbered-environments-single
   '("equation" "math" "displaymath" "multline" "dmath" "empheq")

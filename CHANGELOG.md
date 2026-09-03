@@ -11,6 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- A buffer font the frame cannot measure is now reported once per buffer,
+  instead of being passed over silently. The height stays unknown either way,
+  so the engine still defers sizing to display time; the difference is that a
+  frame whose font cannot be opened now says so.
+
 ## [0.15.0] - 2026-08-24
 
 ### Added
