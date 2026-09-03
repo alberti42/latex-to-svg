@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Installation instructions no longer install the engine by hand:
+  `latex-to-svg-backend` is on MELPA and arrives through the
+  `Package-Requires` header.
 - A tree-sitter failure while excluding Markdown code blocks is now reported
   once per buffer instead of passed over. Node names vary between `markdown`
   grammars, so a grammar that does not know the query signals rather than

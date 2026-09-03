@@ -119,25 +119,24 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
 
 ## Installation
 
-Neither repo is on MELPA yet. The stack has three layers, installed bottom-up:
+The stack has three layers:
 
-- **`latex-to-svg-backend`** — the LaTeX → SVG compile engine, in its own repo.
+- **[`latex-to-svg-backend`](https://melpa.org/#/latex-to-svg-backend)** — the
+  LaTeX → SVG compile engine. It is on MELPA and is pulled in automatically
+  through the `Package-Requires` header, so the recipes below do not install
+  it. (`straight` resolves it from its bundled MELPA recipes; run `M-x
+  straight-pull-recipe-repositories` if yours predates its addition.)
 - **`latex-to-svg-frontend`** — the shared preview core (detection, overlays,
   numbering, refresh), markup-agnostic.
 - **`latex-to-svg-for-markdown`** / **`latex-to-svg-for-org`** — the per-mode
   adaptors. Install whichever you use; both are optional.
 
-The frontend and the two adaptors live in one repo (this one), so their recipes
-select a single file each; the backend is a separate repo.
+This repo is not on MELPA yet, hence the git recipes. The frontend and the two
+adaptors all live here, so each recipe selects a single file.
 
 ### Straight
 
 ```elisp
-;; Backend — the LaTeX -> SVG engine (separate repo)
-(use-package latex-to-svg-backend
-  :straight (latex-to-svg-backend :type git :host github
-                                  :repo "alberti42/latex-to-svg-backend"))
-
 ;; Frontend — the shared preview core
 (use-package latex-to-svg-frontend
   :straight (latex-to-svg-frontend :type git :host github
