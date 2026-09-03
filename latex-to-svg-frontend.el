@@ -261,7 +261,7 @@ are left as literal source."
 Off by default, mirroring `org-return-follows-link': the buffer is
 editable, so `RET' should insert a newline -- including with point at the
 very start of a reference, where the preview's keymap is already active.
-`C-c C-o' follows a reference regardless."
+\\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference] follows a reference regardless."
   :type 'boolean
   :group 'latex-to-svg-frontend)
 
@@ -871,7 +871,8 @@ On `post-command-hook' while the mode is on."
 NUM is the resolved number, recorded so a reconcile can detect when the
 target renumbered.  Draws ordinary buffer text (matching the prose font)
 and makes the span jump, on `mouse-2' (or a short `mouse-1' click, via
-`follow-link') or `C-c C-o', to the equation defining LABEL."
+`follow-link') or \\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference], to the equation
+defining LABEL."
   (let ((b (if (markerp beg) (marker-position beg) beg))
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
@@ -1492,7 +1493,8 @@ and nothing is recompiled \=-- previews are re-fetched from the cache."
 (defun latex-to-svg-frontend-goto-reference (&optional event)
   "Jump to the equation defining the label of the reference preview at point.
 EVENT is the triggering input event.
-Bound in `\\eqref' / `\\ref' preview overlays to `mouse-2' and `C-c C-o'
+Bound in `\\eqref' / `\\ref' preview overlays to `mouse-2' and
+\\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference]
 \(and to `RET' when `latex-to-svg-frontend-return-follows-reference' is
 on); a short `mouse-1' click gets here too, translated to `mouse-2' by
 Emacs' `follow-link' mechanism (see `mouse-1-click-follows-link')."
