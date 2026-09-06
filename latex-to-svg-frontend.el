@@ -257,9 +257,9 @@ are left as literal source."
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-return-follows-reference nil
-  "Non-nil means `RET' on an `\\eqref' / `\\ref' preview follows it.
+  "Non-nil means RET on an `\\eqref' / `\\ref' preview follows it.
 Off by default, mirroring `org-return-follows-link': the buffer is
-editable, so `RET' should insert a newline -- including with point at the
+editable, so RET should insert a newline -- including with point at the
 very start of a reference, where the preview's keymap is already active.
 \\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference] follows a reference regardless."
   :type 'boolean
@@ -1495,7 +1495,7 @@ and nothing is recompiled \=-- previews are re-fetched from the cache."
 EVENT is the triggering input event.
 Bound in `\\eqref' / `\\ref' preview overlays to `mouse-2' and
 \\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference]
-\(and to `RET' when `latex-to-svg-frontend-return-follows-reference' is
+\(and to RET when `latex-to-svg-frontend-return-follows-reference' is
 on); a short `mouse-1' click gets here too, translated to `mouse-2' by
 Emacs' `follow-link' mechanism (see `mouse-1-click-follows-link')."
   (interactive (list last-command-event))
