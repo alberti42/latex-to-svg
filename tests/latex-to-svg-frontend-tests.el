@@ -1141,6 +1141,36 @@ merely *contains* inline math) is left untouched."
             (should (equal (l2sf-tests--center-spec ov)
                            '(space :align-to (- center (0.5 . rebuilt-image)))))))))))
 
+(ert-deftest l2sf-every-option-is-safe-except-the-mode-hook ()
+  ;; This package's options are all inert data -- booleans, numbers, colors,
+  ;; environment names -- so a project can set them in `.dir-locals.el'
+  ;; without a prompt.  The mode hook is the exception, and stays one: a
+  ;; file-local hook is arbitrary code.  (What is executed and what LaTeX is
+  ;; compiled belongs to the engine, which keeps those options unsafe.)
+  (let (unsafe)
+    (mapatoms
+     (lambda (sym)
+       (when (and (get sym 'custom-type)
+                  (string-prefix-p "latex-to-svg-frontend-" (symbol-name sym))
+                  (not (get sym 'safe-local-variable)))
+         (push sym unsafe))))
+    (should (equal unsafe '(latex-to-svg-frontend-mode-hook)))))
+
+(ert-deftest l2sf-padding-safe-matches-the-engine ()
+  ;; A file-local padding is hand-written Lisp, so the `:safe' predicate
+  ;; accepts every shape the engine takes (1-4 numbers) and nothing else --
+  ;; a value Customize cannot express must still not need a y/n prompt.
+  (let ((safe (get 'latex-to-svg-frontend-padding 'safe-local-variable)))
+    (should safe)
+    (dolist (ok (list nil 3 3.5 '(0 0 0 6) '(2 6) '(1 2 3)))
+      (should (funcall safe ok)))
+    (dolist (bad (list "3" '(1 2 3 4 5) '(1 "2") 'x))
+      (should-not (funcall safe bad))))
+  ;; The colors it is threaded with are safe as data too.
+  (dolist (v '(latex-to-svg-frontend-foreground-color
+               latex-to-svg-frontend-background-color))
+    (should (get v 'safe-local-variable))))
+
 (ert-deftest l2sf-passes-color-background-padding ()
   ;; The three appearance defcustoms are threaded to the engine as
   ;; :color / :background / :padding (both on first render and on refresh).

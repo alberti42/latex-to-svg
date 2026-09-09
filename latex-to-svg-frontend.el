@@ -100,6 +100,7 @@ when its number actually changes.
 
 When nil, every element renders verbatim (no numbering)."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-reconcile-idle 0.4
@@ -109,6 +110,7 @@ any downstream preview whose number changed (see
 `latex-to-svg-frontend--reconcile').  nil disables the automatic pass
 \(numbers then refresh only on an explicit render)."
   :type '(choice (const :tag "Disabled" nil) number)
+  :safe (lambda (v) (or (null v) (numberp v)))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-incremental-reconcile t
@@ -122,6 +124,7 @@ Falls back to a full `latex-to-svg-frontend--reconcile' on any structural
 surprise, and the debounced backstop / explicit commands always use the
 full pass.  Set to nil to force the full scan everywhere."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-inline-rescale 1.0
@@ -131,6 +134,7 @@ Applied on top of the engine's global `latex-to-svg-font-scale' via
 after changing it, run `latex-to-svg-frontend-refresh' to apply (with a
 prefix argument to apply in every buffer at once)."
   :type 'number
+  :safe #'numberp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-display-rescale 1.0
@@ -141,6 +145,7 @@ touch larger than inline.  Re-scales from cache (no recompile); after
 changing it, run `latex-to-svg-frontend-refresh' to apply (with a prefix
 argument to apply in every buffer at once)."
   :type 'number
+  :safe #'numberp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-foreground-color nil
@@ -156,6 +161,7 @@ so run `latex-to-svg-frontend-refresh' after changing it (with a prefix
 argument to apply in every buffer at once)."
   :type '(choice (const :tag "Follow buffer foreground" nil)
                  (color :tag "Fixed color"))
+  :safe (lambda (v) (or (null v) (stringp v)))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-background-color nil
@@ -171,6 +177,7 @@ recompile), so run `latex-to-svg-frontend-refresh' after changing it (with
 a prefix argument to apply in every buffer at once)."
   :type '(choice (const :tag "Transparent" nil)
                  (color :tag "Box color"))
+  :safe (lambda (v) (or (null v) (stringp v)))
   :group 'latex-to-svg-frontend)
 
 ;; Before the defcustom on purpose: `defvaralias' discards a value the
@@ -206,6 +213,11 @@ recompile), so run `latex-to-svg-frontend-refresh' after changing it
                        (number :tag "Right ")
                        (number :tag "Bottom")
                        (number :tag "Left  ")))
+  ;; A file-local value is hand-written Lisp, so accept every shape the
+  ;; engine does (1-4 numbers), not just the two Customize offers.
+  :safe (lambda (v) (or (null v) (numberp v)
+                        (and (consp v) (<= 1 (length v) 4)
+                             (seq-every-p #'numberp v))))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-center-display-math nil
@@ -242,6 +254,7 @@ reads as the equation `100-'); escape it as \"\$100-\$200\" for a one-off, or
 turn this off (leaving the other three families on) and use `\(…\)' in
 buffers where `$' is mostly currency."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-detect-dollar-display t
@@ -249,21 +262,25 @@ buffers where `$' is mostly currency."
 Safe to keep on even when `latex-to-svg-frontend-detect-dollar-inline' is
 off: a doubled `$$' is unlikely to occur by accident in prose."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-detect-bracket-inline t
   "Whether to detect inline LaTeX bracket math `\\(…\\)'."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-detect-bracket-display t
   "Whether to detect display LaTeX bracket math `\\[…\\]'."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-detect-environments t
   "Whether to detect LaTeX environments `\\begin{env}…\\end{env}'."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-environments
@@ -290,6 +307,8 @@ An environment opener is also only recognised when nothing but whitespace
 precedes it on its line, so a `\\begin' mid-sentence stays prose."
   :type '(choice (const :tag "Any environment" t)
                  (repeat :tag "Environment names" string))
+  :safe (lambda (v) (or (eq v t)
+                        (and (listp v) (seq-every-p #'stringp v))))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-detect-references t
@@ -298,6 +317,7 @@ Only meaningful with `latex-to-svg-frontend-number-equations' on, since the
 number comes from the document's `\\label' map.  When off, `\\eqref' / `\\ref'
 are left as literal source."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-return-follows-reference nil
@@ -307,6 +327,7 @@ editable, so RET should insert a newline -- including with point at the
 very start of a reference, where the preview's keymap is already active.
 \\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference] follows a reference regardless."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-suppress-emphasis t
@@ -318,6 +339,7 @@ already masks this, but freshly typed or currently-edited math has none.  When
 non-nil, a font-lock pass neutralizes that decoration over every detected math
 span (see `latex-to-svg-frontend--suppress-emphasis')."
   :type 'boolean
+  :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
 ;;;; Per-markup protocol (buffer-local; set by an adaptor's minor mode)
