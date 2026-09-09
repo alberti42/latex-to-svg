@@ -109,10 +109,10 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
   the `markdown` tree-sitter grammar is optional (it adds fenced/indented
   code-block exclusion — inline code is handled without it).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.8.0+ (the engine) — the floor is set by the display-time `:color` /
-  `:background` / `:padding` overrides behind
+  0.9.0+ (the engine) — the floor is set by the display-time `:color` /
+  `:background` / `:padding` overrides (per-side padding needs 0.9.0) behind
   `latex-to-svg-frontend-foreground-color`, `-background-color` and
-  `-background-padding`, and by `:font-height`, which lets the front-end measure
+  `-padding`, and by `:font-height`, which lets the front-end measure
   the buffer font against the frame that actually displays it instead of the
   engine guessing.
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution).
@@ -225,7 +225,7 @@ buffer, not just the current one):
 |--------|---------|-------------|
 | `latex-to-svg-frontend-foreground-color` | `nil` | Fixed ink color; `nil` follows the buffer foreground (tracks the theme). |
 | `latex-to-svg-frontend-background-color` | `nil` | Box color behind previews; `nil` is transparent. A very light gray reads best (e.g. `gray97` / `#f7f7f7`). |
-| `latex-to-svg-frontend-background-padding` | `nil` | Padding (pt) between the equation and the box edge; only visible with a background color. `nil`/`0` crops to the ink. |
+| `latex-to-svg-frontend-padding` | `nil` | Padding (pt) between the equation and the box edge. A number applies to all four sides; a list of four numbers pads each side separately — `(TOP RIGHT BOTTOM LEFT)`, so `(0 0 0 6)` is a left gutter. `nil`/`0` crops to the ink. |
 
 ### Refreshing on appearance changes
 

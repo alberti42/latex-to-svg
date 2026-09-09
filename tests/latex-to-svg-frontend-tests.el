@@ -1068,13 +1068,24 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend--render-region (point-min) (point-max))
         (should (equal l2sf-tests--last-rescale 1.4))))))
 
+(ert-deftest l2sf-padding-obsolete-alias-tracks-the-new-name ()
+  ;; The pre-0.16.0 name stays usable: it is an alias for the new one, so a
+  ;; config that still sets it keeps working.  (That a value set *before* this
+  ;; file loads survives depends on the alias preceding the defcustom in the
+  ;; source -- `defvaralias' discards a value the obsolete name already holds.)
+  (should (eq (indirect-variable 'latex-to-svg-frontend-background-padding)
+              'latex-to-svg-frontend-padding))
+  (should (get 'latex-to-svg-frontend-background-padding 'byte-obsolete-variable))
+  (let ((latex-to-svg-frontend-background-padding '(0 0 0 6)))
+    (should (equal latex-to-svg-frontend-padding '(0 0 0 6)))))
+
 (ert-deftest l2sf-passes-color-background-padding ()
   ;; The three appearance defcustoms are threaded to the engine as
   ;; :color / :background / :padding (both on first render and on refresh).
   (l2sf-tests--with-stub
     (let ((latex-to-svg-frontend-foreground-color "red")
           (latex-to-svg-frontend-background-color "gray97")
-          (latex-to-svg-frontend-background-padding 6)
+          (latex-to-svg-frontend-padding 6)
           (latex-to-svg-frontend-number-equations nil))
       (l2sf-tests--md "\\[b\\]\n"
         (latex-to-svg-frontend--render-region (point-min) (point-max))

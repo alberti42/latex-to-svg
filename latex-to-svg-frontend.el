@@ -7,7 +7,7 @@
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.15.2
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.8.0"))
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.9.0"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -173,17 +173,39 @@ a prefix argument to apply in every buffer at once)."
                  (color :tag "Box color"))
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-background-padding nil
-  "Padding (in pt) around previews inside the background box.
+;; Before the defcustom on purpose: `defvaralias' discards a value the
+;; obsolete name already holds, so a config that sets the old name before
+;; this file loads would silently lose it if the alias came afterwards.
+(define-obsolete-variable-alias 'latex-to-svg-frontend-background-padding
+  'latex-to-svg-frontend-padding "0.16.0")
 
-Has a visible effect only when `latex-to-svg-frontend-background-color'
-is set: it grows the colored box beyond the equation ink on all
-sides.  A number of pt (e.g. 3) that scales with the equation; nil or
-0 crops the box to the ink.  Passed to `latex-to-svg-backend' as
-`:padding'; applies from cache (no recompile), so run
-`latex-to-svg-frontend-refresh' after changing it (with a prefix argument
-to apply in every buffer at once)."
-  :type '(choice (const :tag "None" nil) number)
+(defcustom latex-to-svg-frontend-padding nil
+  "Padding (in pt) added around equation previews.
+
+Grows the box beyond the equation ink, and scales with the equation.
+Either a number of pt (e.g. 3) applied to all four sides, or a list of
+four numbers (TOP RIGHT BOTTOM LEFT) to pad each side separately -- so
+a left gutter and nothing else is (0 0 0 6).  nil or 0 crops the box to
+the ink.  Set from Lisp, the shorter CSS forms the engine accepts work
+too (one, two or three numbers: see `latex-to-svg-backend'), but
+Customize offers only the number and the four-side list.
+
+This mainly matters with `latex-to-svg-frontend-background-color' set,
+since padding is what separates the ink from the box edge.  Without a
+box color the padding is transparent, so a symmetric value is invisible
+but an asymmetric one still shifts the equation within its own image
+\(a left-only pad indents it).
+
+Passed to `latex-to-svg-backend' as `:padding'; applies from cache (no
+recompile), so run `latex-to-svg-frontend-refresh' after changing it
+\(with a prefix argument to apply in every buffer at once)."
+  :type '(choice (const :tag "None" nil)
+                 (number :tag "All four sides (pt)")
+                 (list :tag "Per side (pt)"
+                       (number :tag "Top   ")
+                       (number :tag "Right ")
+                       (number :tag "Bottom")
+                       (number :tag "Left  ")))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-detect-dollar-inline t
@@ -1094,7 +1116,7 @@ overlays when it finishes.  BEG / END should be markers."
                     :rescale-by (latex-to-svg-frontend--rescale-for display-p)
                     :color latex-to-svg-frontend-foreground-color
                     :background latex-to-svg-frontend-background-color
-                    :padding latex-to-svg-frontend-background-padding
+                    :padding latex-to-svg-frontend-padding
                     :font-height (latex-to-svg-frontend--font-height buffer)
                     :metadata (car enums-fallback)
                     :callback (lambda ()
@@ -1402,7 +1424,7 @@ option are on."
                                            (overlay-get ov 'latex-to-svg-frontend-display-math))
                               :color latex-to-svg-frontend-foreground-color
                               :background latex-to-svg-frontend-background-color
-                              :padding latex-to-svg-frontend-background-padding
+                              :padding latex-to-svg-frontend-padding
                               :font-height font-height)))
             (overlay-put ov 'latex-to-svg-frontend-image image)
             (when (overlay-get ov 'display)
