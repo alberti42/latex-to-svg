@@ -11,6 +11,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-09-09
+
+### Added
+
+- `latex-to-svg-frontend-padding` now accepts per-side values, so
+  the box can have a left gutter (or any other asymmetric inset) instead of the
+  same inset all round: a list of one to four numbers read in CSS order —
+  `(ALL)`, `(VERTICAL HORIZONTAL)`, `(TOP HORIZONTAL BOTTOM)`,
+  `(TOP RIGHT BOTTOM LEFT)`. A left gutter and nothing else is `(0 0 0 6)`. A
+  plain number keeps its meaning (all four sides), and the customize `:type`
+  offers both forms. Requires `latex-to-svg-backend` 0.9.0.
+
+### Added
+
+- `latex-to-svg-frontend-center-display-math` (default nil): center
+  display-math previews in the window, the way a LaTeX document centers them.
+  Inline math is never centered. This is a display-time indent, not part of
+  the image — a `before-string` whose stretch is
+  `(space :align-to (- center (0.5 . IMAGE)))`, so redisplay re-centers on a
+  window resize, a split, a font change or `display-line-numbers-mode` with no
+  refresh and, notably, without measuring the image (`image-size` on an
+  undisplayed SVG is not reliable, which is why the engine does not measure
+  either). An equation wider than the window, or one not starting its own
+  line, stays where it is.
+- `:safe` predicates on **every** option except `latex-to-svg-frontend-mode-hook`,
+  so a per-file or per-project value in a `-*-` line or `.dir-locals.el`
+  applies without the "risky local variable" prompt. These carry data only —
+  booleans, numbers, color strings, environment names; no paths and no code —
+  which is the same rule the engine follows. The mode hook is deliberately
+  excluded: a file-local hook is arbitrary code. What is executed and which
+  LaTeX gets compiled belong to the engine, which keeps those options unsafe.
+  The padding predicate accepts every shape the engine takes (one to four
+  numbers), including the CSS shorthands Customize cannot express.
+
+### Changed
+
+- `latex-to-svg-frontend-background-padding` is renamed
+  `latex-to-svg-frontend-padding`: with per-side values the option is no longer
+  only about the background box — without a box color the padding is
+  transparent, so a symmetric value is invisible, but an asymmetric one still
+  shifts the equation within its own image (a left-only pad indents it). The
+  old name keeps working as an obsolete alias, declared *before* the
+  `defcustom` so a config that sets it before this file loads is still
+  honored.
+- The docstring no longer claims padding is visible *only* with a background
+  color, for the same reason.
+
 ## [0.15.2] - 2026-09-07
 
 ### Fixed
@@ -339,7 +386,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.15.2...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/alberti42/latex-to-svg/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/alberti42/latex-to-svg/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/alberti42/latex-to-svg/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/alberti42/latex-to-svg/compare/v0.14.0...v0.15.0
