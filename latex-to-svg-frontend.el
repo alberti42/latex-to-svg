@@ -208,6 +208,28 @@ recompile), so run `latex-to-svg-frontend-refresh' after changing it
                        (number :tag "Left  ")))
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-center-display-math nil
+  "Whether to center display-math previews in the window.
+
+Display math is centered the way a LaTeX document centers it, rather
+than starting at the left margin.  Inline math is never centered: it
+belongs in the run of text.
+
+This is a display-time indent, not part of the image: the preview keeps
+its own size and any `latex-to-svg-frontend-padding' box, and a space
+before it stretches to put its center on the window's center.  The
+stretch is computed by redisplay, so it follows a window resize, a
+split, a font change or `display-line-numbers-mode' on its own -- no
+refresh needed for those.  After changing this option, though, run
+`latex-to-svg-frontend-refresh' to apply it to previews already on
+screen (with a prefix argument, in every buffer at once).
+
+An equation wider than the window, or one that does not start its own
+line, simply stays where it is: the space cannot pull it left."
+  :type 'boolean
+  :safe #'booleanp
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-detect-dollar-inline t
   "Whether to detect inline TeX dollar math `$…$'.
 `$' is the least reliable delimiter, since it also occurs in prose (prices,
@@ -712,6 +734,39 @@ enough to run on every command (see `--handle-cursor')."
 
 ;;;; Overlays
 
+(defun latex-to-svg-frontend--center-prefix (ov image)
+  "Return a centering `before-string' for IMAGE on OV, or nil.
+Nil unless `latex-to-svg-frontend-center-display-math' is on and OV is
+display math -- inline math belongs in the run of text.
+
+The string is one space whose `display' is a stretch reaching to the
+window center less half the image: `(space :align-to (- center (0.5
+. IMAGE)))'.  Redisplay evaluates that expression, so the indent tracks
+the window width, a split and the font with no help from us -- and
+nothing measures the image, which is what `image-size' would have had
+to do (see `latex-to-svg-backend' on why measuring an SVG is not
+reliable)."
+  (when (and latex-to-svg-frontend-center-display-math
+             image
+             (overlay-get ov 'latex-to-svg-frontend-display-math))
+    (propertize " " 'display `(space :align-to (- center (0.5 . ,image))))))
+
+(defun latex-to-svg-frontend--show-image (ov image)
+  "Show IMAGE on OV, centered if it is display math and centering is on.
+The centering prefix embeds IMAGE, so it is rebuilt here rather than
+kept across a re-render: every path that shows an image goes through
+this function, and `latex-to-svg-frontend--hide-image' undoes it."
+  (overlay-put ov 'display image)
+  (overlay-put ov 'before-string
+               (latex-to-svg-frontend--center-prefix ov image)))
+
+(defun latex-to-svg-frontend--hide-image (ov)
+  "Hide OV's image, revealing its LaTeX source.
+Drops the centering prefix with it, so revealed source is not indented
+by a leftover stretch."
+  (overlay-put ov 'display nil)
+  (overlay-put ov 'before-string nil))
+
 (defun latex-to-svg-frontend--overlays-in (beg end)
   "Return this package's overlays intersecting BEG..END."
   (seq-filter (lambda (o) (overlay-get o 'latex-to-svg-frontend))
@@ -741,13 +796,14 @@ in the span."
         (overlay-put ov 'latex-to-svg-frontend-source (or source value))
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'help-echo (or source value))
-        (overlay-put ov 'display image)
         ;; Keep markup font-lock (Org emphasis, ...) from drawing a
         ;; strike-through / underline across the rendered image.
         (overlay-put ov 'face latex-to-svg-frontend--neutralize-face)
         (overlay-put ov 'priority 1)
         (overlay-put ov 'latex-to-svg-frontend-display-math display-p)
         (overlay-put ov 'latex-to-svg-frontend-image image)
+        ;; After `display-math', which decides whether it is centered.
+        (latex-to-svg-frontend--show-image ov image)
         (when enums-fallback
           (let ((meta (plist-get (latex-to-svg-backend-metadata value) :nums)))
             (overlay-put ov 'latex-to-svg-frontend-enums (or meta enums-fallback))
@@ -771,7 +827,7 @@ AFTER is non-nil after the change; reveal OV's source and flag it for
 re-render."
   (when after
     (overlay-put ov 'latex-to-svg-frontend-modified t)
-    (overlay-put ov 'display nil)))
+    (latex-to-svg-frontend--hide-image ov)))
 
 (defun latex-to-svg-frontend--revealable-overlay-at (pos)
   "Return this package's preview overlay covering POS, or nil.
@@ -782,7 +838,7 @@ Both image previews and `\\eqref' / `\\ref' text previews qualify."
 
 (defun latex-to-svg-frontend--open-overlay (ov)
   "Reveal OV's LaTeX source by hiding its image / reference text."
-  (overlay-put ov 'display nil))
+  (latex-to-svg-frontend--hide-image ov))
 
 (defun latex-to-svg-frontend--close-overlay (ov)
   "Re-show OV's preview, or re-render it if its source was edited while open."
@@ -792,7 +848,8 @@ Both image previews and `\\eqref' / `\\ref' text previews qualify."
       (overlay-put ov 'latex-to-svg-frontend-modified nil)
       (latex-to-svg-frontend--rerender-overlay ov))
      ((overlay-get ov 'latex-to-svg-frontend-image)
-      (overlay-put ov 'display (overlay-get ov 'latex-to-svg-frontend-image)))
+      (latex-to-svg-frontend--show-image
+       ov (overlay-get ov 'latex-to-svg-frontend-image)))
      ((overlay-get ov 'latex-to-svg-frontend-ref)
       (overlay-put ov 'display (overlay-get ov 'latex-to-svg-frontend-ref-display))))))
 
@@ -1428,7 +1485,7 @@ option are on."
                               :font-height font-height)))
             (overlay-put ov 'latex-to-svg-frontend-image image)
             (when (overlay-get ov 'display)
-              (overlay-put ov 'display image))))
+              (latex-to-svg-frontend--show-image ov image))))
         (setq latex-to-svg-frontend--rendered-appearance
               (latex-to-svg-backend-appearance font-height))))))
 

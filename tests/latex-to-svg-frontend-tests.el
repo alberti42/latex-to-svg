@@ -1079,6 +1079,68 @@ merely *contains* inline math) is left untouched."
   (let ((latex-to-svg-frontend-background-padding '(0 0 0 6)))
     (should (equal latex-to-svg-frontend-padding '(0 0 0 6)))))
 
+(defun l2sf-tests--center-spec (ov)
+  "Return the `display' spec of OV's centering prefix, or nil."
+  (when-let* ((pre (overlay-get ov 'before-string)))
+    (get-text-property 0 'display pre)))
+
+(ert-deftest l2sf-centers-display-math-only ()
+  ;; Centering is a display-time indent on display math: a one-space
+  ;; `before-string' whose stretch reaches the window center less half the
+  ;; image.  Inline math belongs in the run of text and is never centered.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-center-display-math t)
+          (latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--md "\\[a\\]\n\ntext \\(b\\) more\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((ovs (l2sf-tests--overlays)))
+          (should (= (length ovs) 2))
+          (dolist (ov ovs)
+            (if (overlay-get ov 'latex-to-svg-frontend-display-math)
+                (progn
+                  (should (equal (overlay-get ov 'before-string) " "))
+                  ;; The image itself appears in the spec -- that is what
+                  ;; lets redisplay size the stretch without measuring it.
+                  (should (equal (l2sf-tests--center-spec ov)
+                                 `(space :align-to
+                                         (- center (0.5 . ,l2sf-tests--image))))))
+              (should-not (overlay-get ov 'before-string)))))))))
+
+(ert-deftest l2sf-centering-off-by-default ()
+  ;; Off, nothing is indented -- previews start at the left margin as before.
+  (l2sf-tests--with-stub
+    (should-not latex-to-svg-frontend-center-display-math)
+    (let ((latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--md "\\[a\\]\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (dolist (ov (l2sf-tests--overlays))
+          (should-not (overlay-get ov 'before-string)))))))
+
+(ert-deftest l2sf-centering-follows-reveal-and-refresh ()
+  ;; The prefix embeds the image, so it must track every show/hide: revealed
+  ;; source must not sit behind a leftover stretch, and a refresh (which
+  ;; rebuilds the image) must rebuild the prefix with it.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-center-display-math t)
+          (latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--md "\\[a\\]\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((ov (car (l2sf-tests--overlays))))
+          (should (overlay-get ov 'before-string))
+          ;; Revealed for editing: image and prefix both gone.
+          (latex-to-svg-frontend--open-overlay ov)
+          (should-not (overlay-get ov 'display))
+          (should-not (overlay-get ov 'before-string))
+          ;; Cursor leaves: both back.
+          (latex-to-svg-frontend--close-overlay ov)
+          (should (overlay-get ov 'display))
+          (should (overlay-get ov 'before-string))
+          ;; A refresh re-threads the prefix against the rebuilt image.
+          (let ((l2sf-tests--image 'rebuilt-image))
+            (latex-to-svg-frontend-refresh)
+            (should (equal (l2sf-tests--center-spec ov)
+                           '(space :align-to (- center (0.5 . rebuilt-image)))))))))))
+
 (ert-deftest l2sf-passes-color-background-padding ()
   ;; The three appearance defcustoms are threaded to the engine as
   ;; :color / :background / :padding (both on first render and on refresh).

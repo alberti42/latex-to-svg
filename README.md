@@ -225,6 +225,7 @@ buffer, not just the current one):
 |--------|---------|-------------|
 | `latex-to-svg-frontend-foreground-color` | `nil` | Fixed ink color; `nil` follows the buffer foreground (tracks the theme). |
 | `latex-to-svg-frontend-background-color` | `nil` | Box color behind previews; `nil` is transparent. A very light gray reads best (e.g. `gray97` / `#f7f7f7`). |
+| `latex-to-svg-frontend-center-display-math` | `nil` | Center display-math previews in the window (inline math is never centered). A display-time indent — redisplay re-centers on resize, split or font change; run `C-u M-x latex-to-svg-frontend-refresh` after changing the option itself. |
 | `latex-to-svg-frontend-padding` | `nil` | Padding (pt) between the equation and the box edge. A number applies to all four sides; a list of four numbers pads each side separately — `(TOP RIGHT BOTTOM LEFT)`, so `(0 0 0 6)` is a left gutter. `nil`/`0` crops to the ink. |
 
 ### Refreshing on appearance changes
