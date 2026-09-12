@@ -100,7 +100,9 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
   `gfm-mode` — it uses the `markdown` grammar directly (reusing the buffer's
   parser if there is one, else creating its own), so the grammar is an optional
   accelerator for block code, not a dependency on the major mode.
-- Org: `#+begin_src` / `example` / `export` / `comment` blocks + comment lines.
+- Org: `#+begin_src` / `example` / `export` / `comment` blocks + comment lines,
+  plus inline `~code~` / `=verbatim=` spans (via Org's own `org-verbatim-re`),
+  so `=\(=` stays literal text.
 
 ## Requirements
 
@@ -400,10 +402,6 @@ Pull requests adding adaptors for other major modes are welcome.
 
 - **`\tag`-based references and `subequations` sub-lettering** aren't modelled
   (see [`docs/numbering.md`](docs/numbering.md)).
-- **Org inline `~code~` / `=verbatim=` aren't excluded** — a math delimiter
-  written inside them is still detected and previewed (Org block code —
-  `#+begin_src` / `example` / … — and comment lines *are* excluded; only
-  inline code / verbatim isn't yet).
 
 ## Tests
 

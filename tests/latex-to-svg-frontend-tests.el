@@ -192,6 +192,32 @@ A plain buffer suffices — detection is a regexp scanner."
                            (latex-to-svg-frontend--elements (point-min) (point-max)))
                    '("$a$" "$b$")))))
 
+(ert-deftest l2sf-org-adaptor-skips-inline-verbatim ()
+  ;; `=verbatim=' / `~code~' spans are literal text: a math delimiter typed
+  ;; inside them (e.g. writing about `=\(=') must not be previewed, while real
+  ;; math on the same line still is.  Uses Org's own `org-verbatim-re'.
+  (skip-unless (and (require 'org nil t)
+                    (boundp 'org-verbatim-re) (stringp org-verbatim-re)))
+  (l2sf-tests--md
+      "I typed =\\(= and =\\)= but \\(y\\) is math, ~\\[z\\]~ is not.\n"
+    (setq-local latex-to-svg-frontend-exclude-function
+                #'latex-to-svg-for-org--exclusions)
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("\\(y\\)")))))
+
+(ert-deftest l2sf-org-adaptor-inline-verbatim-fallback ()
+  ;; Same, with Org's own `org-verbatim-re' unavailable: the built-in fallback
+  ;; regexp must cover it (and must not swallow `=' used as an operator).
+  (l2sf-tests--md
+      "Prose =\\(= here; x = 1 and y = 2; $a=b$ then $c=d$.\n"
+    (let ((org-verbatim-re nil))         ; force the fallback
+      (setq-local latex-to-svg-frontend-exclude-function
+                  #'latex-to-svg-for-org--exclusions)
+      (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                             (latex-to-svg-frontend--elements (point-min) (point-max)))
+                     '("$a=b$" "$c=d$"))))))
+
 (ert-deftest l2sf-org-adaptor-block-straddling-end ()
   ;; A bounded scan (as `--element-at' does) whose END falls *inside* a
   ;; `#+begin_src' block must not signal: the unbounded `#+end_src' search

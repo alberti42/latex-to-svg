@@ -11,6 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.1] - 2026-09-12
+
+### Fixed
+
+- Org: inline `~code~` / `=verbatim=` spans are now excluded from detection,
+  so writing about the delimiters themselves (`=\(=` and `=\)=`) stays literal
+  text instead of being previewed as math. The exclusion reuses Org's own
+  `org-verbatim-re` when available (so what we skip is exactly what Org
+  fontifies as verbatim), with an equivalent built-in fallback otherwise.
+
 ## [0.16.0] - 2026-09-09
 
 ### Added
@@ -386,7 +396,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.16.1...HEAD
+[0.16.1]: https://github.com/alberti42/latex-to-svg/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/alberti42/latex-to-svg/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/alberti42/latex-to-svg/compare/v0.15.1...v0.15.2
 [0.15.1]: https://github.com/alberti42/latex-to-svg/compare/v0.15.0...v0.15.1

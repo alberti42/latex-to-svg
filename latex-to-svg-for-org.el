@@ -6,7 +6,7 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.16.0
+;; Version: 0.16.1
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.11.0"))
 ;; Keywords: tex, org, math, images
 
@@ -32,9 +32,10 @@
 ;; `latex-to-svg-frontend'.
 ;;
 ;; Detection uses the core's universal scanner (not `org-element'); the Org
-;; block/comment regions below are excluded from it.  Inline `~code~' /
-;; `=verbatim=' are not yet excluded (see README); disable a delimiter family
-;; with the core toggles if a markup character causes false positives.
+;; block/comment regions below are excluded from it, as are inline `~code~' /
+;; `=verbatim=' spans, so `=\(=' stays literal text.  Disable a delimiter
+;; family with the core toggles if a markup character still causes false
+;; positives.
 ;;
 ;; Usage:
 ;;
@@ -47,11 +48,39 @@
 
 (require 'latex-to-svg-frontend)
 
-(defun latex-to-svg-for-org--exclusions (_beg end)
-  "Return Org code / comment regions up to END to skip.
-Covers `#+begin_src' / `example' / `export' / `comment' blocks and whole
-comment lines (`# …').  This is the buffer's
-`latex-to-svg-frontend-exclude-function'."
+(defvar org-verbatim-re)
+
+(defconst latex-to-svg-for-org--verbatim-fallback-re
+  (concat "\\([-[:space:]('\"{]\\|^\\)"                   ; 1: pre char
+          "\\(\\([=~]\\)"                                ; 2: whole, 3: marker
+          "\\([^[:space:]]\\|[^[:space:]].*?[^[:space:]]\\)" ; 4: body
+          "\\3\\)"
+          "\\([-[:space:].,:!?;'\")}]\\|$\\)")            ; 5: post char
+  "Fallback for `org-verbatim-re', same group layout (2 = the whole span).
+Used when Org has not yet computed its emphasis regexps.")
+
+(defun latex-to-svg-for-org--inline-verbatim-regions (beg end)
+  "Return inline `~code~' / `=verbatim=' regions between BEG and END.
+Uses Org's own `org-verbatim-re' when available so what we skip is exactly
+what Org fontifies as verbatim; group 2 is the span including its markers."
+  (let ((re (if (and (boundp 'org-verbatim-re) (stringp org-verbatim-re))
+                org-verbatim-re
+              latex-to-svg-for-org--verbatim-fallback-re))
+        (regions '()))
+    (save-excursion
+      ;; Start one char early so the pre-char alternative can match the
+      ;; character just before BEG (BEG itself is usually a block start).
+      (goto-char (max (point-min) (1- beg)))
+      (while (re-search-forward re end t)
+        (push (cons (match-beginning 2) (match-end 2)) regions)
+        (goto-char (match-end 2))))
+    regions))
+
+(defun latex-to-svg-for-org--exclusions (beg end)
+  "Return Org code / verbatim / comment regions in BEG..END to skip.
+Covers `#+begin_src' / `example' / `export' / `comment' blocks, whole
+comment lines (`# …'), and inline `~code~' / `=verbatim=' spans.  This is
+the buffer's `latex-to-svg-frontend-exclude-function'."
   (let ((regions '())
         (case-fold-search t))
     (save-excursion
@@ -75,7 +104,11 @@ comment lines (`# …').  This is the buffer's
         ;; Whole comment lines: `# …' or a bare `#'.
         (goto-char (point-min))
         (while (re-search-forward "^[ \t]*#\\(?: .*\\)?$" end t)
-          (push (cons (match-beginning 0) (match-end 0)) regions))))
+          (push (cons (match-beginning 0) (match-end 0)) regions))
+        ;; Inline `~code~' / `=verbatim='.
+        (setq regions
+              (nconc (latex-to-svg-for-org--inline-verbatim-regions beg end)
+                     regions))))
     regions))
 
 ;;;###autoload
