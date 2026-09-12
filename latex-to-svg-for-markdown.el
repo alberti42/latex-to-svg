@@ -48,19 +48,112 @@
 (defvar-local latex-to-svg-for-markdown--treesit-warned nil
   "Non-nil once a tree-sitter failure has been reported in this buffer.")
 
+(defconst latex-to-svg-for-markdown--fence-open-re
+  "^[ \t]\\{0,3\\}\\(`\\{3,\\}\\|~\\{3,\\}\\)\\([^\n]*\\)$"
+  "Regexp matching a CommonMark opening code fence.
+Group 1 is the fence run (3+ backticks or 3+ tildes), group 2 its info string.")
+
+(defconst latex-to-svg-for-markdown--list-item-re
+  "\\`[ \t]*\\(?:[-*+][ \t]\\|[0-9]+[.)][ \t]\\)"
+  "Regexp matching a list-item line (matched against a whole line string).
+An indented run right after such a line is list continuation, not code.")
+
+(defconst latex-to-svg-for-markdown--indent-re "\\`\\(?:    \\|\t\\)"
+  "Regexp matching the indentation that opens a CommonMark indented code line.")
+
+(defconst latex-to-svg-for-markdown--blank-re "\\`[ \t]*\\'"
+  "Regexp matching a blank line (as a whole-string match).")
+
+(defun latex-to-svg-for-markdown--fence-regions (end)
+  "Return CommonMark fenced code block regions, scanning up to END.
+Handles both fence characters: 3+ backticks or 3+ tildes.  Per CommonMark
+the closing fence must use the same character and be at least as long as
+the opening one, so a block opened with four tildes may quote a three-tilde
+fence in its body; an unclosed fence runs to the end of the buffer.
+
+Scanning starts at `point-min' (a block straddling the requested range must
+be excluded whole) and the close search is unbounded, so this can leave
+point past END -- hence the loop guard."
+  (let ((regions '()))
+    (save-excursion
+      (goto-char (point-min))
+      (while (and (<= (point) end)
+                  (re-search-forward latex-to-svg-for-markdown--fence-open-re
+                                     end t))
+        (let* ((b (match-beginning 0))
+               (fence (match-string 1))
+               (info (match-string 2))
+               (char (aref fence 0)))
+          ;; A backtick fence's info string may not contain a backtick
+          ;; (CommonMark); such a line is an inline code span, not a fence.
+          (if (and (eq char ?`) (string-search "`" info))
+              (goto-char (match-end 1))
+            (push (cons b (if (re-search-forward
+                               (format "^[ \t]\\{0,3\\}%c\\{%d,\\}[ \t]*$"
+                                       char (length fence))
+                               nil t)
+                              (match-end 0)
+                            (point-max)))
+                  regions)
+            (goto-char (cdar regions))))))
+    regions))
+
+(defun latex-to-svg-for-markdown--indented-code-regions (end)
+  "Return CommonMark indented (4-space / tab) code block regions up to END.
+An indented run only opens a code block after a blank line -- it may not
+interrupt a paragraph -- and not right after a list item, where the same
+indentation means list continuation.  Deeper list nesting is not modelled:
+this is the no-grammar fallback; the tree-sitter parse is exact."
+  (let ((regions '())
+        (prev-blank t)                  ; start of buffer counts as blank
+        (prev-line ""))                 ; last non-blank line seen
+    (save-excursion
+      (goto-char (point-min))
+      (while (and (not (eobp)) (<= (point) end))
+        (let* ((bol (point))
+               (eol (line-end-position))
+               (line (buffer-substring-no-properties bol eol))
+               (blank (string-match-p latex-to-svg-for-markdown--blank-re line)))
+          (if (and prev-blank (not blank)
+                   (string-match-p latex-to-svg-for-markdown--indent-re line)
+                   (not (string-match-p
+                         latex-to-svg-for-markdown--list-item-re prev-line)))
+              ;; Consume the run: indented or blank lines, ending at the last
+              ;; indented one (trailing blanks belong to what follows).
+              (let ((last eol))
+                (forward-line 1)
+                (while (and (not (eobp))
+                            (let ((l (buffer-substring-no-properties
+                                      (point) (line-end-position))))
+                              (cond
+                               ((string-match-p
+                                 latex-to-svg-for-markdown--indent-re l)
+                                (setq last (line-end-position)))
+                               ((string-match-p
+                                 latex-to-svg-for-markdown--blank-re l)
+                                t))))
+                  (forward-line 1))
+                (push (cons bol last) regions)
+                (setq prev-blank t prev-line ""))
+            (setq prev-blank blank)
+            (unless blank (setq prev-line line))
+            (forward-line 1)))))
+    regions))
+
 (defun latex-to-svg-for-markdown--exclusions (beg end)
   "Return Markdown code / verbatim regions within BEG..END to skip.
 Fenced / indented code blocks via a `markdown' tree-sitter parser when
-available, plus inline code spans (`` `…` ``) via regexp so it works with
-no grammar installed.  This is the buffer's
+available, else an equivalent regexp fallback (`--fence-regions' and
+`--indented-code-regions'); plus inline code spans via regexp always, so
+this works with no grammar installed.  This is the buffer's
 `latex-to-svg-frontend-exclude-function'.
 
 A tree-sitter failure is reported once per buffer and then tolerated: the
-inline-code pass still runs, but fenced and indented blocks are no longer
-excluded, so math inside them renders.  Node names vary between `markdown'
-grammars, so a grammar that does not know this query signals rather than
-matching nothing."
-  (let ((regions '()))
+regexp fallback takes over.  Node names vary between `markdown' grammars,
+so a grammar that does not know this query signals rather than matching
+nothing."
+  (let ((regions '())
+        (parsed nil))
     (when (and (fboundp 'treesit-available-p) (treesit-available-p)
                (fboundp 'treesit-language-available-p)
                (treesit-language-available-p 'markdown))
@@ -68,6 +161,7 @@ matching nothing."
           (let ((parser (or (car (treesit-parser-list (current-buffer) 'markdown))
                             (treesit-parser-create 'markdown))))
             (when parser
+              (setq parsed t)
               (dolist (cap (treesit-query-capture
                             (treesit-parser-root-node parser)
                             '((fenced_code_block) @c
@@ -77,6 +171,7 @@ matching nothing."
                   (push (cons (treesit-node-start n) (treesit-node-end n))
                         regions)))))
         (treesit-error
+         (setq parsed nil)
          (unless latex-to-svg-for-markdown--treesit-warned
            (setq latex-to-svg-for-markdown--treesit-warned t)
            (display-warning
@@ -87,12 +182,29 @@ matching nothing."
     (save-excursion
       (save-restriction
         (widen)
+        ;; Block code without a grammar: fences (both characters) and
+        ;; indented blocks.  Skipped when the parse above covered them -- it
+        ;; is exact, these regexps only approximate.  Run first: their close
+        ;; searches are unbounded and can leave point past END, which would
+        ;; break the bounded inline search below.
+        (unless parsed
+          (setq regions
+                (nconc (latex-to-svg-for-markdown--fence-regions end)
+                       (latex-to-svg-for-markdown--indented-code-regions end)
+                       regions)))
+        ;; Inline code spans.  A backtick already inside a block region is
+        ;; skipped, so a stray tick in a code block cannot pair with one
+        ;; after it and swallow the real math in between.
         (goto-char beg)
         (while (re-search-forward "`+" end t)
           (let* ((b (match-beginning 0))
-                 (ticks (- (match-end 0) b)))
-            (when (re-search-forward (format "`\\{%d\\}" ticks) end t)
-              (push (cons b (match-end 0)) regions))))))
+                 (ticks (- (match-end 0) b))
+                 (block (seq-find (lambda (r) (and (>= b (car r)) (< b (cdr r))))
+                                  regions)))
+            (cond
+             (block (goto-char (max (match-end 0) (min end (cdr block)))))
+             ((re-search-forward (format "`\\{%d\\}" ticks) end t)
+              (push (cons b (match-end 0)) regions)))))))
     regions))
 
 (defun latex-to-svg-for-markdown--buffer-p ()

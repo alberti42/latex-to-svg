@@ -94,12 +94,14 @@ from running away.
 The *only* markup-specific thing is **which regions to skip** (code, verbatim).
 Each adaptor supplies that as a buffer-local `exclude-function`:
 
-- Markdown: inline code spans (a backtick regexp) plus, when the `markdown`
-  tree-sitter grammar is installed, fenced / indented code blocks. The adaptor
-  runs the same in `markdown-ts-mode` **or** classic `markdown-mode` /
-  `gfm-mode` — it uses the `markdown` grammar directly (reusing the buffer's
-  parser if there is one, else creating its own), so the grammar is an optional
-  accelerator for block code, not a dependency on the major mode.
+- Markdown: inline code spans, fenced code blocks (either fence character) and
+  indented code blocks. Blocks come from the `markdown` tree-sitter grammar
+  when it is installed, else from an equivalent regexp fallback; inline spans
+  are always regexp. The adaptor runs the same in `markdown-ts-mode` **or**
+  classic `markdown-mode` / `gfm-mode` — it uses the `markdown` grammar
+  directly (reusing the buffer's parser if there is one, else creating its
+  own), so the grammar is an optional accuracy boost, not a dependency on the
+  major mode.
 - Org: `#+begin_src` / `example` / `export` / `comment` blocks + comment lines,
   plus inline `~code~` / `=verbatim=` spans (via Org's own `org-verbatim-re`),
   so `=\(=` stays literal text.
@@ -108,8 +110,9 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
 
 - Emacs 29.1+ with SVG image support. The Markdown adaptor works under
   `markdown-ts-mode` (Emacs 31.1+) **or** classic `markdown-mode` / `gfm-mode`;
-  the `markdown` tree-sitter grammar is optional (it adds fenced/indented
-  code-block exclusion — inline code is handled without it).
+  the `markdown` tree-sitter grammar is optional (it makes code-block
+  exclusion exact; without it a regexp fallback handles fenced and indented
+  blocks).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
   0.9.0+ (the engine) — the floor is set by the display-time `:color` /
   `:background` / `:padding` overrides (per-side padding needs 0.9.0) behind

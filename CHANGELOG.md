@@ -20,6 +20,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   text instead of being previewed as math. The exclusion reuses Org's own
   `org-verbatim-re` when available (so what we skip is exactly what Org
   fontifies as verbatim), with an equivalent built-in fallback otherwise.
+- Markdown: block code is now excluded even with no `markdown` tree-sitter
+  grammar installed. A regexp fallback (used only when the parse did not run)
+  covers CommonMark fenced blocks with **either** fence character — 3+
+  backticks or 3+ tildes, closing fence at least as long as the opening one,
+  an unclosed fence running to end of buffer — and 4-space / tab **indented**
+  code blocks, which have no delimiters at all. The fallback does not treat
+  list continuation, a paragraph's indented lines, or `~~strikethrough~~` as
+  code. Inline code spans were, and remain, excluded regardless of grammar.
 
 ## [0.16.0] - 2026-09-09
 

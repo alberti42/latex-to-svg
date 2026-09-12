@@ -181,6 +181,54 @@ A plain buffer suffices — detection is a regexp scanner."
                              (latex-to-svg-frontend--elements (point-min) (point-max)))
                      '("$a$" "$b$"))))))
 
+(defmacro l2sf-tests--no-treesit (&rest body)
+  "Run BODY with tree-sitter reported unavailable (exercise the fallback)."
+  (declare (indent 0) (debug t))
+  `(cl-letf (((symbol-function 'treesit-available-p) (lambda () nil)))
+     ,@body))
+
+(defun l2sf-tests--md-values ()
+  "Return the detected math of the current buffer under the Markdown adaptor."
+  (setq-local latex-to-svg-frontend-exclude-function
+              #'latex-to-svg-for-markdown--exclusions)
+  (mapcar #'latex-to-svg-frontend--math-value
+          (latex-to-svg-frontend--elements (point-min) (point-max))))
+
+(ert-deftest l2sf-markdown-adaptor-fallback-block-code ()
+  ;; With no `markdown' grammar, block code is still excluded by regexp:
+  ;; both fence characters (CommonMark allows 3+ tildes as well as backticks)
+  ;; and 4-space / tab indented code blocks.
+  (l2sf-tests--no-treesit
+    (l2sf-tests--md
+        (concat "before $a$\n\n```\n$skip1$\n```\n\n~~~python\n$skip2$\n~~~\n\n"
+                "    indented $skip3$\n    more $skip4$\n\nafter $b$\n")
+      (should (equal (l2sf-tests--md-values) '("$a$" "$b$"))))))
+
+(ert-deftest l2sf-markdown-adaptor-fallback-longer-fence ()
+  ;; A fence may be quoted inside a longer one of the same character: the
+  ;; close must be at least as long as the open, so the inner `~~~' lines are
+  ;; body, not delimiters.
+  (l2sf-tests--no-treesit
+    (l2sf-tests--md "~~~~\n~~~\n$skip$\n~~~\n~~~~\n\nafter $b$\n"
+      (should (equal (l2sf-tests--md-values) '("$b$"))))
+    ;; An unclosed fence swallows the rest of the buffer (as Markdown does).
+    (l2sf-tests--md "```\n$skip$\n"
+      (should (equal (l2sf-tests--md-values) '())))))
+
+(ert-deftest l2sf-markdown-adaptor-fallback-indent-false-positives ()
+  ;; Indentation is only code when it may be: not as list continuation, and
+  ;; not interrupting a paragraph.  Strikethrough (`~~…~~') is emphasis, not
+  ;; a fence.
+  (l2sf-tests--no-treesit
+    (l2sf-tests--md "- item\n\n    continuation $a$\n\npara $b$\n"
+      (should (equal (l2sf-tests--md-values) '("$a$" "$b$"))))
+    (l2sf-tests--md "1. item\n\n    continuation $a$\n\npara $b$\n"
+      (should (equal (l2sf-tests--md-values) '("$a$" "$b$"))))
+    (l2sf-tests--md "paragraph\n    lazy continuation $a$\n\npara $b$\n"
+      (should (equal (l2sf-tests--md-values) '("$a$" "$b$"))))
+    (l2sf-tests--md "text ~~struck $a$~~ more $b$\n"
+      (should (equal (l2sf-tests--md-values) '("$a$" "$b$"))))))
+
 (ert-deftest l2sf-org-adaptor-skips-code-and-comments ()
   ;; The Org adaptor's exclude-function skips #+begin_src blocks and comment
   ;; lines (pure regexp — no grammar needed).
