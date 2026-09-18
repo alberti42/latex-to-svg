@@ -227,9 +227,10 @@ Display math is centered the way a LaTeX document centers it, rather
 than starting at the left margin.  Inline math is never centered: it
 belongs in the run of text.
 
-The indent is applied at display time, not baked into the image: the preview keeps
-its own size and any `latex-to-svg-frontend-padding' box, and a space
-before it stretches to put its center on the window's center.  The
+The indent is applied at display time, not baked into the image: the
+preview keeps its own size and any `latex-to-svg-frontend-padding' box,
+and a space before it stretches to put its center on the window's
+center.  The
 stretch is computed by redisplay, so it follows a window resize, a
 split, a font change or `display-line-numbers-mode' on its own -- no
 refresh needed for those.  After changing this option, though, run
