@@ -1,5 +1,15 @@
 # latex-to-svg
 
+![Made for GNU Emacs](https://img.shields.io/badge/Made%20for-GNU%20Emacs-7F5AB6?logo=gnuemacs&logoColor=white)
+[![MELPA](https://melpa.org/packages/latex-to-svg-frontend-badge.svg)](https://melpa.org/#/latex-to-svg-frontend)
+[![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-frontend-badge.svg)](https://stable.melpa.org/#/latex-to-svg-frontend)
+[![melpazoid](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml)
+[![CI](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml)
+[![License: GPL-3.0](https://img.shields.io/github/license/alberti42/latex-to-svg)](LICENSE)
+
+The two MELPA badges are the core, `latex-to-svg-frontend`; the adaptors get
+their own once they are on MELPA.
+
 SVG LaTeX-math previews for Emacs markup buffers, on top of the
 [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
 rendering engine.

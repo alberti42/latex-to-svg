@@ -1,0 +1,70 @@
+---
+
+# The checks MELPA's reviewers run, on every push: melpazoid
+# <https://github.com/riscy/melpazoid> byte-compiles the package as
+# package-build would, runs package-lint and checkdoc over it, and looks
+# for the habits MELPA asks packages to avoid.
+#
+# The CI job byte-compiles and runs checkdoc against the Emacs of the
+# runner.  This job runs them against MELPA's own recipe and a current
+# checkout of package-lint, which is where a symbol newer than the
+# declared Emacs floor shows up.
+#
+# This repository ships three packages, each with its own MELPA recipe, so
+# the job runs once per recipe: what is checked is one package and the
+# single file that recipe ships, not the checkout as a whole.
+#
+# It fails the build only on errors.
+
+name: melpazoid
+
+on:  # yamllint disable-line rule:truthy
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  melpazoid:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - package: latex-to-svg-frontend
+            recipe: '(latex-to-svg-frontend :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-frontend.el"))'
+          - package: latex-to-svg-for-org
+            recipe: '(latex-to-svg-for-org :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-org.el"))'
+          - package: latex-to-svg-for-markdown
+            recipe: '(latex-to-svg-for-markdown :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-markdown.el"))'
+    name: MELPA checks (${{ matrix.package }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install melpazoid
+        run: |
+          python -m pip install --upgrade pip
+          sudo apt-get update && sudo apt-get install --yes emacs
+          emacs --version
+          git clone https://github.com/riscy/melpazoid.git ~/melpazoid
+          pip install ~/melpazoid
+
+      - name: Run melpazoid
+        env:
+          LOCAL_REPO: ${{ github.workspace }}
+          # The recipe MELPA itself builds from, so that what is checked
+          # here is what MELPA ships.
+          RECIPE: ${{ matrix.recipe }}
+          # A package of this repository that is on MELPA already would
+          # otherwise be reported as a problem.
+          EXIST_OK: 'true'
+        run: make -C ~/melpazoid

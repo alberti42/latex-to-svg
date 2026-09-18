@@ -227,7 +227,7 @@ Display math is centered the way a LaTeX document centers it, rather
 than starting at the left margin.  Inline math is never centered: it
 belongs in the run of text.
 
-This is a display-time indent, not part of the image: the preview keeps
+The indent is applied at display time, not baked into the image: the preview keeps
 its own size and any `latex-to-svg-frontend-padding' box, and a space
 before it stretches to put its center on the window's center.  The
 stretch is computed by redisplay, so it follows a window resize, a
@@ -761,9 +761,9 @@ enough to run on every command (see `--handle-cursor')."
 Nil unless `latex-to-svg-frontend-center-display-math' is on and OV is
 display math -- inline math belongs in the run of text.
 
-The string is one space whose `display' is a stretch reaching to the
-window center less half the image: `(space :align-to (- center (0.5
-. IMAGE)))'.  Redisplay evaluates that expression, so the indent tracks
+The string is one space whose `display' is a stretch reaching to the window
+center less half the image: `(space :align-to (- center (0.5 . IMAGE)))'.
+Redisplay evaluates that expression, so the indent tracks
 the window width, a split and the font with no help from us -- and
 nothing measures the image, which is what `image-size' would have had
 to do (see `latex-to-svg-backend' on why measuring an SVG is not

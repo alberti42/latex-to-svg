@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- GitHub Actions: a `CI` workflow (byte-compilation with warnings as errors,
+  checkdoc and the ERT suite, on Emacs 29.1 through master) and a `melpazoid`
+  workflow that runs MELPA's own checks once per recipe. The README carries
+  their badges, next to MELPA and MELPA Stable for `latex-to-svg-frontend`.
+  Two core docstrings were reworded so checkdoc passes; no behavior changed.
+
 ## [0.16.1] - 2026-09-12
 
 ### Fixed

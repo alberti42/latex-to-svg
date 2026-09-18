@@ -1,0 +1,93 @@
+# Byte-compilation, checkdoc and the ERT suite, on every push to main and
+# every pull request.
+#
+# The three packages in this repository (`latex-to-svg-frontend' and its
+# `latex-to-svg-for-org' / `latex-to-svg-for-markdown' adaptors) all load
+# the engine, `latex-to-svg-backend'.  package.el installs it from MELPA,
+# which is where a user gets it too, so an engine change that breaks this
+# front-end shows up here rather than in a user's report.  Every later step
+# calls `package-initialize' to put it on the load-path.
+#
+# The suite stubs the engine and detects math with a regexp scanner, so it
+# needs no TeX toolchain, no graphical display and no tree-sitter grammar;
+# the one test that needs a Markdown major mode skips itself without one.
+#
+# The matrix is the declared floor (29.1, the `Package-Requires' of all
+# three files), then the newest of each series, then master.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        emacs_version: ['29.1', '29.4', '30.2', '31.1', 'snapshot']
+    name: Emacs ${{ matrix.emacs_version }}
+    # A snapshot Emacs breaks for reasons that are not this package's;
+    # it is here as early warning, not as a gate.
+    continue-on-error: ${{ matrix.emacs_version == 'snapshot' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: purcell/setup-emacs@master
+        with:
+          version: ${{ matrix.emacs_version }}
+
+      - name: Report version
+        run: emacs --version | head -1
+
+      - name: Install the engine from MELPA
+        run: |
+          emacs -Q -batch --eval '(progn
+            (require (quote package))
+            (add-to-list (quote package-archives)
+                         (cons "melpa" "https://melpa.org/packages/") t)
+            (package-initialize)
+            (package-refresh-contents)
+            (package-install (quote latex-to-svg-backend)))'
+
+      - name: Byte-compile, warnings as errors
+        run: |
+          emacs -Q -batch \
+            --eval '(progn (require (quote package)) (package-initialize))' \
+            --eval '(setq byte-compile-error-on-warn t)' \
+            -L . -f batch-byte-compile \
+            latex-to-svg-frontend.el \
+            latex-to-svg-for-org.el \
+            latex-to-svg-for-markdown.el
+
+      # Docstring conventions, exiting non-zero on any finding.  Both flags
+      # are set rather than left at their defaults, so the step reports the
+      # same thing on every Emacs: the experimental verb check defaults to t
+      # up to Emacs 30 and nil from 31.
+      - name: Checkdoc
+        run: |
+          emacs -Q -batch --eval '(progn
+            (require (quote checkdoc))
+            (setq checkdoc-force-docstrings-flag nil)
+            (setq checkdoc-verb-check-experimental-flag nil)
+            (dolist (file (list "latex-to-svg-frontend.el"
+                                "latex-to-svg-for-org.el"
+                                "latex-to-svg-for-markdown.el"))
+              (checkdoc-file file))
+            (if (get-buffer "*Warnings*")
+                (kill-emacs 1)
+              (message "checkdoc: clean")))'
+
+      - name: ERT
+        run: |
+          emacs -Q -batch \
+            --eval '(progn (require (quote package)) (package-initialize))' \
+            -L . -l ert -l tests/latex-to-svg-frontend-tests.el \
+            -f ert-run-tests-batch-and-exit
