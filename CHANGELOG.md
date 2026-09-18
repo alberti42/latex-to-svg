@@ -11,14 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- Markdown: excluding code blocks no longer signals on Emacs 29 when the
-  `markdown` tree-sitter grammar is installed. `treesit-parser-list` only
-  accepts a language argument from Emacs 30 on; the buffer's parsers are now
-  filtered by `treesit-parser-language` instead. The resulting
-  `wrong-number-of-arguments` was not a `treesit-error`, so the handler that
-  falls back to the regexp scanner did not catch it.
+## [0.16.2] - 2026-09-18
 
 ### Added
 
@@ -26,7 +19,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checkdoc and the ERT suite, on Emacs 29.1 through master) and a `melpazoid`
   workflow that runs MELPA's own checks once per recipe. The README carries
   their badges, next to MELPA and MELPA Stable for `latex-to-svg-frontend`.
-  Two core docstrings were reworded so checkdoc passes; no behavior changed.
+
+### Fixed
+
+- Markdown: excluding code blocks no longer signals on Emacs 29 when the
+  `markdown` tree-sitter grammar is installed. `treesit-parser-list` only
+  accepts a language argument from Emacs 30 on; the buffer's parsers are now
+  filtered by `treesit-parser-language` instead. The resulting
+  `wrong-number-of-arguments` was not a `treesit-error`, so the handler that
+  falls back to the regexp scanner did not catch it. Present since 0.7.2.
+- Two core docstrings reworded so `checkdoc` passes; no behavior changed.
 
 ## [0.16.1] - 2026-09-12
 
@@ -421,7 +423,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.16.1...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.16.2...HEAD
+[0.16.2]: https://github.com/alberti42/latex-to-svg/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/alberti42/latex-to-svg/compare/v0.16.0...v0.16.1
 [0.16.0]: https://github.com/alberti42/latex-to-svg/compare/v0.15.2...v0.16.0
 [0.15.2]: https://github.com/alberti42/latex-to-svg/compare/v0.15.1...v0.15.2
