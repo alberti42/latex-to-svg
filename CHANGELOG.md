@@ -11,6 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Tests: a drift guard over the release metadata — the three `Version:` headers
+  must agree, and the newest dated `CHANGELOG.md` section must not claim a
+  version the sources have not reached.
+
 ## [0.16.2] - 2026-09-18
 
 ### Added

@@ -24,6 +24,7 @@
 
 (require 'cl-lib)
 (require 'ert)
+(require 'lisp-mnt)
 ;; `display-warning' is autoloaded, and `cl-letf' resolving that autoload loads
 ;; warnings.el, which redefines it -- clobbering a stub installed in the same
 ;; `cl-letf'.  Load it up front so stubbing it is deterministic.
@@ -1577,6 +1578,46 @@ merely *contains* inline math) is left untouched."
                            (l2sf-tests--overlays))))
         (should (equal (overlay-get ref 'latex-to-svg-frontend-ref) "eq:b"))
         (should (equal "(2)" (substring-no-properties (overlay-get ref 'display))))))))
+
+;;; --- Release hygiene ------------------------------------------------------
+
+(defconst l2sf-tests--repo-root
+  (expand-file-name ".." (file-name-directory
+                          (or load-file-name buffer-file-name)))
+  "Directory holding the three packages and `CHANGELOG.md'.")
+
+(defun l2sf-tests--header-version (file)
+  "Return the `Version:' header of FILE, relative to the repository root."
+  (with-temp-buffer
+    (insert-file-contents (expand-file-name file l2sf-tests--repo-root))
+    (lm-header "version")))
+
+(defun l2sf-tests--changelog-latest ()
+  "Return the newest dated version in `CHANGELOG.md', as a string."
+  (with-temp-buffer
+    (insert-file-contents (expand-file-name "CHANGELOG.md" l2sf-tests--repo-root))
+    (goto-char (point-min))
+    (and (re-search-forward "^## \\[\\([0-9.]+\\)\\] - " nil t)
+         (match-string 1))))
+
+(ert-deftest l2sf-package-versions-agree ()
+  ;; Drift guard: the repository ships three packages on one version stream,
+  ;; so their `Version:' headers are bumped together.
+  (let ((versions (mapcar #'l2sf-tests--header-version
+                          '("latex-to-svg-frontend.el"
+                            "latex-to-svg-for-org.el"
+                            "latex-to-svg-for-markdown.el"))))
+    (should (seq-every-p #'stringp versions))
+    (should (equal (seq-uniq versions) (list (car versions))))))
+
+(ert-deftest l2sf-changelog-not-behind-package-version ()
+  ;; Drift guard: a released section never claims a version the sources have
+  ;; not reached.  Between releases the headers may run ahead of the newest
+  ;; dated section, with the entries under `[Unreleased]'.
+  (let ((header (l2sf-tests--header-version "latex-to-svg-frontend.el"))
+        (changelog (l2sf-tests--changelog-latest)))
+    (should (stringp changelog))
+    (should (version<= changelog header))))
 
 (provide 'latex-to-svg-frontend-tests)
 
