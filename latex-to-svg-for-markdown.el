@@ -6,7 +6,7 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.16.1
+;; Version: 0.16.2
 ;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.11.0"))
 ;; Keywords: tex, markdown, math, images
 
@@ -158,8 +158,15 @@ nothing."
                (fboundp 'treesit-language-available-p)
                (treesit-language-available-p 'markdown))
       (condition-case err
-          (let ((parser (or (car (treesit-parser-list (current-buffer) 'markdown))
-                            (treesit-parser-create 'markdown))))
+          ;; `treesit-parser-list' only took a language argument from Emacs
+          ;; 30 on, so filter the buffer's parsers ourselves: on 29 the
+          ;; extra argument signals, and `wrong-number-of-arguments' is not
+          ;; a `treesit-error' the handler below would catch.
+          (let* ((existing (seq-find
+                            (lambda (p)
+                              (eq (treesit-parser-language p) 'markdown))
+                            (treesit-parser-list (current-buffer))))
+                 (parser (or existing (treesit-parser-create 'markdown))))
             (when parser
               (setq parsed t)
               (dolist (cap (treesit-query-capture

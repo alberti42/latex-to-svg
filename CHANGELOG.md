@@ -11,6 +11,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Markdown: excluding code blocks no longer signals on Emacs 29 when the
+  `markdown` tree-sitter grammar is installed. `treesit-parser-list` only
+  accepts a language argument from Emacs 30 on; the buffer's parsers are now
+  filtered by `treesit-parser-language` instead. The resulting
+  `wrong-number-of-arguments` was not a `treesit-error`, so the handler that
+  falls back to the regexp scanner did not catch it.
+
 ### Added
 
 - GitHub Actions: a `CI` workflow (byte-compilation with warnings as errors,
