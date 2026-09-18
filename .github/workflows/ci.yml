@@ -47,15 +47,27 @@ jobs:
       - name: Report version
         run: emacs --version | head -1
 
+      # `package-refresh-contents' downloads MELPA's archive-contents in one
+      # piece.  A truncated response leaves package.el reporting "Failed to
+      # download 'melpa' archive: End of file during parsing" and carrying on
+      # with no MELPA package registered, so the install below fails on an
+      # otherwise healthy runner.  Fetch again rather than trust one request.
       - name: Install the engine from MELPA
         run: |
-          emacs -Q -batch --eval '(progn
-            (require (quote package))
-            (add-to-list (quote package-archives)
-                         (cons "melpa" "https://melpa.org/packages/") t)
-            (package-initialize)
-            (package-refresh-contents)
-            (package-install (quote latex-to-svg-backend)))'
+          for attempt in 1 2 3; do
+            if emacs -Q -batch --eval '(progn
+              (require (quote package))
+              (add-to-list (quote package-archives)
+                           (cons "melpa" "https://melpa.org/packages/") t)
+              (package-initialize)
+              (package-refresh-contents)
+              (package-install (quote latex-to-svg-backend)))'; then
+              exit 0
+            fi
+            echo "MELPA fetch failed (attempt $attempt of 3); retrying in 15s"
+            sleep 15
+          done
+          exit 1
 
       - name: Byte-compile, warnings as errors
         run: |
