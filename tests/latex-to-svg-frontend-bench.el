@@ -165,7 +165,7 @@ the incremental pass early-exits) and near the BOTTOM."
         (out '()))
     (cl-letf (((symbol-function 'latex-to-svg-backend)
                (lambda (&rest _) 'bench-image))
-              ((symbol-function 'latex-to-svg-backend-metadata) (lambda (_) nil)))
+              ((symbol-function 'latex-to-svg-backend-metadata) (lambda (&rest _) nil)))
       (dolist (n sizes)
         (with-temp-buffer
           (insert (l2sf-bench--md-doc n))

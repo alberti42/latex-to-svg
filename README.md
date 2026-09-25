@@ -130,7 +130,8 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
   `-padding`, and by `:font-height`, which lets the front-end measure
   the buffer font against the frame that actually displays it instead of the
   engine guessing.
-- `latex` + `dvisvgm` on `exec-path` (any TeX distribution).
+- `latex` + `dvisvgm` on `exec-path` (any TeX distribution), or RaTeX's
+  `render-svg` for the `ratex` renderer (see [Renderer](#renderer)).
 
 ## Installation
 
@@ -227,6 +228,44 @@ differ:
   (latex-to-svg-for-markdown-mode 1))
 (add-hook 'markdown-ts-mode-hook #'my/latex-to-svg-markdown-setup)
 ```
+
+### Renderer
+
+`latex-to-svg-frontend-renderer` chooses the program that typesets the
+previews:
+
+| Value | Program | Typesets |
+|-------|---------|----------|
+| `latex` (default) | `latex` + `dvisvgm` | Full LaTeX, with any package the backend's preamble loads. |
+| `ratex` | RaTeX's `render-svg` | The math KaTeX supports, with no packages and no TeX installation. |
+
+The choice is passed to the backend with each equation. Where the programs
+are is a backend setting (`latex-to-svg-backend-latex-program`,
+`latex-to-svg-backend-ratex-program`); the backend README's
+[Renderers](https://github.com/alberti42/latex-to-svg-backend#renderers)
+section covers installing RaTeX and what changes with it. The option is safe
+as a file- or directory-local variable, so a project can choose RaTeX in its
+`.dir-locals.el`:
+
+```elisp
+((nil . ((latex-to-svg-frontend-renderer . ratex))))
+```
+
+Each renderer has its own cache entries. After changing the option, run
+`C-u C-c C-x C-l` to re-render the buffer.
+
+What works with `ratex`:
+
+- **Numbering and references work.** RaTeX has no equation counter, so each
+  numbered row gets its number as `\tag{N}`, and `\label` is removed from
+  what RaTeX receives. The numbers come from the front-end's own count of
+  rows (see [`docs/numbering.md`](docs/numbering.md)).
+- **Environments:** `equation`, `align`, `alignat`, `gather`, and their starred
+  forms. `multline`, `eqnarray`, `flalign` and the other environments RaTeX
+  does not have fail to compile: the backend warns with a link to RaTeX's
+  output, and the source stays visible.
+- **An `\eqref` or `\ref` inside an equation fails** (`a = b \text{ by }
+  \eqref{x}`). A reference in the prose is drawn as buffer text and works.
 
 ### Colors and box
 
@@ -415,6 +454,10 @@ Pull requests adding adaptors for other major modes are welcome.
 
 - **`\tag`-based references and `subequations` sub-lettering** aren't modelled
   (see [`docs/numbering.md`](docs/numbering.md)).
+- **With the `ratex` renderer, numbers come from the front-end's row count
+  alone.** Where that count is wrong (a `\\` inside `\substack`, for one),
+  the preview numbers differently from the exported document; the `latex`
+  renderer corrects such a count from what LaTeX reports.
 
 ## Tests
 

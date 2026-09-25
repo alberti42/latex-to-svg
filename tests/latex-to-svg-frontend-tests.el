@@ -60,7 +60,9 @@
   (declare (indent 0) (debug t))
   `(let ((l2sf-tests--appearance '("#000" "#fff" 20))
          (l2sf-tests--invalidated nil)
+         (l2sf-tests--invalidated-renderers nil)
          (l2sf-tests--metadata nil)
+         (l2sf-tests--metadata-renderers nil)
          (l2sf-tests--last-rescale nil)
          (l2sf-tests--last-args nil)
          (latex-to-svg-backend-metadata-prefix nil))
@@ -72,9 +74,13 @@
                ((symbol-function 'latex-to-svg-backend-appearance)
                 (lambda (&optional _font-height) l2sf-tests--appearance))
                ((symbol-function 'latex-to-svg-backend-metadata)
-                (lambda (value) (cdr (assoc value l2sf-tests--metadata))))
+                (lambda (value &optional renderer)
+                  (push renderer l2sf-tests--metadata-renderers)
+                  (cdr (assoc value l2sf-tests--metadata))))
                ((symbol-function 'latex-to-svg-backend-invalidate)
-                (lambda (latex) (push latex l2sf-tests--invalidated))))
+                (lambda (latex &optional renderer)
+                  (push latex l2sf-tests--invalidated)
+                  (push renderer l2sf-tests--invalidated-renderers))))
        ,@body)))
 
 (defmacro l2sf-tests--md (text &rest body)
@@ -1121,6 +1127,141 @@ merely *contains* inline math) is left untouched."
                "\\setcounter{equation}{2}%"
                (overlay-get (nth 1 (l2sf-tests--overlays))
                             'latex-to-svg-frontend-value))))))
+
+;;;; RaTeX renderer
+
+(ert-deftest l2sf-ratex-tags-equation ()
+  ;; With `ratex', a numbered `equation' carries its number as a `\tag'
+  ;; before `\end', with no `\setcounter' prefix and no `\typeout' probe.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\nx\n\\end{equation}\n\n"
+                "\\begin{equation}\ny\n\\end{equation}\n")
+      (let ((latex-to-svg-frontend-renderer 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (should (equal (l2sf-tests--values)
+                     '("\\begin{equation}\nx\n\\tag{1}\\end{equation}"
+                       "\\begin{equation}\ny\n\\tag{2}\\end{equation}")))
+      (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex)))))
+
+(ert-deftest l2sf-ratex-suppressed-equation-untagged ()
+  ;; A single-equation block with `\notag' takes no number, so it gets no tag
+  ;; (RaTeX rejects `\tag' together with `\notag').
+  (should (equal (latex-to-svg-frontend--tagged-value
+                  4 "\\begin{equation}\nx \\notag\n\\end{equation}")
+                 "\\begin{equation}\nx \\notag\n\\end{equation}")))
+
+(ert-deftest l2sf-ratex-tags-align-rows ()
+  ;; Each numbered row gets the next number before its `\\\\'; the `\notag'
+  ;; row gets none.
+  (should (equal (latex-to-svg-frontend--tagged-value
+                  1 (concat "\\begin{align}\na &= 1 \\\\\n"
+                            "b &= 2 \\notag \\\\\nc &= 3\n\\end{align}"))
+                 (concat "\\begin{align}\na &= 1 \\tag{2}\\\\\n"
+                         "b &= 2 \\notag \\\\\nc &= 3\n\\tag{3}\\end{align}"))))
+
+(ert-deftest l2sf-ratex-keeps-user-tag ()
+  ;; A row that already has `\tag{A}' is left alone (a second tag is a RaTeX
+  ;; error), and the next row takes the next number.
+  (should (equal (latex-to-svg-frontend--tagged-value
+                  0 "\\begin{align}\na \\tag{A} \\\\\nb\n\\end{align}")
+                 "\\begin{align}\na \\tag{A} \\\\\nb\n\\tag{1}\\end{align}")))
+
+(ert-deftest l2sf-ratex-nested-environment-one-tag ()
+  ;; The `\\\\' inside a nested `cases' does not end a row, so the row gets
+  ;; one tag, after the `cases'.
+  (should (equal (latex-to-svg-frontend--tagged-value
+                  0 (concat "\\begin{align}\n"
+                            "f &= \\begin{cases} 1 \\\\ 0 \\end{cases} \\\\\n"
+                            "g &= 2\n\\end{align}"))
+                 (concat "\\begin{align}\n"
+                         "f &= \\begin{cases} 1 \\\\ 0 \\end{cases} \\tag{1}\\\\\n"
+                         "g &= 2\n\\tag{2}\\end{align}"))))
+
+(ert-deftest l2sf-ratex-trailing-break-tags-empty-row ()
+  ;; A trailing `\\\\' leaves an empty last row.  `--count-multi-rows' counts
+  ;; it, as LaTeX does, so it is tagged too and the two renderers agree.
+  (let ((source "\\begin{align}\na \\\\\nb \\\\\n\\end{align}"))
+    (should (= (latex-to-svg-frontend--count-numbered-equations source) 3))
+    (should (equal (latex-to-svg-frontend--tagged-value 0 source)
+                   (concat "\\begin{align}\na \\tag{1}\\\\\n"
+                           "b \\tag{2}\\\\\n\\tag{3}\\end{align}")))))
+
+(ert-deftest l2sf-ratex-removes-labels-keeps-source ()
+  ;; RaTeX has no `\label': it is removed from the value sent to the engine,
+  ;; kept in the overlay's source, and `\eqref' still resolves from it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "See $\\eqref{eq:a}$.\n")
+      (let ((latex-to-svg-frontend-renderer 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (let* ((ovs (l2sf-tests--overlays))
+             (eq-ov (nth 0 ovs))
+             (ref-ov (nth 1 ovs)))
+        (should (equal (overlay-get eq-ov 'latex-to-svg-frontend-value)
+                       "\\begin{equation}\nx\n\\tag{1}\\end{equation}"))
+        (should (equal (overlay-get eq-ov 'latex-to-svg-frontend-source)
+                       "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}"))
+        (should (equal (overlay-get ref-ov 'latex-to-svg-frontend-ref-display)
+                       "(1)"))))))
+
+(ert-deftest l2sf-ratex-unnumbered-unchanged ()
+  ;; Starred environments and `\[…\]' take no number: their value is the
+  ;; source, untouched.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{align*}\na \\\\\nb\n\\end{align*}\n\n\\[x\\]\n"
+      (let ((latex-to-svg-frontend-renderer 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (should (equal (l2sf-tests--values)
+                     '("\\begin{align*}\na \\\\\nb\n\\end{align*}" "\\[x\\]"))))))
+
+(ert-deftest l2sf-latex-renderer-value-unchanged ()
+  ;; The default renderer keeps today's value byte for byte (labels included),
+  ;; so no LaTeX user's cache is invalidated, and passes `:renderer latex'.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{equation}\\label{a}\nx\n\\end{equation}\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should (equal (l2sf-tests--values)
+                     '("\\setcounter{equation}{0}%\n\\begin{equation}\\label{a}\nx\n\\end{equation}\\typeout{L2S=\\arabic{equation}}%\n")))
+      (should (eq (plist-get l2sf-tests--last-args :renderer) 'latex)))))
+
+(ert-deftest l2sf-renderer-reaches-every-engine-call ()
+  ;; `latex-to-svg-backend', `-metadata' and `-invalidate' all receive the
+  ;; renderer, and a refresh uses the one recorded on the overlay, not the
+  ;; option's current value.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{equation}\nx\n\\end{equation}\n"
+      (let ((latex-to-svg-frontend-renderer 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex))
+        (should (equal l2sf-tests--metadata-renderers '(ratex)))
+        (should (eq (overlay-get (car (l2sf-tests--overlays))
+                                 'latex-to-svg-frontend-renderer)
+                    'ratex))
+        (latex-to-svg-frontend-regenerate)
+        (should (equal l2sf-tests--invalidated-renderers '(ratex))))
+      (setq l2sf-tests--last-args nil)
+      (let ((latex-to-svg-frontend-renderer 'latex))
+        (latex-to-svg-frontend-refresh))
+      (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex)))))
+
+(ert-deftest l2sf-ratex-reconcile-retags-downstream ()
+  ;; Renumbering after an edit rebuilds the tagged value, not a `\setcounter'.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+                "\\begin{equation}\nb\n\\end{equation}\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (setq-local latex-to-svg-frontend-renderer 'ratex)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (goto-char (point-min))
+      (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
+      (search-forward "\\end{equation}") (backward-char 1) (insert "*")
+      (latex-to-svg-frontend--reconcile)
+      (should (equal (overlay-get (car (last (l2sf-tests--overlays)))
+                                  'latex-to-svg-frontend-value)
+                     "\\begin{equation}\nb\n\\tag{1}\\end{equation}")))))
 
 ;;;; Inline / display rescale
 

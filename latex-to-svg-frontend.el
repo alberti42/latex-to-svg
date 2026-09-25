@@ -88,6 +88,30 @@
   :group 'text
   :prefix "latex-to-svg-frontend-")
 
+(defcustom latex-to-svg-frontend-renderer 'latex
+  "Renderer that typesets the previews: `latex' or `ratex'.
+
+`latex' runs `latex' and `dvisvgm': full LaTeX, with any package the
+backend's preamble loads.  `ratex' runs RaTeX's `render-svg': no TeX
+installation, for the math KaTeX supports and no packages.  Where the
+programs are is set in the backend (see
+`latex-to-svg-backend-latex-program' and
+`latex-to-svg-backend-ratex-program').
+
+Passed to `latex-to-svg-backend' as `:renderer'.  Each renderer has its
+own cache entries, so switching back and forth does not recompile an
+equation already compiled by both.  After changing it, run
+`\\[universal-argument] \\[latex-to-svg-frontend]' to re-render the
+buffer.
+
+With `ratex', a numbered environment gets its numbers as a `\\tag{N}' on
+each numbered row instead of a `\\setcounter' prefix, and every `\\label'
+is removed from what RaTeX receives (see docs/numbering.md)."
+  :type '(choice (const :tag "LaTeX (latex + dvisvgm)" latex)
+                 (const :tag "RaTeX (render-svg)" ratex))
+  :safe (lambda (v) (memq v '(latex ratex)))
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-number-equations t
   "Whether to compute and bake equation numbers into display-math previews.
 
@@ -799,14 +823,15 @@ by a leftover stretch."
   "Delete this package's preview overlays intersecting BEG..END."
   (mapc #'delete-overlay (latex-to-svg-frontend--overlays-in beg end)))
 
-(defun latex-to-svg-frontend--set-overlay (beg end value image &optional source enums-fallback display-p)
+(defun latex-to-svg-frontend--set-overlay (beg end value image &optional source enums-fallback display-p renderer)
   "Overlay BEG..END (positions or markers) with IMAGE, keyed to render VALUE.
 VALUE is the exact string handed to the engine (a numbered environment
 carries its `\\setcounter' prefix); SOURCE, if given, is the human-readable
 LaTeX shown in `help-echo'.  ENUMS-FALLBACK, when non-nil, marks this as a
 numbered equation and records its (INITIAL . FINAL) number range in
-`latex-to-svg-frontend-enums'.  Replaces any existing preview overlay
-in the span."
+`latex-to-svg-frontend-enums'.  RENDERER is the renderer VALUE was sent
+to, recorded so a refresh fetches the same cache entry.  Replaces any
+existing preview overlay in the span."
   (let ((b (if (markerp beg) (marker-position beg) beg))
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
@@ -814,6 +839,7 @@ in the span."
       (let ((ov (make-overlay b e)))
         (overlay-put ov 'latex-to-svg-frontend t)
         (overlay-put ov 'latex-to-svg-frontend-value value)
+        (overlay-put ov 'latex-to-svg-frontend-renderer renderer)
         ;; Raw LaTeX (no `\setcounter' prefix) so a numbered overlay can be
         ;; renumbered from itself, without re-scanning buffer text.
         (overlay-put ov 'latex-to-svg-frontend-source (or source value))
@@ -828,7 +854,7 @@ in the span."
         ;; After `display-math', which decides whether it is centered.
         (latex-to-svg-frontend--show-image ov image)
         (when enums-fallback
-          (let ((meta (plist-get (latex-to-svg-backend-metadata value) :nums)))
+          (let ((meta (plist-get (latex-to-svg-backend-metadata value renderer) :nums)))
             (overlay-put ov 'latex-to-svg-frontend-enums (or meta enums-fallback))
             (when (and meta (not (equal meta enums-fallback)))
               (latex-to-svg-frontend--schedule-reconcile))))
@@ -1001,6 +1027,10 @@ defining LABEL."
 
 ;;;; Numbering
 
+(defconst latex-to-svg-frontend--unnumbered-regexp
+  "\\\\nonumber\\|\\\\notag\\|\\\\tag{"
+  "Regexp matching what keeps an equation or a row from taking a number.")
+
 (defun latex-to-svg-frontend--environment-name (value)
   "Return the LaTeX environment name at the start of source VALUE, or nil."
   (and (string-match "\\`[ \t\n]*\\\\begin{\\([^}]+\\)}" value)
@@ -1030,7 +1060,7 @@ defining LABEL."
       (goto-char (point-min))
       (while (re-search-forward "\\\\\\\\" nil t) (cl-incf rows))
       (goto-char (point-min))
-      (while (re-search-forward "\\\\nonumber\\|\\\\notag\\|\\\\tag{" nil t)
+      (while (re-search-forward latex-to-svg-frontend--unnumbered-regexp nil t)
         (cl-incf suppressed))
       (max 0 (- rows suppressed)))))
 
@@ -1040,7 +1070,7 @@ Unknown / non-numbered environments (and starred forms) consume 0."
   (let ((env (latex-to-svg-frontend--environment-name value)))
     (cond
      ((member env latex-to-svg-frontend--numbered-environments-single)
-      (if (string-match-p "\\\\nonumber\\|\\\\notag\\|\\\\tag{" value) 0 1))
+      (if (string-match-p latex-to-svg-frontend--unnumbered-regexp value) 0 1))
      ((member env latex-to-svg-frontend--numbered-environments-multi)
       (latex-to-svg-frontend--count-multi-rows value env))
      (t 0))))
@@ -1053,37 +1083,53 @@ Unknown / non-numbered environments (and starred forms) consume 0."
       (setq start (match-end 0)))
     (nreverse names)))
 
+(defun latex-to-svg-frontend--end-position (value env)
+  "Return where the last `\\end{ENV}' in source VALUE starts, or nil."
+  (let ((close (concat "\\\\end{" (regexp-quote env) "}"))
+        (start 0) pos)
+    (while (string-match close value start)
+      (setq pos (match-beginning 0)
+            start (match-end 0)))
+    pos))
+
+(defun latex-to-svg-frontend--multi-rows (value env)
+  "Return the top-level rows of multi-equation source VALUE named ENV.
+Each row is a cons (BEG . END) of positions in VALUE, in order.  END is
+where the row's `\\\\' starts, or the closing `\\end{ENV}' for the
+last row.  A `\\\\' inside a nested environment (`cases', `matrix', …)
+does not end a row."
+  (let* ((start (if (string-match (concat "\\\\begin{" (regexp-quote env) "}")
+                                  value)
+                    (match-end 0)
+                  0))
+         (end (or (latex-to-svg-frontend--end-position value env)
+                  (length value)))
+         (rows nil) (depth 0) (row-start start) (i start))
+    (while (and (string-match "\\\\begin{[^}]+}\\|\\\\end{[^}]+}\\|\\\\\\\\"
+                              value i)
+                (< (match-beginning 0) end))
+      (let ((m (match-string 0 value)))
+        (cond
+         ((string-prefix-p "\\begin" m) (cl-incf depth))
+         ((string-prefix-p "\\end" m) (setq depth (max 0 (1- depth))))
+         ((= depth 0)
+          (push (cons row-start (match-beginning 0)) rows)
+          (setq row-start (match-end 0)))))
+      (setq i (match-end 0)))
+    (push (cons row-start end) rows)
+    (nreverse rows)))
+
 (defun latex-to-svg-frontend--multi-row-labels (value env offset)
   "Return an alist of (LABEL . NUMBER) for multi-equation source VALUE.
 ENV is the environment name; OFFSET the counter before the block."
-  (with-temp-buffer
-    (insert value)
-    (goto-char (point-min))
-    (when (re-search-forward (concat "\\\\begin{" (regexp-quote env) "}") nil t)
-      (delete-region (point-min) (point)))
-    (goto-char (point-max))
-    (when (re-search-backward (concat "\\\\end{" (regexp-quote env) "}") nil t)
-      (delete-region (match-beginning 0) (point-max)))
-    (let ((rows nil) (depth 0) (row-start (point-min)))
-      (goto-char (point-min))
-      (while (re-search-forward "\\\\begin{[^}]+}\\|\\\\end{[^}]+}\\|\\\\\\\\" nil t)
-        (let ((m (match-string 0)))
-          (cond
-           ((string-prefix-p "\\begin" m) (cl-incf depth))
-           ((string-prefix-p "\\end" m) (setq depth (max 0 (1- depth))))
-           ((= depth 0)
-            (push (buffer-substring-no-properties row-start (match-beginning 0)) rows)
-            (setq row-start (match-end 0))))))
-      (push (buffer-substring-no-properties row-start (point-max)) rows)
-      (setq rows (nreverse rows))
-      (let ((num (1+ offset)) (out nil))
-        (dolist (row rows)
-          (if (string-match-p "\\\\nonumber\\|\\\\notag\\|\\\\tag{" row)
-              nil
-            (dolist (name (latex-to-svg-frontend--labels-in row))
-              (push (cons name num) out))
-            (cl-incf num)))
-        (nreverse out)))))
+  (let ((num (1+ offset)) (out nil))
+    (pcase-dolist (`(,beg . ,end) (latex-to-svg-frontend--multi-rows value env))
+      (let ((row (substring value beg end)))
+        (unless (string-match-p latex-to-svg-frontend--unnumbered-regexp row)
+          (dolist (name (latex-to-svg-frontend--labels-in row))
+            (push (cons name num) out))
+          (cl-incf num))))
+    (nreverse out)))
 
 (defun latex-to-svg-frontend--scan-numbering (&optional environments)
   "Scan the widened buffer; return the cons (OFFSETS . LABELS).
@@ -1176,19 +1222,70 @@ emitting the block's final counter (captured into the `.eld' sidecar)."
   (format "\\setcounter{equation}{%d}%%\n%s\\typeout{%s\\arabic{equation}}%%\n"
           k source latex-to-svg-frontend--metadata-prefix))
 
+(defun latex-to-svg-frontend--tagged-value (k source)
+  "Number SOURCE from counter K with a `\\tag' on each numbered row.
+RaTeX has no equation counter, so the numbers are written in: a
+single-equation environment gets `\\tag{K+1}' before its `\\end', and
+each top-level row of a multi-equation environment that is not
+suppressed gets the next number before its `\\\\' (or the `\\end').
+The numbers are the ones `--multi-row-labels' assigns, so the picture
+and `\\eqref' agree.  Any other SOURCE is returned unchanged."
+  (let ((env (latex-to-svg-frontend--environment-name source)))
+    (cond
+     ((member env latex-to-svg-frontend--numbered-environments-single)
+      (let ((end (latex-to-svg-frontend--end-position source env)))
+        (if (and end (= (latex-to-svg-frontend--count-numbered-equations source) 1))
+            (concat (substring source 0 end)
+                    (format "\\tag{%d}" (1+ k))
+                    (substring source end))
+          source)))
+     ((member env latex-to-svg-frontend--numbered-environments-multi)
+      (let ((num (1+ k)) (pos 0) (parts nil))
+        (pcase-dolist (`(,beg . ,end) (latex-to-svg-frontend--multi-rows source env))
+          (unless (string-match-p latex-to-svg-frontend--unnumbered-regexp
+                                  (substring source beg end))
+            (push (substring source pos end) parts)
+            (push (format "\\tag{%d}" num) parts)
+            (setq pos end)
+            (cl-incf num)))
+        (push (substring source pos) parts)
+        (apply #'concat (nreverse parts))))
+     (t source))))
+
+(defun latex-to-svg-frontend--renderer-for (_source)
+  "Return the renderer for the equation whose LaTeX is SOURCE.
+That is `latex-to-svg-frontend-renderer'."
+  latex-to-svg-frontend-renderer)
+
+(defun latex-to-svg-frontend--engine-value (k source renderer)
+  "Return the string handed to RENDERER for SOURCE, numbered from counter K.
+K nil means SOURCE is not numbered.  For `latex', a numbered SOURCE gets
+`--setcounter-value' and any other SOURCE is passed verbatim.  For
+`ratex', a numbered SOURCE gets `--tagged-value', and every `\\label' is
+removed, because RaTeX has no `\\label'.  The overlay keeps SOURCE, so
+the label map, built from the source, still sees the labels."
+  (if (eq renderer 'ratex)
+      (replace-regexp-in-string
+       "\\\\label{[^}]*}" ""
+       (if k (latex-to-svg-frontend--tagged-value k source) source)
+       t t)
+    (if k (latex-to-svg-frontend--setcounter-value k source) source)))
+
 (defun latex-to-svg-frontend--numbered-value (el source table)
   "Return the exact engine string for EL: SOURCE, adjusted for numbering.
 TABLE is a (OFFSETS . LABELS) scan."
   (let ((k (and (car-safe table)
                 (gethash (latex-to-svg-frontend--math-begin el) (car-safe table)))))
-    (if k (latex-to-svg-frontend--setcounter-value k source) source)))
+    (latex-to-svg-frontend--engine-value
+     k source (latex-to-svg-frontend--renderer-for source))))
 
 ;;;; Rendering
 
-(defun latex-to-svg-frontend--place (buffer beg end value &optional source enums-fallback display-p)
+(defun latex-to-svg-frontend--place (buffer beg end value &optional source enums-fallback display-p renderer)
   "Ensure BEG..END in BUFFER shows the current image for render VALUE.
 Overlays immediately on a cache hit, else schedules an async compile and
-overlays when it finishes.  BEG / END should be markers."
+overlays when it finishes.  BEG / END should be markers.  RENDERER is
+passed to the engine as `:renderer' (nil means `latex')."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (let ((image (latex-to-svg-backend
@@ -1199,23 +1296,28 @@ overlays when it finishes.  BEG / END should be markers."
                     :padding latex-to-svg-frontend-padding
                     :font-height (latex-to-svg-frontend--font-height buffer)
                     :metadata (car enums-fallback)
+                    :renderer renderer
                     :callback (lambda ()
                                 (latex-to-svg-frontend--place
-                                 buffer beg end value source enums-fallback display-p)))))
+                                 buffer beg end value source enums-fallback display-p
+                                 renderer)))))
         (when image
-          (latex-to-svg-frontend--set-overlay beg end value image source enums-fallback display-p))))))
+          (latex-to-svg-frontend--set-overlay
+           beg end value image source enums-fallback display-p renderer))))))
 
 (defun latex-to-svg-frontend--render-numbered (el k)
   "Render numbered environment EL starting at counter K."
   (let* ((bounds (latex-to-svg-frontend--element-bounds el))
          (source (latex-to-svg-frontend--math-value el))
-         (value (latex-to-svg-frontend--setcounter-value k source))
+         (renderer (latex-to-svg-frontend--renderer-for source))
+         (value (latex-to-svg-frontend--engine-value k source renderer))
          (heuristic (latex-to-svg-frontend--count-numbered-equations source)))
     (latex-to-svg-frontend--place (current-buffer)
                                       (copy-marker (car bounds))
                                       (copy-marker (cdr bounds))
                                       value source (cons (1+ k) (+ k heuristic))
-                                      (latex-to-svg-frontend--display-p source))))
+                                      (latex-to-svg-frontend--display-p source)
+                                      renderer)))
 
 (defun latex-to-svg-frontend--render-element (el &optional table)
   "Render math element EL in the current buffer.
@@ -1240,11 +1342,15 @@ number, or `(??)' when the label is unknown), a numbered environment via
          (cdr parsed) num
          (latex-to-svg-frontend--reference-display-text (car parsed) num))))
      (k (latex-to-svg-frontend--render-numbered el k))
-     (t (latex-to-svg-frontend--place (current-buffer)
-                                          (copy-marker (car bounds))
-                                          (copy-marker (cdr bounds))
-                                          source source nil
-                                          (latex-to-svg-frontend--display-p source))))))
+     (t (let ((renderer (latex-to-svg-frontend--renderer-for source)))
+          (latex-to-svg-frontend--place (current-buffer)
+                                            (copy-marker (car bounds))
+                                            (copy-marker (cdr bounds))
+                                            (latex-to-svg-frontend--engine-value
+                                             nil source renderer)
+                                            source nil
+                                            (latex-to-svg-frontend--display-p source)
+                                            renderer))))))
 
 (defun latex-to-svg-frontend--render-region (beg end)
   "Render every math element overlapping BEG..END in the current buffer."
@@ -1321,13 +1427,15 @@ LABELS is `--overlay-labels', for an `\\eqref' / `\\ref' being rendered."
 (defun latex-to-svg-frontend--renumber-overlay (ov k)
   "Re-render numbered overlay OV at counter K, reusing its stored source."
   (let* ((source (overlay-get ov 'latex-to-svg-frontend-source))
-         (value (latex-to-svg-frontend--setcounter-value k source))
+         (renderer (latex-to-svg-frontend--renderer-for source))
+         (value (latex-to-svg-frontend--engine-value k source renderer))
          (heuristic (latex-to-svg-frontend--count-numbered-equations source)))
     (latex-to-svg-frontend--place
      (current-buffer)
      (copy-marker (overlay-start ov)) (copy-marker (overlay-end ov))
      value source (cons (1+ k) (+ k heuristic))
-     (latex-to-svg-frontend--display-p source))))
+     (latex-to-svg-frontend--display-p source)
+     renderer)))
 
 (defun latex-to-svg-frontend--reconcile-from (pos)
   "Renumber from the just-rendered equation at POS downward, then re-resolve refs.
@@ -1505,7 +1613,9 @@ option are on."
                               :color latex-to-svg-frontend-foreground-color
                               :background latex-to-svg-frontend-background-color
                               :padding latex-to-svg-frontend-padding
-                              :font-height font-height)))
+                              :font-height font-height
+                              :renderer (overlay-get
+                                         ov 'latex-to-svg-frontend-renderer))))
             (overlay-put ov 'latex-to-svg-frontend-image image)
             (when (overlay-get ov 'display)
               (latex-to-svg-frontend--show-image ov image))))
@@ -1662,9 +1772,10 @@ cache.  Interactively acts on the active region, or the whole buffer."
         (end (or end (point-max)))
         (table (latex-to-svg-frontend--maybe-table)))
     (dolist (el (latex-to-svg-frontend--elements beg end))
-      (latex-to-svg-backend-invalidate
-       (latex-to-svg-frontend--numbered-value
-        el (latex-to-svg-frontend--math-value el) table)))
+      (let ((source (latex-to-svg-frontend--math-value el)))
+        (latex-to-svg-backend-invalidate
+         (latex-to-svg-frontend--numbered-value el source table)
+         (latex-to-svg-frontend--renderer-for source))))
     (latex-to-svg-frontend--clear-region beg end)
     (latex-to-svg-frontend--render-region beg end)))
 

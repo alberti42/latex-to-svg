@@ -152,6 +152,48 @@ kept: every reference is re-resolved from the buffer's current `\label`s, so
 its references for free.  A reference thus never shows a stale number: an
 unresolved one always reads `(??)` / `??`.
 
+## The RaTeX renderer
+
+With `latex-to-svg-frontend-renderer` set to `ratex`, the engine typesets with
+RaTeX's `render-svg`. RaTeX has no preamble, no packages, no counters and no
+`\typeout`, and it rejects `\label`. So the front-end writes every number in
+itself: `--engine-value` hands RaTeX `--tagged-value` instead of
+`--setcounter-value`.
+
+- **`\tag{N}` on every numbered row**, numbered `K+1`, `K+2`, … in document
+  order. A single-equation environment gets one `\tag{K+1}` before its
+  `\end{env}`, unless the block has `\nonumber` / `\notag` / `\tag`. A
+  multi-equation environment gets a tag at the end of each top-level row that
+  has none of those, before its `\\` (or the `\end{env}` for the last row).
+  The rows are the ones `--multi-rows` splits out, which is also what
+  `--multi-row-labels` numbers the labels from, so the picture and `\eqref`
+  agree. A trailing `\\` leaves an empty last row; it is counted, as LaTeX
+  counts it, and tagged.
+- **Every `\label{…}` removed** from the value sent to RaTeX. The overlay's
+  `-source` keeps it, because the label map is built from the source.
+- **No `\setcounter`, no `\typeout`.**
+
+The renderer is recorded on the overlay (`latex-to-svg-frontend-renderer`), so
+a refresh fetches the same cache entry it rendered.
+
+**No ground truth.** RaTeX writes no `.eld` sidecar, so
+`latex-to-svg-backend-metadata` returns nil and `--set-overlay` keeps the
+heuristic range. That is also what the picture shows, because the tags come
+from the same count, so `--reconcile` never finds a disagreement to correct.
+The cost: where the heuristic miscounts (a `\\` inside `\substack`, which
+`--multi-rows` takes for a row break), the preview numbers differently from
+the exported document, and the misplaced tag can make RaTeX fail. With the
+`latex` renderer, LaTeX numbers the block itself and the ground truth corrects
+the counter for the blocks after it.
+
+**Environments RaTeX lacks.** RaTeX v0.1.14 has `equation`, `align`,
+`alignat` and `gather`, and their starred forms. Detection does not depend on
+the renderer, so `math`, `displaymath`, `multline`, `eqnarray`, `flalign`,
+`xalignat`, `xxalignat`, `subequations`, `dmath`, `empheq`, `dseries`,
+`dgroup` and `darray` are still detected; each fails to compile with the
+backend's warning, whose log names the environment, and the source stays
+visible.
+
 ## Engine boundary
 
 The only engine capability numbering relies on is generic and

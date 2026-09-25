@@ -13,6 +13,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `latex-to-svg-frontend-renderer` chooses the program that typesets the
+  previews: `latex` (the default: `latex` + `dvisvgm`) or `ratex` (RaTeX's
+  `render-svg`). It is passed to the backend as `:renderer` with every call,
+  and is safe as a file- or directory-local variable. With `ratex`, a
+  numbered environment gets its numbers as a `\tag{N}` on each numbered row
+  instead of a `\setcounter` prefix, and every `\label` is removed from what
+  RaTeX receives; `\eqref` / `\ref` resolve as before. Environments RaTeX
+  does not have (`multline`, `eqnarray`, `flalign`, …) fail to compile with
+  the backend's warning. With `latex`, the value sent to the engine is
+  unchanged, so no cached equation is recompiled. Requires the backend's
+  `:renderer` argument.
 - Tests: a drift guard over the release metadata — the three `Version:` headers
   must agree, and the newest dated `CHANGELOG.md` section must not claim a
   version the sources have not reached.
