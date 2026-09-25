@@ -106,7 +106,11 @@ buffer.
 
 With `ratex', a numbered environment gets its numbers as a `\\tag{N}' on
 each numbered row instead of a `\\setcounter' prefix, and every `\\label'
-is removed from what RaTeX receives (see docs/numbering.md)."
+is removed from what RaTeX receives (see docs/numbering.md).
+
+A display equation can choose its own renderer, or stay unrendered, with
+a comment at its top: `% renderer=latex', `% renderer=ratex' or
+`% renderer=skip' (see `latex-to-svg-frontend--cookie')."
   :type '(choice (const :tag "LaTeX (latex + dvisvgm)" latex)
                  (const :tag "RaTeX (render-svg)" ratex))
   :safe (lambda (v) (memq v '(latex ratex)))
@@ -865,6 +869,35 @@ existing preview overlay in the span."
                (latex-to-svg-frontend--font-height (current-buffer))))
         ov))))
 
+(defun latex-to-svg-frontend--set-unrendered-overlay (beg end source enums-fallback renderer)
+  "Mark BEG..END as math whose cookie leaves it unrendered.
+RENDERER is `skip', or a warning string (see `--renderer-for'), which is
+shown with `display-warning' and as the overlay's `help-echo'.  The
+overlay shows nothing: the source stays as text.  It keeps SOURCE and,
+when ENUMS-FALLBACK is non-nil, the equation's number range, so the
+incremental renumbering counts the numbers a skipped equation takes, as
+the exported document does.  Leaving it after an edit re-renders it."
+  (let ((b (if (markerp beg) (marker-position beg) beg))
+        (e (if (markerp end) (marker-position end) end)))
+    (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
+      (latex-to-svg-frontend--clear-region b e)
+      (let ((ov (make-overlay b e)))
+        (overlay-put ov 'latex-to-svg-frontend t)
+        (overlay-put ov 'latex-to-svg-frontend-unrendered t)
+        (overlay-put ov 'latex-to-svg-frontend-source source)
+        (overlay-put ov 'latex-to-svg-frontend-renderer renderer)
+        (overlay-put ov 'evaporate t)
+        (when enums-fallback
+          (overlay-put ov 'latex-to-svg-frontend-enums enums-fallback))
+        (when (stringp renderer)
+          (overlay-put ov 'help-echo renderer)
+          (display-warning 'latex-to-svg-frontend
+                           (format "%s, line %d: %s" (buffer-name)
+                                   (line-number-at-pos b) renderer)))
+        (overlay-put ov 'modification-hooks
+                     (list #'latex-to-svg-frontend--on-modify))
+        ov))))
+
 ;;;; Reveal on cursor entry
 
 (defvar-local latex-to-svg-frontend--last-point nil
@@ -880,9 +913,11 @@ re-render."
 
 (defun latex-to-svg-frontend--revealable-overlay-at (pos)
   "Return this package's preview overlay covering POS, or nil.
-Both image previews and `\\eqref' / `\\ref' text previews qualify."
+Image previews, `\\eqref' / `\\ref' text previews and unrendered math
+\(see `--set-unrendered-overlay') qualify."
   (seq-find (lambda (o) (or (overlay-get o 'latex-to-svg-frontend-image)
-                            (overlay-get o 'latex-to-svg-frontend-ref)))
+                            (overlay-get o 'latex-to-svg-frontend-ref)
+                            (overlay-get o 'latex-to-svg-frontend-unrendered)))
             (overlays-at pos)))
 
 (defun latex-to-svg-frontend--open-overlay (ov)
@@ -1252,10 +1287,86 @@ and `\\eqref' agree.  Any other SOURCE is returned unchanged."
         (apply #'concat (nreverse parts))))
      (t source))))
 
-(defun latex-to-svg-frontend--renderer-for (_source)
+(defconst latex-to-svg-frontend--cookie-regexp
+  "%[ \t]*\\(?:latex-to-svg:[ \t]*\\)?\\([a-z]+\\)[ \t]*=[ \t]*\\([a-z]+\\)"
+  "Regexp matching a cookie: `%', optionally `latex-to-svg:', then KEY=VALUE.
+Group 1 is KEY and group 2 is VALUE.  Where a cookie may stand is
+checked by `latex-to-svg-frontend--cookie'.")
+
+(defconst latex-to-svg-frontend--cookie-opener-regexp
+  (concat "\\`[ \t\n]*\\(?:"
+          "\\\\begin{[^}]*}\\(?:{[^}\n]*}\\|\\[[^]\n]*\\]\\)*"
+          "\\|\\\\\\[\\|\\$\\$\\)")
+  "Regexp matching the opener of display math, with an environment's arguments.")
+
+(defconst latex-to-svg-frontend--renderer-cookie-values
+  '(("latex" . latex) ("tex" . latex)
+    ("ratex" . ratex)
+    ("skip" . skip) ("none" . skip))
+  "The values of a `renderer=' cookie, and what each one selects.")
+
+(defun latex-to-svg-frontend--cookie (source)
+  "Return the cookie of display math SOURCE as (KEY . VALUE), or nil.
+A cookie is a `%' comment before any math: on the opener line, with only
+blanks (and an environment's arguments) between the opener and the `%',
+or alone on the line right after a blank opener line.  A `%' comment
+further down is an ordinary comment."
+  (let ((case-fold-search nil)
+        (cookie (concat "\\`[ \t]*" latex-to-svg-frontend--cookie-regexp)))
+    (when (string-match latex-to-svg-frontend--cookie-opener-regexp source)
+      (let* ((start (match-end 0))
+             (eol (or (string-search "\n" source start) (length source)))
+             (line (substring source start eol))
+             (next (and (< eol (length source))
+                        (substring source (1+ eol)
+                                   (or (string-search "\n" source (1+ eol))
+                                       (length source))))))
+        (cond
+         ((string-match cookie line)
+          (cons (match-string 1 line) (match-string 2 line)))
+         ((and next
+               (string-match-p "\\`[ \t]*\\'" line)
+               (string-match cookie next))
+          (cons (match-string 1 next) (match-string 2 next))))))))
+
+(defun latex-to-svg-frontend--missing-tools-message (renderer)
+  "Return the warning for a cookie requesting RENDERER, whose programs are missing."
+  (pcase renderer
+    ('ratex (format "renderer=ratex: `%s' not found (see `%s')"
+                    latex-to-svg-backend-ratex-program
+                    'latex-to-svg-backend-ratex-program))
+    (_ (format "renderer=latex: `%s' or `%s' not found (see `%s' and `%s')"
+               latex-to-svg-backend-latex-program
+               latex-to-svg-backend-dvisvgm-program
+               'latex-to-svg-backend-latex-program
+               'latex-to-svg-backend-dvisvgm-program))))
+
+(defun latex-to-svg-frontend--renderer-for (source)
   "Return the renderer for the equation whose LaTeX is SOURCE.
-That is `latex-to-svg-frontend-renderer'."
-  latex-to-svg-frontend-renderer)
+Display math can choose its renderer with a cookie (see
+`latex-to-svg-frontend--cookie'); without one, the renderer is
+`latex-to-svg-frontend-renderer'.  The result is `latex' or `ratex';
+`skip' for `renderer=skip' or `renderer=none'; or a string, the warning
+for an unknown key or value, or for a requested renderer whose programs
+are not found.  For `skip' and a string, nothing is sent to the engine."
+  (let ((cookie (and (latex-to-svg-frontend--display-p source)
+                     (latex-to-svg-frontend--cookie source))))
+    (if (null cookie)
+        latex-to-svg-frontend-renderer
+      (let ((renderer (cdr (assoc (cdr cookie)
+                                  latex-to-svg-frontend--renderer-cookie-values))))
+        (cond
+         ((not (equal (car cookie) "renderer"))
+          (format "Unknown key `%s' in cookie `%%%s=%s'"
+                  (car cookie) (car cookie) (cdr cookie)))
+         ((null renderer)
+          (format "Unknown value `%s' in cookie `%% renderer=%s' (known: %s)"
+                  (cdr cookie) (cdr cookie)
+                  (mapconcat #'car latex-to-svg-frontend--renderer-cookie-values
+                             ", ")))
+         ((eq renderer 'skip) 'skip)
+         ((latex-to-svg-backend-tools-available-p renderer) renderer)
+         (t (latex-to-svg-frontend--missing-tools-message renderer)))))))
 
 (defun latex-to-svg-frontend--engine-value (k source renderer)
   "Return the string handed to RENDERER for SOURCE, numbered from counter K.
@@ -1285,9 +1396,14 @@ TABLE is a (OFFSETS . LABELS) scan."
   "Ensure BEG..END in BUFFER shows the current image for render VALUE.
 Overlays immediately on a cache hit, else schedules an async compile and
 overlays when it finishes.  BEG / END should be markers.  RENDERER is
-passed to the engine as `:renderer' (nil means `latex')."
+passed to the engine as `:renderer' (nil means `latex').  Any other
+RENDERER (`skip', or a warning string: see `--renderer-for') sends
+nothing to the engine and installs `--set-unrendered-overlay' instead."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
+      (if (not (memq renderer '(nil latex ratex)))
+          (latex-to-svg-frontend--set-unrendered-overlay
+           beg end source enums-fallback renderer)
       (let ((image (latex-to-svg-backend
                     value
                     :rescale-by (latex-to-svg-frontend--rescale-for display-p)
@@ -1303,7 +1419,7 @@ passed to the engine as `:renderer' (nil means `latex')."
                                  renderer)))))
         (when image
           (latex-to-svg-frontend--set-overlay
-           beg end value image source enums-fallback display-p renderer))))))
+           beg end value image source enums-fallback display-p renderer)))))))
 
 (defun latex-to-svg-frontend--render-numbered (el k)
   "Render numbered environment EL starting at counter K."
@@ -1425,17 +1541,20 @@ LABELS is `--overlay-labels', for an `\\eqref' / `\\ref' being rendered."
     (cons offsets (latex-to-svg-frontend--overlay-labels))))
 
 (defun latex-to-svg-frontend--renumber-overlay (ov k)
-  "Re-render numbered overlay OV at counter K, reusing its stored source."
+  "Re-render numbered overlay OV at counter K, reusing its stored source.
+An unrendered overlay only takes its new number range."
   (let* ((source (overlay-get ov 'latex-to-svg-frontend-source))
-         (renderer (latex-to-svg-frontend--renderer-for source))
-         (value (latex-to-svg-frontend--engine-value k source renderer))
-         (heuristic (latex-to-svg-frontend--count-numbered-equations source)))
-    (latex-to-svg-frontend--place
-     (current-buffer)
-     (copy-marker (overlay-start ov)) (copy-marker (overlay-end ov))
-     value source (cons (1+ k) (+ k heuristic))
-     (latex-to-svg-frontend--display-p source)
-     renderer)))
+         (heuristic (latex-to-svg-frontend--count-numbered-equations source))
+         (enums (cons (1+ k) (+ k heuristic))))
+    (if (overlay-get ov 'latex-to-svg-frontend-unrendered)
+        (overlay-put ov 'latex-to-svg-frontend-enums enums)
+      (let ((renderer (latex-to-svg-frontend--renderer-for source)))
+        (latex-to-svg-frontend--place
+         (current-buffer)
+         (copy-marker (overlay-start ov)) (copy-marker (overlay-end ov))
+         (latex-to-svg-frontend--engine-value k source renderer)
+         source enums (latex-to-svg-frontend--display-p source)
+         renderer)))))
 
 (defun latex-to-svg-frontend--reconcile-from (pos)
   "Renumber from the just-rendered equation at POS downward, then re-resolve refs.
@@ -1468,7 +1587,8 @@ usable source).  No-op unless the mode and numbering are on."
                 ;; The block at POS was just rendered fresh; only renumber the
                 ;; ones after it whose base shifted.
                 (unless (or at-pos (equal (car enums) (1+ k)))
-                  (when (overlay-get ov 'display)
+                  (when (or (overlay-get ov 'display)
+                            (overlay-get ov 'latex-to-svg-frontend-unrendered))
                     (latex-to-svg-frontend--renumber-overlay ov k)))
                 (setq k (+ k (max 0 (- (cdr enums) (car enums) -1))))))))
         (if fell-back
@@ -1557,10 +1677,12 @@ the pending-change range.  No-op unless the mode and numbering are on."
                                    (- (cdr enums) (car enums) -1)
                                  (latex-to-svg-frontend--count-numbered-equations
                                   (latex-to-svg-frontend--math-value el)))))
-                (when (and ov
-                           (overlay-get ov 'display)
-                           (not (equal (car enums) (1+ k))))
-                  (latex-to-svg-frontend--render-numbered el k))
+                (when (and ov (not (equal (car enums) (1+ k))))
+                  (cond
+                   ((overlay-get ov 'latex-to-svg-frontend-unrendered)
+                    (latex-to-svg-frontend--renumber-overlay ov k))
+                   ((overlay-get ov 'display)
+                    (latex-to-svg-frontend--render-numbered el k))))
                 (setq k (+ k (max 0 consumed)))))))
         (latex-to-svg-frontend--reconcile-references
          (cdr (latex-to-svg-frontend--scan-numbering envs))))
@@ -1772,10 +1894,12 @@ cache.  Interactively acts on the active region, or the whole buffer."
         (end (or end (point-max)))
         (table (latex-to-svg-frontend--maybe-table)))
     (dolist (el (latex-to-svg-frontend--elements beg end))
-      (let ((source (latex-to-svg-frontend--math-value el)))
-        (latex-to-svg-backend-invalidate
-         (latex-to-svg-frontend--numbered-value el source table)
-         (latex-to-svg-frontend--renderer-for source))))
+      (let* ((source (latex-to-svg-frontend--math-value el))
+             (renderer (latex-to-svg-frontend--renderer-for source)))
+        (when (memq renderer '(latex ratex))
+          (latex-to-svg-backend-invalidate
+           (latex-to-svg-frontend--numbered-value el source table)
+           renderer))))
     (latex-to-svg-frontend--clear-region beg end)
     (latex-to-svg-frontend--render-region beg end)))
 

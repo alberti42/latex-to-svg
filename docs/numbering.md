@@ -186,6 +186,20 @@ the exported document, and the misplaced tag can make RaTeX fail. With the
 `latex` renderer, LaTeX numbers the block itself and the ground truth corrects
 the counter for the blocks after it.
 
+**The renderer is chosen per equation.** A cookie at the top of a display
+equation (`% renderer=latex`, `ratex` or `skip`; see the README) overrides
+`latex-to-svg-frontend-renderer` for that equation. `--renderer-for` reads it
+from the source, so every caller of `--engine-value` makes the
+`\setcounter`-or-`\tag` choice per equation, and the numbers still agree,
+because both paths use the same count.
+
+A skipped equation, or one whose cookie is invalid, is still counted:
+`--scan-numbering` counts every detected environment, and
+`--set-unrendered-overlay` gives it an overlay with no image that carries its
+source and number range, so `--counter-before`, `--overlay-labels` and
+`--reconcile-from` see it like any other numbered overlay.
+`--renumber-overlay` only updates its range.
+
 **Environments RaTeX lacks.** RaTeX v0.1.14 has `equation`, `align`,
 `alignat` and `gather`, and their starred forms. Detection does not depend on
 the renderer, so `math`, `displaymath`, `multline`, `eqnarray`, `flalign`,

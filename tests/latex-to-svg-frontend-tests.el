@@ -65,12 +65,18 @@
          (l2sf-tests--metadata-renderers nil)
          (l2sf-tests--last-rescale nil)
          (l2sf-tests--last-args nil)
+         (l2sf-tests--calls nil)
+         (l2sf-tests--missing-renderers nil)
          (latex-to-svg-backend-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
-                (lambda (_latex &rest args)
+                (lambda (latex &rest args)
                   (setq l2sf-tests--last-rescale (plist-get args :rescale-by)
                         l2sf-tests--last-args args)
+                  (push (cons latex (plist-get args :renderer)) l2sf-tests--calls)
                   l2sf-tests--image))
+               ((symbol-function 'latex-to-svg-backend-tools-available-p)
+                (lambda (&optional renderer)
+                  (not (memq renderer l2sf-tests--missing-renderers))))
                ((symbol-function 'latex-to-svg-backend-appearance)
                 (lambda (&optional _font-height) l2sf-tests--appearance))
                ((symbol-function 'latex-to-svg-backend-metadata)
@@ -1262,6 +1268,151 @@ merely *contains* inline math) is left untouched."
       (should (equal (overlay-get (car (last (l2sf-tests--overlays)))
                                   'latex-to-svg-frontend-value)
                      "\\begin{equation}\nb\n\\tag{1}\\end{equation}")))))
+
+;;;; Per-equation cookies
+
+(ert-deftest l2sf-cookie-forms ()
+  ;; Each form the hand-over lists selects the right renderer: on the opener
+  ;; line or alone on the next line, with or without `latex-to-svg:', with
+  ;; blanks around each part, after an environment's arguments.
+  (l2sf-tests--with-stub
+    (dolist (case '(("\\[% renderer=skip\nx\\]" . skip)
+                    ("\\[\n% renderer=none\nx=1\n\\]" . skip)
+                    ("\\begin{align}% latex-to-svg: renderer = tex\na\n\\end{align}" . latex)
+                    ("\\begin{alignat}{2}  %latex-to-svg:renderer=latex\na\n\\end{alignat}" . latex)
+                    ("$$ % renderer=ratex\nx$$" . ratex)))
+      (should (eq (latex-to-svg-frontend--renderer-for (car case)) (cdr case))))))
+
+(ert-deftest l2sf-cookie-position-rule ()
+  ;; Only a comment before any math is a cookie: one further down the body,
+  ;; after math on the opener line, after `\%', or in inline math is not.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-renderer 'latex))
+      (dolist (source '("\\begin{align}\na \\\\% renderer=ratex\n\\end{align}"
+                        "\\begin{align} x\n% renderer=ratex\n\\end{align}"
+                        "$$x = 10\\% renderer=ratex$$"
+                        "\\[% just a comment\nx\\]"
+                        "$x % renderer=ratex$"))
+        (should (eq (latex-to-svg-frontend--renderer-for source) 'latex))))))
+
+(ert-deftest l2sf-cookie-value-passed-verbatim ()
+  ;; The engine receives the cookie with the rest of the source, and the
+  ;; cookie's renderer as `:renderer'.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[% renderer=ratex\nx\\]\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should (equal l2sf-tests--calls '(("\\[% renderer=ratex\nx\\]" . ratex)))))))
+
+(ert-deftest l2sf-cookie-skip-leaves-source ()
+  ;; `skip' and `none' send nothing to the engine; the source stays as text.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[% renderer=skip\nx\\]\n\n\\[% renderer=none\ny\\]\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should-not l2sf-tests--calls)
+      (dolist (ov (l2sf-tests--overlays))
+        (should (overlay-get ov 'latex-to-svg-frontend-unrendered))
+        (should-not (overlay-get ov 'display))))))
+
+(ert-deftest l2sf-cookie-unknown-value-warns ()
+  ;; An unknown value warns, sends nothing to the engine, and does not fall
+  ;; back to the default renderer.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[% renderer=katex\nx\\]\n"
+      (let ((warnings nil))
+        (cl-letf (((symbol-function 'display-warning)
+                   (lambda (_type message &rest _) (push message warnings))))
+          (latex-to-svg-frontend--render-region (point-min) (point-max)))
+        (should-not l2sf-tests--calls)
+        (should (= (length warnings) 1))
+        (should (string-match-p "katex" (car warnings)))))))
+
+(ert-deftest l2sf-cookie-missing-renderer-warns ()
+  ;; A cookie naming a renderer whose programs are missing warns instead of
+  ;; letting the backend draw its placeholder.
+  (l2sf-tests--with-stub
+    (setq l2sf-tests--missing-renderers '(ratex))
+    (l2sf-tests--md "\\[% renderer=ratex\nx\\]\n"
+      (let ((warnings nil))
+        (cl-letf (((symbol-function 'display-warning)
+                   (lambda (_type message &rest _) (push message warnings))))
+          (latex-to-svg-frontend--render-region (point-min) (point-max)))
+        (should-not l2sf-tests--calls)
+        (should (string-match-p "not found" (car warnings)))))))
+
+(ert-deftest l2sf-cookie-skipped-equation-keeps-its-numbers ()
+  ;; A skipped `align' is still numbered in the exported document: the
+  ;; equation after it keeps its number, and a label inside it resolves.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{align}% renderer=skip\na \\label{a} \\\\\nb\n\\end{align}\n\n"
+                "\\begin{equation}\nc\n\\end{equation}\n\n"
+                "See $\\eqref{a}$.\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((ovs (l2sf-tests--overlays)))
+        (should (equal (overlay-get (nth 0 ovs) 'latex-to-svg-frontend-enums)
+                       '(1 . 2)))
+        (should (string-prefix-p "\\setcounter{equation}{2}%"
+                                 (overlay-get (nth 1 ovs)
+                                              'latex-to-svg-frontend-value)))
+        (should (equal (overlay-get (nth 2 ovs) 'latex-to-svg-frontend-ref-display)
+                       "(1)"))
+        ;; The incremental path counts it too.
+        (should (= (latex-to-svg-frontend--counter-before
+                    (overlay-start (nth 1 ovs)))
+                   2))
+        (should (equal (gethash "a" (latex-to-svg-frontend--overlay-labels)) 1))))))
+
+(ert-deftest l2sf-cookie-skipped-equation-renumbered ()
+  ;; When an equation above a skipped one is removed, the skipped one takes
+  ;; its new number range, so the counter after it stays right.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+                "\\begin{equation}% renderer=skip\nb\n\\end{equation}\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (goto-char (point-min))
+      (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
+      (search-forward "\\end{equation}") (backward-char 1) (insert "*")
+      (latex-to-svg-frontend--reconcile)
+      (should (equal (overlay-get (car (last (l2sf-tests--overlays)))
+                                  'latex-to-svg-frontend-enums)
+                     '(1 . 1))))))
+
+(ert-deftest l2sf-cookie-overrides-option-for-numbering ()
+  ;; The `\setcounter'-or-`\tag' choice follows the equation's renderer: a
+  ;; `latex' cookie under a global `ratex' gets `\setcounter', and the reverse
+  ;; gets `\tag'.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{equation}% renderer=latex\nx\n\\end{equation}\n"
+      (let ((latex-to-svg-frontend-renderer 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (should (string-prefix-p "\\setcounter{equation}{0}%"
+                               (car (l2sf-tests--values))))
+      (should (eq (plist-get l2sf-tests--last-args :renderer) 'latex))))
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{equation}% renderer=ratex\nx\n\\end{equation}\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should (equal (l2sf-tests--values)
+                     '("\\begin{equation}% renderer=ratex\nx\n\\tag{1}\\end{equation}")))
+      (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex)))))
+
+(ert-deftest l2sf-cookie-removed-then-rendered ()
+  ;; Editing the cookie of a skipped equation away and leaving it renders it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[% renderer=skip\nx\\]\n\nafter\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should-not l2sf-tests--calls)
+      (goto-char (point-min))
+      (search-forward "skip")
+      (replace-match "latex")
+      (goto-char (point-max))
+      (latex-to-svg-frontend--heal-modified)
+      (should (equal l2sf-tests--calls '(("\\[% renderer=latex\nx\\]" . latex))))
+      (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                  'fake-image)))))
 
 ;;;; Inline / display rescale
 

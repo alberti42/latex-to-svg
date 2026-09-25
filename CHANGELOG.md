@@ -24,6 +24,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the backend's warning. With `latex`, the value sent to the engine is
   unchanged, so no cached equation is recompiled. Requires the backend's
   `:renderer` argument.
+- A cookie at the top of a display equation chooses its renderer:
+  `% renderer=latex` (alias `tex`), `% renderer=ratex`, or
+  `% renderer=skip` (alias `none`) to leave the source as text. It stands on
+  the opener line or alone on the line after it, optionally written
+  `% latex-to-svg: renderer=…`. A skipped equation still takes its numbers.
+  An unknown key or value, or a renderer whose programs are not found, warns
+  and leaves the source visible. The cookie is passed to the engine with the
+  rest of the source.
 - Tests: a drift guard over the release metadata — the three `Version:` headers
   must agree, and the newest dated `CHANGELOG.md` section must not claim a
   version the sources have not reached.

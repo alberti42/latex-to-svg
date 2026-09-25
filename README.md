@@ -263,9 +263,46 @@ What works with `ratex`:
 - **Environments:** `equation`, `align`, `alignat`, `gather`, and their starred
   forms. `multline`, `eqnarray`, `flalign` and the other environments RaTeX
   does not have fail to compile: the backend warns with a link to RaTeX's
-  output, and the source stays visible.
+  output, and the source stays visible. A `% renderer=latex` cookie sends one
+  such equation to LaTeX (see below).
 - **An `\eqref` or `\ref` inside an equation fails** (`a = b \text{ by }
   \eqref{x}`). A reference in the prose is drawn as buffer text and works.
+
+#### Choosing the renderer for one equation
+
+A LaTeX comment at the top of a display equation chooses its renderer, or
+leaves it unrendered:
+
+```latex
+\[
+% renderer=skip
+x=1
+\]
+
+\begin{align}% latex-to-svg: renderer=ratex
+a &= b
+\end{align}
+```
+
+| Cookie | Effect |
+|--------|--------|
+| `renderer=latex`, alias `renderer=tex` | this equation uses the LaTeX renderer |
+| `renderer=ratex` | this equation uses the RaTeX renderer |
+| `renderer=skip`, alias `renderer=none` | no preview: the source stays as text |
+
+- **Where:** a `%` comment before any math, either on the opener line
+  (after an environment's arguments, if any) or on its own line right after
+  it. A `%` comment further down the body is an ordinary comment.
+- **Form:** `%`, then optionally `latex-to-svg:`, then `KEY=VALUE`, with
+  blanks allowed around each part.
+- **Display math only.** A `%` inside `$…$` comments out the closing `$`, so an
+  inline equation cannot carry a cookie.
+- **An unknown key or value** (`renderer=katex`) warns and leaves the source
+  visible. So does a cookie naming a renderer whose programs are not found.
+- **A skipped equation still takes its numbers**, as in the exported document,
+  so the equations after it keep theirs, and a `\label` in it still resolves.
+- The cookie stays in what the engine receives; both renderers treat it as a
+  comment.
 
 ### Colors and box
 
