@@ -217,8 +217,8 @@ front-end's, as with RaTeX. The value has no `\setcounter` and no
 `\typeout`, so this path has no ground truth either. Numbering sees no
 difference: the overlay records the requested engine, `ratex`, and the
 number range comes from the same count. With the fallback off, the equation
-fails with the backend's warning, whose log names the environment, and the
-source stays visible.
+fails with the backend's warning, whose log names the environment, and keeps
+its source as text.
 
 ## Backend boundary
 
