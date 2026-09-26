@@ -3,7 +3,7 @@
 How `latex-to-svg-frontend` numbers display math and resolves `\eqref` / `\ref`.
 It is a **pure front-end** feature gated behind
 `latex-to-svg-frontend-number-equations` (on by default) — no markup or equation
-awareness leaks into the `latex-to-svg-backend` engine.  It works the same for
+awareness leaks into the backend, `latex-to-svg-backend`.  It works the same for
 every adaptor (Org, Markdown, …): numbering operates on the markup-independent
 math records the scanner produces.
 
@@ -16,11 +16,11 @@ reconcile are original.
 ## How a number gets on screen
 
 An equation's number depends on every numbered equation before it, but the
-engine caches each fragment in isolation by content hash. We bridge that with
+backend caches each fragment in isolation by content hash. We bridge that with
 one trick: **prepend `\setcounter{equation}{K}` to the block**, where `K` is the
 count of preceding numbered equations. LaTeX then prints the right number, and
 because `K` is part of the hashed input the number is cached for free — change
-`K` and it re-renders, leave it and it's a cache hit. No engine equation-logic.
+`K` and it re-renders, leave it and it's a cache hit. No backend equation-logic.
 
 `K` comes from a document-order Elisp scan (`--scan-numbering`) that threads a
 counter over the numbered environments. Two sources feed the per-block
@@ -30,7 +30,7 @@ counter over the numbered environments. Two sources feed the per-block
   environment table below. Synchronous, so the whole buffer renders in
   parallel — there is no sequential cold path.
 - **Ground truth (authoritative):** each numbered block is rendered with a
-  probe `\typeout{L2S=\arabic{equation}}`; the engine captures the final counter
+  probe `\typeout{L2S=\arabic{equation}}`; the backend captures the final counter
   into a `<hash>.eld` sidecar as `(:v 1 :nums (INITIAL . FINAL))` (INITIAL =
   `K+1` supplied by the front-end via `:metadata`, FINAL read back from LaTeX).
   Then `consumed = FINAL − INITIAL + 1`. Readable on cache hit or miss.
@@ -152,12 +152,12 @@ kept: every reference is re-resolved from the buffer's current `\label`s, so
 its references for free.  A reference thus never shows a stale number: an
 unresolved one always reads `(??)` / `??`.
 
-## The RaTeX renderer
+## The RaTeX engine
 
-With `latex-to-svg-frontend-renderer` set to `ratex`, the engine typesets with
+With `latex-to-svg-frontend-engine` set to `ratex`, the backend typesets with
 RaTeX's `render-svg`. RaTeX has no preamble, no packages, no counters and no
 `\typeout`, and it rejects `\label`. So the front-end writes every number in
-itself: `--engine-value` hands RaTeX `--tagged-value` instead of
+itself: `--backend-value` hands RaTeX `--tagged-value` instead of
 `--setcounter-value`.
 
 - **`\tag{N}` on every numbered row**, numbered `K+1`, `K+2`, … in document
@@ -173,7 +173,7 @@ itself: `--engine-value` hands RaTeX `--tagged-value` instead of
   `-source` keeps it, because the label map is built from the source.
 - **No `\setcounter`, no `\typeout`.**
 
-The renderer is recorded on the overlay (`latex-to-svg-frontend-renderer`), so
+The engine is recorded on the overlay (`latex-to-svg-frontend-engine`), so
 a refresh fetches the same cache entry it rendered.
 
 **No ground truth.** RaTeX writes no `.eld` sidecar, so
@@ -183,13 +183,13 @@ from the same count, so `--reconcile` never finds a disagreement to correct.
 The cost: where the heuristic miscounts (a `\\` inside `\substack`, which
 `--multi-rows` takes for a row break), the preview numbers differently from
 the exported document, and the misplaced tag can make RaTeX fail. With the
-`latex` renderer, LaTeX numbers the block itself and the ground truth corrects
+`latex` engine, LaTeX numbers the block itself and the ground truth corrects
 the counter for the blocks after it.
 
-**The renderer is chosen per equation.** A cookie at the top of a display
-equation (`% renderer=latex`, `ratex` or `skip`; see the README) overrides
-`latex-to-svg-frontend-renderer` for that equation. `--renderer-for` reads it
-from the source, so every caller of `--engine-value` makes the
+**The engine is chosen per equation.** A cookie at the top of a display
+equation (`% engine=latex`, `ratex` or `skip`; see the README) overrides
+`latex-to-svg-frontend-engine` for that equation. `--engine-for` reads it
+from the source, so every caller of `--backend-value` makes the
 `\setcounter`-or-`\tag` choice per equation, and the numbers still agree,
 because both paths use the same count.
 
@@ -202,15 +202,15 @@ source and number range, so `--counter-before`, `--overlay-labels` and
 
 **Environments RaTeX lacks.** RaTeX v0.1.14 has `equation`, `align`,
 `alignat` and `gather`, and their starred forms. Detection does not depend on
-the renderer, so `math`, `displaymath`, `multline`, `eqnarray`, `flalign`,
+the engine, so `math`, `displaymath`, `multline`, `eqnarray`, `flalign`,
 `xalignat`, `xxalignat`, `subequations`, `dmath`, `empheq`, `dseries`,
 `dgroup` and `darray` are still detected; each fails to compile with the
 backend's warning, whose log names the environment, and the source stays
 visible.
 
-## Engine boundary
+## Backend boundary
 
-The only engine capability numbering relies on is generic and
+The only backend capability numbering relies on is generic and
 equation-unaware: `latex-to-svg-backend` captures a caller-supplied number
 (`:metadata`) paired with a number a compile emits on
 `latex-to-svg-backend-metadata-prefix` lines, caches the pair in a `.eld`

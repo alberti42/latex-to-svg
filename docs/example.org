@@ -4,7 +4,7 @@
 
 * Getting started
 
-Open this file and turn the previews on with =M-x latex-to-svg-for-org-mode= (or add =(add-hook 'org-mode-hook #'latex-to-svg-for-org-mode)= to your init).  It needs the [[https://github.com/alberti42/latex-to-svg-backend][latex-to-svg-backend]] engine on your ~load-path~, plus =latex= and =dvisvgm=.
+Open this file and turn the previews on with =M-x latex-to-svg-for-org-mode= (or add =(add-hook 'org-mode-hook #'latex-to-svg-for-org-mode)= to your init).  It needs the [[https://github.com/alberti42/latex-to-svg-backend][latex-to-svg-backend]] package on your ~load-path~, plus =latex= and =dvisvgm=.
 
 While the mode is on, =C-c C-x C-l= (=latex-to-svg-frontend=) toggles the fragment at point, renders the region, or — failing both — the whole buffer.  =C-u C-c C-x C-l= re-renders the buffer from cache; =C-u C-u C-c C-x C-l= regenerates (recompiles) it.  =M-x latex-to-svg-frontend-refresh= re-tints / re-scales for the current theme and font size straight from cache (no LaTeX).
 

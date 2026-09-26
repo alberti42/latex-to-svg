@@ -14,7 +14,7 @@
 ;;   emacs -batch -l ert -l tests/latex-to-svg-frontend-tests.el \
 ;;         -f ert-run-tests-batch-and-exit
 ;;
-;; The engine (`latex-to-svg-backend') is stubbed to return a synchronous fake image,
+;; The backend (`latex-to-svg-backend') is stubbed to return a synchronous fake image,
 ;; so no TeX toolchain or graphical display is needed.  Math detection is a
 ;; regexp scanner, so most tests run in a plain temp buffer with no tree-sitter
 ;; grammar required; only the minor-mode enable/disable test needs a real
@@ -34,7 +34,7 @@
              (expand-file-name ".." (file-name-directory
                                      (or load-file-name buffer-file-name))))
 
-;; `latex-to-svg-backend' (the engine) is a sibling repo; add it to `load-path' so the
+;; `latex-to-svg-backend' (the backend) is a sibling repo; add it to `load-path' so the
 ;; module's `(require 'latex-to-svg-backend)' resolves when running from a checkout.
 (let ((dir (or (getenv "LATEX_TO_SVG_DIR")
                (expand-file-name "../../latex-to-svg-backend"
@@ -51,42 +51,42 @@
 ;; which skips itself when it (or the `markdown' grammar) is unavailable.
 (require 'markdown-ts-mode nil t)
 
-;; --- Stub the engine: synchronous, deterministic, no TeX / no display -------
+;; --- Stub the backend: synchronous, deterministic, no TeX / no display -------
 
 (defvar l2sf-tests--image 'fake-image)
 
 (defmacro l2sf-tests--with-stub (&rest body)
-  "Run BODY with the engine stubbed to return `l2sf-tests--image'."
+  "Run BODY with the backend stubbed to return `l2sf-tests--image'."
   (declare (indent 0) (debug t))
   `(let ((l2sf-tests--appearance '("#000" "#fff" 20))
          (l2sf-tests--invalidated nil)
-         (l2sf-tests--invalidated-renderers nil)
+         (l2sf-tests--invalidated-engines nil)
          (l2sf-tests--metadata nil)
-         (l2sf-tests--metadata-renderers nil)
+         (l2sf-tests--metadata-engines nil)
          (l2sf-tests--last-rescale nil)
          (l2sf-tests--last-args nil)
          (l2sf-tests--calls nil)
-         (l2sf-tests--missing-renderers nil)
+         (l2sf-tests--missing-engines nil)
          (latex-to-svg-backend-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
                 (lambda (latex &rest args)
                   (setq l2sf-tests--last-rescale (plist-get args :rescale-by)
                         l2sf-tests--last-args args)
-                  (push (cons latex (plist-get args :renderer)) l2sf-tests--calls)
+                  (push (cons latex (plist-get args :engine)) l2sf-tests--calls)
                   l2sf-tests--image))
                ((symbol-function 'latex-to-svg-backend-tools-available-p)
-                (lambda (&optional renderer)
-                  (not (memq renderer l2sf-tests--missing-renderers))))
+                (lambda (&optional engine)
+                  (not (memq engine l2sf-tests--missing-engines))))
                ((symbol-function 'latex-to-svg-backend-appearance)
                 (lambda (&optional _font-height) l2sf-tests--appearance))
                ((symbol-function 'latex-to-svg-backend-metadata)
-                (lambda (value &optional renderer)
-                  (push renderer l2sf-tests--metadata-renderers)
+                (lambda (value &optional engine)
+                  (push engine l2sf-tests--metadata-engines)
                   (cdr (assoc value l2sf-tests--metadata))))
                ((symbol-function 'latex-to-svg-backend-invalidate)
-                (lambda (latex &optional renderer)
+                (lambda (latex &optional engine)
                   (push latex l2sf-tests--invalidated)
-                  (push renderer l2sf-tests--invalidated-renderers))))
+                  (push engine l2sf-tests--invalidated-engines))))
        ,@body)))
 
 (defmacro l2sf-tests--md (text &rest body)
@@ -113,7 +113,7 @@ A plain buffer suffices — detection is a regexp scanner."
 (ert-deftest l2sf-detects-fragments-and-environments ()
   ;; The scanner finds inline `$…$' / `\(…\)', display `\[…\]' / `$$…$$', and
   ;; environments, returning each element's verbatim source (delimiters and
-  ;; all — exactly what the verbatim engine wants).
+  ;; all — exactly what the verbatim backend wants).
   (l2sf-tests--md
       "Inline $E=mc^2$ and \\(a+b\\).\n\nDisplay \\[F=ma\\] then $$g$$\n\n\\begin{equation}\nx=1\n\\end{equation}\n"
     (should (equal (mapcar #'latex-to-svg-frontend--math-value
@@ -894,7 +894,7 @@ merely *contains* inline math) is left untouched."
 ;;;; Minor mode
 
 (ert-deftest l2sf-font-height-reports-unmeasurable-font ()
-  ;; A font the frame cannot measure leaves the height unknown, so the engine
+  ;; A font the frame cannot measure leaves the height unknown, so the backend
   ;; defers sizing -- but it is reported, once per buffer, never swallowed.
   (let ((warnings 0))
     (with-temp-buffer
@@ -1134,7 +1134,7 @@ merely *contains* inline math) is left untouched."
                (overlay-get (nth 1 (l2sf-tests--overlays))
                             'latex-to-svg-frontend-value))))))
 
-;;;; RaTeX renderer
+;;;; RaTeX engine
 
 (ert-deftest l2sf-ratex-tags-equation ()
   ;; With `ratex', a numbered `equation' carries its number as a `\tag'
@@ -1143,12 +1143,12 @@ merely *contains* inline math) is left untouched."
     (l2sf-tests--md
         (concat "\\begin{equation}\nx\n\\end{equation}\n\n"
                 "\\begin{equation}\ny\n\\end{equation}\n")
-      (let ((latex-to-svg-frontend-renderer 'ratex))
+      (let ((latex-to-svg-frontend-engine 'ratex))
         (latex-to-svg-frontend--render-region (point-min) (point-max)))
       (should (equal (l2sf-tests--values)
                      '("\\begin{equation}\nx\n\\tag{1}\\end{equation}"
                        "\\begin{equation}\ny\n\\tag{2}\\end{equation}")))
-      (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex)))))
+      (should (eq (plist-get l2sf-tests--last-args :engine) 'ratex)))))
 
 (ert-deftest l2sf-ratex-suppressed-equation-untagged ()
   ;; A single-equation block with `\notag' takes no number, so it gets no tag
@@ -1186,7 +1186,7 @@ merely *contains* inline math) is left untouched."
 
 (ert-deftest l2sf-ratex-trailing-break-tags-empty-row ()
   ;; A trailing `\\\\' leaves an empty last row.  `--count-multi-rows' counts
-  ;; it, as LaTeX does, so it is tagged too and the two renderers agree.
+  ;; it, as LaTeX does, so it is tagged too and the two engines agree.
   (let ((source "\\begin{align}\na \\\\\nb \\\\\n\\end{align}"))
     (should (= (latex-to-svg-frontend--count-numbered-equations source) 3))
     (should (equal (latex-to-svg-frontend--tagged-value 0 source)
@@ -1194,13 +1194,13 @@ merely *contains* inline math) is left untouched."
                            "b \\tag{2}\\\\\n\\tag{3}\\end{align}")))))
 
 (ert-deftest l2sf-ratex-removes-labels-keeps-source ()
-  ;; RaTeX has no `\label': it is removed from the value sent to the engine,
+  ;; RaTeX has no `\label': it is removed from the value sent to the backend,
   ;; kept in the overlay's source, and `\eqref' still resolves from it.
   (l2sf-tests--with-stub
     (l2sf-tests--md
         (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
                 "See $\\eqref{eq:a}$.\n")
-      (let ((latex-to-svg-frontend-renderer 'ratex))
+      (let ((latex-to-svg-frontend-engine 'ratex))
         (latex-to-svg-frontend--render-region (point-min) (point-max)))
       (let* ((ovs (l2sf-tests--overlays))
              (eq-ov (nth 0 ovs))
@@ -1217,40 +1217,40 @@ merely *contains* inline math) is left untouched."
   ;; source, untouched.
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\begin{align*}\na \\\\\nb\n\\end{align*}\n\n\\[x\\]\n"
-      (let ((latex-to-svg-frontend-renderer 'ratex))
+      (let ((latex-to-svg-frontend-engine 'ratex))
         (latex-to-svg-frontend--render-region (point-min) (point-max)))
       (should (equal (l2sf-tests--values)
                      '("\\begin{align*}\na \\\\\nb\n\\end{align*}" "\\[x\\]"))))))
 
-(ert-deftest l2sf-latex-renderer-value-unchanged ()
-  ;; The default renderer keeps today's value byte for byte (labels included),
-  ;; so no LaTeX user's cache is invalidated, and passes `:renderer latex'.
+(ert-deftest l2sf-latex-engine-value-unchanged ()
+  ;; The default engine keeps today's value byte for byte (labels included),
+  ;; so no LaTeX user's cache is invalidated, and passes `:engine latex'.
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\begin{equation}\\label{a}\nx\n\\end{equation}\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (should (equal (l2sf-tests--values)
                      '("\\setcounter{equation}{0}%\n\\begin{equation}\\label{a}\nx\n\\end{equation}\\typeout{L2S=\\arabic{equation}}%\n")))
-      (should (eq (plist-get l2sf-tests--last-args :renderer) 'latex)))))
+      (should (eq (plist-get l2sf-tests--last-args :engine) 'latex)))))
 
-(ert-deftest l2sf-renderer-reaches-every-engine-call ()
+(ert-deftest l2sf-engine-reaches-every-backend-call ()
   ;; `latex-to-svg-backend', `-metadata' and `-invalidate' all receive the
-  ;; renderer, and a refresh uses the one recorded on the overlay, not the
+  ;; engine, and a refresh uses the one recorded on the overlay, not the
   ;; option's current value.
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\begin{equation}\nx\n\\end{equation}\n"
-      (let ((latex-to-svg-frontend-renderer 'ratex))
+      (let ((latex-to-svg-frontend-engine 'ratex))
         (latex-to-svg-frontend--render-region (point-min) (point-max))
-        (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex))
-        (should (equal l2sf-tests--metadata-renderers '(ratex)))
+        (should (eq (plist-get l2sf-tests--last-args :engine) 'ratex))
+        (should (equal l2sf-tests--metadata-engines '(ratex)))
         (should (eq (overlay-get (car (l2sf-tests--overlays))
-                                 'latex-to-svg-frontend-renderer)
+                                 'latex-to-svg-frontend-engine)
                     'ratex))
         (latex-to-svg-frontend-regenerate)
-        (should (equal l2sf-tests--invalidated-renderers '(ratex))))
+        (should (equal l2sf-tests--invalidated-engines '(ratex))))
       (setq l2sf-tests--last-args nil)
-      (let ((latex-to-svg-frontend-renderer 'latex))
+      (let ((latex-to-svg-frontend-engine 'latex))
         (latex-to-svg-frontend-refresh))
-      (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex)))))
+      (should (eq (plist-get l2sf-tests--last-args :engine) 'ratex)))))
 
 (ert-deftest l2sf-ratex-reconcile-retags-downstream ()
   ;; Renumbering after an edit rebuilds the tagged value, not a `\setcounter'.
@@ -1259,7 +1259,7 @@ merely *contains* inline math) is left untouched."
         (concat "\\begin{equation}\na\n\\end{equation}\n\n"
                 "\\begin{equation}\nb\n\\end{equation}\n")
       (setq-local latex-to-svg-frontend-mode t)
-      (setq-local latex-to-svg-frontend-renderer 'ratex)
+      (setq-local latex-to-svg-frontend-engine 'ratex)
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (goto-char (point-min))
       (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
@@ -1272,41 +1272,41 @@ merely *contains* inline math) is left untouched."
 ;;;; Per-equation cookies
 
 (ert-deftest l2sf-cookie-forms ()
-  ;; Each form the hand-over lists selects the right renderer: on the opener
+  ;; Each form the hand-over lists selects the right engine: on the opener
   ;; line or alone on the next line, with or without `latex-to-svg:', with
   ;; blanks around each part, after an environment's arguments.
   (l2sf-tests--with-stub
-    (dolist (case '(("\\[% renderer=skip\nx\\]" . skip)
-                    ("\\[\n% renderer=none\nx=1\n\\]" . skip)
-                    ("\\begin{align}% latex-to-svg: renderer = tex\na\n\\end{align}" . latex)
-                    ("\\begin{alignat}{2}  %latex-to-svg:renderer=latex\na\n\\end{alignat}" . latex)
-                    ("$$ % renderer=ratex\nx$$" . ratex)))
-      (should (eq (latex-to-svg-frontend--renderer-for (car case)) (cdr case))))))
+    (dolist (case '(("\\[% engine=skip\nx\\]" . skip)
+                    ("\\[\n% engine=none\nx=1\n\\]" . skip)
+                    ("\\begin{align}% latex-to-svg: engine = tex\na\n\\end{align}" . latex)
+                    ("\\begin{alignat}{2}  %latex-to-svg:engine=latex\na\n\\end{alignat}" . latex)
+                    ("$$ % engine=ratex\nx$$" . ratex)))
+      (should (eq (latex-to-svg-frontend--engine-for (car case)) (cdr case))))))
 
 (ert-deftest l2sf-cookie-position-rule ()
   ;; Only a comment before any math is a cookie: one further down the body,
   ;; after math on the opener line, after `\%', or in inline math is not.
   (l2sf-tests--with-stub
-    (let ((latex-to-svg-frontend-renderer 'latex))
-      (dolist (source '("\\begin{align}\na \\\\% renderer=ratex\n\\end{align}"
-                        "\\begin{align} x\n% renderer=ratex\n\\end{align}"
-                        "$$x = 10\\% renderer=ratex$$"
+    (let ((latex-to-svg-frontend-engine 'latex))
+      (dolist (source '("\\begin{align}\na \\\\% engine=ratex\n\\end{align}"
+                        "\\begin{align} x\n% engine=ratex\n\\end{align}"
+                        "$$x = 10\\% engine=ratex$$"
                         "\\[% just a comment\nx\\]"
-                        "$x % renderer=ratex$"))
-        (should (eq (latex-to-svg-frontend--renderer-for source) 'latex))))))
+                        "$x % engine=ratex$"))
+        (should (eq (latex-to-svg-frontend--engine-for source) 'latex))))))
 
 (ert-deftest l2sf-cookie-value-passed-verbatim ()
-  ;; The engine receives the cookie with the rest of the source, and the
-  ;; cookie's renderer as `:renderer'.
+  ;; The backend receives the cookie with the rest of the source, and the
+  ;; cookie's engine as `:engine'.
   (l2sf-tests--with-stub
-    (l2sf-tests--md "\\[% renderer=ratex\nx\\]\n"
+    (l2sf-tests--md "\\[% engine=ratex\nx\\]\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (should (equal l2sf-tests--calls '(("\\[% renderer=ratex\nx\\]" . ratex)))))))
+      (should (equal l2sf-tests--calls '(("\\[% engine=ratex\nx\\]" . ratex)))))))
 
 (ert-deftest l2sf-cookie-skip-leaves-source ()
-  ;; `skip' and `none' send nothing to the engine; the source stays as text.
+  ;; `skip' and `none' send nothing to the backend; the source stays as text.
   (l2sf-tests--with-stub
-    (l2sf-tests--md "\\[% renderer=skip\nx\\]\n\n\\[% renderer=none\ny\\]\n"
+    (l2sf-tests--md "\\[% engine=skip\nx\\]\n\n\\[% engine=none\ny\\]\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (should-not l2sf-tests--calls)
       (dolist (ov (l2sf-tests--overlays))
@@ -1314,10 +1314,10 @@ merely *contains* inline math) is left untouched."
         (should-not (overlay-get ov 'display))))))
 
 (ert-deftest l2sf-cookie-unknown-value-warns ()
-  ;; An unknown value warns, sends nothing to the engine, and does not fall
-  ;; back to the default renderer.
+  ;; An unknown value warns, sends nothing to the backend, and does not fall
+  ;; back to the default engine.
   (l2sf-tests--with-stub
-    (l2sf-tests--md "\\[% renderer=katex\nx\\]\n"
+    (l2sf-tests--md "\\[% engine=katex\nx\\]\n"
       (let ((warnings nil))
         (cl-letf (((symbol-function 'display-warning)
                    (lambda (_type message &rest _) (push message warnings))))
@@ -1326,12 +1326,12 @@ merely *contains* inline math) is left untouched."
         (should (= (length warnings) 1))
         (should (string-match-p "katex" (car warnings)))))))
 
-(ert-deftest l2sf-cookie-missing-renderer-warns ()
-  ;; A cookie naming a renderer whose programs are missing warns instead of
+(ert-deftest l2sf-cookie-missing-engine-warns ()
+  ;; A cookie naming an engine whose programs are missing warns instead of
   ;; letting the backend draw its placeholder.
   (l2sf-tests--with-stub
-    (setq l2sf-tests--missing-renderers '(ratex))
-    (l2sf-tests--md "\\[% renderer=ratex\nx\\]\n"
+    (setq l2sf-tests--missing-engines '(ratex))
+    (l2sf-tests--md "\\[% engine=ratex\nx\\]\n"
       (let ((warnings nil))
         (cl-letf (((symbol-function 'display-warning)
                    (lambda (_type message &rest _) (push message warnings))))
@@ -1344,7 +1344,7 @@ merely *contains* inline math) is left untouched."
   ;; equation after it keeps its number, and a label inside it resolves.
   (l2sf-tests--with-stub
     (l2sf-tests--md
-        (concat "\\begin{align}% renderer=skip\na \\label{a} \\\\\nb\n\\end{align}\n\n"
+        (concat "\\begin{align}% engine=skip\na \\label{a} \\\\\nb\n\\end{align}\n\n"
                 "\\begin{equation}\nc\n\\end{equation}\n\n"
                 "See $\\eqref{a}$.\n")
       (setq-local latex-to-svg-frontend-mode t)
@@ -1369,7 +1369,7 @@ merely *contains* inline math) is left untouched."
   (l2sf-tests--with-stub
     (l2sf-tests--md
         (concat "\\begin{equation}\na\n\\end{equation}\n\n"
-                "\\begin{equation}% renderer=skip\nb\n\\end{equation}\n")
+                "\\begin{equation}% engine=skip\nb\n\\end{equation}\n")
       (setq-local latex-to-svg-frontend-mode t)
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (goto-char (point-min))
@@ -1381,27 +1381,27 @@ merely *contains* inline math) is left untouched."
                      '(1 . 1))))))
 
 (ert-deftest l2sf-cookie-overrides-option-for-numbering ()
-  ;; The `\setcounter'-or-`\tag' choice follows the equation's renderer: a
+  ;; The `\setcounter'-or-`\tag' choice follows the equation's engine: a
   ;; `latex' cookie under a global `ratex' gets `\setcounter', and the reverse
   ;; gets `\tag'.
   (l2sf-tests--with-stub
-    (l2sf-tests--md "\\begin{equation}% renderer=latex\nx\n\\end{equation}\n"
-      (let ((latex-to-svg-frontend-renderer 'ratex))
+    (l2sf-tests--md "\\begin{equation}% engine=latex\nx\n\\end{equation}\n"
+      (let ((latex-to-svg-frontend-engine 'ratex))
         (latex-to-svg-frontend--render-region (point-min) (point-max)))
       (should (string-prefix-p "\\setcounter{equation}{0}%"
                                (car (l2sf-tests--values))))
-      (should (eq (plist-get l2sf-tests--last-args :renderer) 'latex))))
+      (should (eq (plist-get l2sf-tests--last-args :engine) 'latex))))
   (l2sf-tests--with-stub
-    (l2sf-tests--md "\\begin{equation}% renderer=ratex\nx\n\\end{equation}\n"
+    (l2sf-tests--md "\\begin{equation}% engine=ratex\nx\n\\end{equation}\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (should (equal (l2sf-tests--values)
-                     '("\\begin{equation}% renderer=ratex\nx\n\\tag{1}\\end{equation}")))
-      (should (eq (plist-get l2sf-tests--last-args :renderer) 'ratex)))))
+                     '("\\begin{equation}% engine=ratex\nx\n\\tag{1}\\end{equation}")))
+      (should (eq (plist-get l2sf-tests--last-args :engine) 'ratex)))))
 
 (ert-deftest l2sf-cookie-removed-then-rendered ()
   ;; Editing the cookie of a skipped equation away and leaving it renders it.
   (l2sf-tests--with-stub
-    (l2sf-tests--md "\\[% renderer=skip\nx\\]\n\nafter\n"
+    (l2sf-tests--md "\\[% engine=skip\nx\\]\n\nafter\n"
       (setq-local latex-to-svg-frontend-mode t)
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (should-not l2sf-tests--calls)
@@ -1410,7 +1410,7 @@ merely *contains* inline math) is left untouched."
       (replace-match "latex")
       (goto-char (point-max))
       (latex-to-svg-frontend--heal-modified)
-      (should (equal l2sf-tests--calls '(("\\[% renderer=latex\nx\\]" . latex))))
+      (should (equal l2sf-tests--calls '(("\\[% engine=latex\nx\\]" . latex))))
       (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
                   'fake-image)))))
 
@@ -1513,7 +1513,7 @@ merely *contains* inline math) is left untouched."
   ;; environment names -- so a project can set them in `.dir-locals.el'
   ;; without a prompt.  The mode hook is the exception, and stays one: a
   ;; file-local hook is arbitrary code.  (What is executed and what LaTeX is
-  ;; compiled belongs to the engine, which keeps those options unsafe.)
+  ;; compiled belongs to the backend, which keeps those options unsafe.)
   (let (unsafe)
     (mapatoms
      (lambda (sym)
@@ -1523,9 +1523,9 @@ merely *contains* inline math) is left untouched."
          (push sym unsafe))))
     (should (equal unsafe '(latex-to-svg-frontend-mode-hook)))))
 
-(ert-deftest l2sf-padding-safe-matches-the-engine ()
+(ert-deftest l2sf-padding-safe-matches-the-backend ()
   ;; A file-local padding is hand-written Lisp, so the `:safe' predicate
-  ;; accepts every shape the engine takes (1-4 numbers) and nothing else --
+  ;; accepts every shape the backend takes (1-4 numbers) and nothing else --
   ;; a value Customize cannot express must still not need a y/n prompt.
   (let ((safe (get 'latex-to-svg-frontend-padding 'safe-local-variable)))
     (should safe)
@@ -1539,7 +1539,7 @@ merely *contains* inline math) is left untouched."
     (should (get v 'safe-local-variable))))
 
 (ert-deftest l2sf-passes-color-background-padding ()
-  ;; The three appearance defcustoms are threaded to the engine as
+  ;; The three appearance defcustoms are threaded to the backend as
   ;; :color / :background / :padding (both on first render and on refresh).
   (l2sf-tests--with-stub
     (let ((latex-to-svg-frontend-foreground-color "red")

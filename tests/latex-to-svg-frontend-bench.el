@@ -20,7 +20,7 @@
 ;;   - scan-numbering : label/offset table build
 ;;   - reconcile      : end-to-end `--reconcile' (no overlays => no compile)
 ;;
-;; No engine calls: we install the exclude-function and set the mode flags
+;; No backend calls: we install the exclude-function and set the mode flags
 ;; by hand and never render, so nothing hits `latex-to-svg-backend'.
 
 (require 'latex-to-svg-frontend)
@@ -156,7 +156,7 @@ E_%d = m c^2 + \\sum_{k=0}^{%d} k
 
 (defun l2sf-bench-leave (&optional sizes reps)
   "Benchmark the cursor-leave reconcile: incremental vs full, across SIZES.
-Stubs the engine (instant dummy image) so overlays exist without a compile,
+Stubs the backend (instant dummy image) so overlays exist without a compile,
 renders the whole buffer, then times a full `--reconcile' against
 `--reconcile-from' for an in-place edit near the TOP (no count change, so
 the incremental pass early-exits) and near the BOTTOM."

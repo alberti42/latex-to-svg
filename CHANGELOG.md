@@ -13,28 +13,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `latex-to-svg-frontend-renderer` chooses the program that typesets the
+- `latex-to-svg-frontend-engine` chooses the program that typesets the
   previews: `latex` (the default: `latex` + `dvisvgm`) or `ratex` (RaTeX's
-  `render-svg`). It is passed to the backend as `:renderer` with every call,
+  `render-svg`). It is passed to the backend as `:engine` with every call,
   and is safe as a file- or directory-local variable. With `ratex`, a
   numbered environment gets its numbers as a `\tag{N}` on each numbered row
   instead of a `\setcounter` prefix, and every `\label` is removed from what
   RaTeX receives; `\eqref` / `\ref` resolve as before. Environments RaTeX
   does not have (`multline`, `eqnarray`, `flalign`, …) fail to compile with
-  the backend's warning. With `latex`, the value sent to the engine is
+  the backend's warning. With `latex`, the value sent to the backend is
   unchanged, so no cached equation is recompiled. Requires the backend's
-  `:renderer` argument.
-- A cookie at the top of a display equation chooses its renderer:
-  `% renderer=latex` (alias `tex`), `% renderer=ratex`, or
-  `% renderer=skip` (alias `none`) to leave the source as text. It stands on
+  `:engine` argument.
+- A cookie at the top of a display equation chooses its engine:
+  `% engine=latex` (alias `tex`), `% engine=ratex`, or
+  `% engine=skip` (alias `none`) to leave the source as text. It stands on
   the opener line or alone on the line after it, optionally written
-  `% latex-to-svg: renderer=…`. A skipped equation still takes its numbers.
-  An unknown key or value, or a renderer whose programs are not found, warns
-  and leaves the source visible. The cookie is passed to the engine with the
+  `% latex-to-svg: engine=…`. A skipped equation still takes its numbers.
+  An unknown key or value, or an engine whose programs are not found, warns
+  and leaves the source visible. The cookie is passed to the backend with the
   rest of the source.
 - Tests: a drift guard over the release metadata — the three `Version:` headers
   must agree, and the newest dated `CHANGELOG.md` section must not claim a
   version the sources have not reached.
+
+### Changed
+
+- In the documentation, "engine" now names the program that typesets an
+  equation, LaTeX or RaTeX, and "backend" names `latex-to-svg-backend`. The
+  released versions' entries below use "engine" for the backend, as they were
+  written.
 
 ## [0.16.2] - 2026-09-18
 

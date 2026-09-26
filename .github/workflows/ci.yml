@@ -3,13 +3,13 @@
 #
 # The three packages in this repository (`latex-to-svg-frontend' and its
 # `latex-to-svg-for-org' / `latex-to-svg-for-markdown' adaptors) all load
-# the engine, `latex-to-svg-backend'.  package.el installs it from MELPA,
-# which is where a user gets it too, so an engine change that breaks this
+# the backend, `latex-to-svg-backend'.  package.el installs it from MELPA,
+# which is where a user gets it too, so a backend change that breaks this
 # front-end shows up here rather than in a user's report.  Every later step
 # calls `package-initialize' to put it on the load-path.  (On the `ratex'
-# branch the engine is a checkout instead, passed with `-L': see its step.)
+# branch the backend is a checkout instead, passed with `-L': see its step.)
 #
-# The suite stubs the engine and detects math with a regexp scanner, so it
+# The suite stubs the backend and detects math with a regexp scanner, so it
 # needs no TeX toolchain, no graphical display and no tree-sitter grammar;
 # the one test that needs a Markdown major mode skips itself without one.
 #
@@ -48,11 +48,11 @@ jobs:
       - name: Report version
         run: emacs --version | head -1
 
-      # On the `ratex' branch only: the front-end passes `:renderer', which
-      # the engine on MELPA (0.9.0) does not accept, so the engine is checked
+      # On the `ratex' branch only: the front-end passes `:engine', which
+      # the backend on MELPA (0.9.0) does not accept, so the backend is checked
       # out at its own `ratex' branch instead of installed from MELPA.
-      # Restore the MELPA install once the engine is released with it.
-      - name: Check out the engine at its ratex branch
+      # Restore the MELPA install once the backend is released with it.
+      - name: Check out the backend at its ratex branch
         uses: actions/checkout@v4
         with:
           repository: alberti42/latex-to-svg-backend

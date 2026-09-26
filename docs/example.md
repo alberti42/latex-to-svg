@@ -3,7 +3,7 @@
 Open this file and turn the previews on with `M-x
 latex-to-svg-for-markdown-mode` (or add `(add-hook 'markdown-ts-mode-hook
 #'latex-to-svg-for-markdown-mode)` to your init). It needs the
-[latex-to-svg-backend](https://github.com/alberti42/latex-to-svg-backend) engine
+[latex-to-svg-backend](https://github.com/alberti42/latex-to-svg-backend) package
 on your `load-path`, plus `latex` and `dvisvgm`.
 
 While the mode is on, `C-c C-x C-l` (`latex-to-svg-frontend`) toggles the

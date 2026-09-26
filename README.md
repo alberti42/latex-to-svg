@@ -10,9 +10,9 @@
 The two MELPA badges are the core, `latex-to-svg-frontend`; the adaptors get
 their own once they are on MELPA.
 
-SVG LaTeX-math previews for Emacs markup buffers, on top of the
-[`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-rendering engine.
+SVG LaTeX-math previews for Emacs markup buffers, on top of
+[`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend),
+the backend that compiles LaTeX to SVG.
 
 This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 
@@ -25,17 +25,17 @@ This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 ```
   latex-to-svg-for-markdown ─┐
                              ├─▶ latex-to-svg-frontend ─▶ latex-to-svg-backend
-  latex-to-svg-for-org ──────┘        (this repo)              (engine)
+  latex-to-svg-for-org ──────┘        (this repo)             (backend)
 ```
 
 You install an **adaptor**; it pulls in the frontend core and the backend
-engine as dependencies.
+as dependencies.
 
 ![`docs/example.md` in `markdown-ts-mode`: rendered display equations, per-line equation numbers, click-to-jump `\ref`/`\eqref` links, and reveal-on-cursor showing the `\label` source at point.](Screenshot.png)
 
 ## Why
 
-The engine compiles each unique equation **once** (content-addressed on disk),
+The backend compiles each unique equation **once** (content-addressed on disk),
 **color-independent** (`dvisvgm --currentcolor`, tinted at display) and
 **size-independent** (scaled at display to the buffer font). So the previews do
 what a browser/pandoc pipeline can't:
@@ -57,16 +57,16 @@ what a browser/pandoc pipeline can't:
   treated as the LaTeX syntax they are. Prose emphasis outside math is
   untouched; toggle with `latex-to-svg-frontend-suppress-emphasis`.
 
-The engine cache is shared across every front-end (Org, Markdown,
+The backend cache is shared across every front-end (Org, Markdown,
 `agent-shell-math-renderer`), so an equation compiles once across all of them.
 
 ## Related packages
 
 This repo is one layer of a three-part stack, and one of two front-ends built
-on the same engine:
+on the same backend:
 
 - [**`latex-to-svg-backend`**](https://github.com/alberti42/latex-to-svg-backend)
-  — the rendering engine: one LaTeX string in, one image out, with the
+  — the backend: one LaTeX string in, one image out, with the
   content-addressed on-disk cache, `--currentcolor` tinting, display scaling and
   the compile-metadata sidecar that numbering reads.
 - **`latex-to-svg`** (this repo) — the markup front-end: detection, overlays,
@@ -75,7 +75,7 @@ on the same engine:
 - [**`agent-shell-math-renderer`**](https://github.com/alberti42/agent-shell-math-renderer)
   — the sibling front-end, rendering math in
   [`agent-shell`](https://github.com/xenodium/agent-shell)'s streamed markdown
-  output. Same engine, same cache: an equation that appears both in your Org
+  output. Same backend, same cache: an equation that appears both in your Org
   notes and in an agent's reply compiles only once.
 
 Several other Emacs packages preview LaTeX math — the built-in Org
@@ -83,7 +83,7 @@ Several other Emacs packages preview LaTeX math — the built-in Org
 `preview-latex`, `texfrag`, `org-latex-impatient`, `org-xlatex`,
 `latex-math-preview`. A **detailed comparison** of how they render, what they
 are tied to, and which of them recolor from cache or support numbering and
-cross-references lives in the engine's README, under
+cross-references lives in the backend's README, under
 [Related packages](https://github.com/alberti42/latex-to-svg-backend#related-packages)
 — rather than repeat it here.
 
@@ -124,23 +124,23 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
   exclusion exact; without it a regexp fallback handles fenced and indented
   blocks).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.9.0+ (the engine) — the floor is set by the display-time `:color` /
+  0.9.0+ (the backend) — the floor is set by the display-time `:color` /
   `:background` / `:padding` overrides (per-side padding needs 0.9.0) behind
   `latex-to-svg-frontend-foreground-color`, `-background-color` and
   `-padding`, and by `:font-height`, which lets the front-end measure
   the buffer font against the frame that actually displays it instead of the
-  engine guessing.
+  backend guessing.
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution), or RaTeX's
-  `render-svg` for the `ratex` renderer (see [Renderer](#renderer)).
+  `render-svg` for the `ratex` engine (see [Engine](#engine)).
 
 ## Installation
 
 The stack has three layers:
 
 - **[`latex-to-svg-backend`](https://melpa.org/#/latex-to-svg-backend)** — the
-  LaTeX → SVG compile engine. It is on MELPA and is pulled in automatically
-  through the `Package-Requires` header, so the recipes below do not install
-  it. (`straight` resolves it from its bundled MELPA recipes; run `M-x
+  backend, which compiles LaTeX to SVG. It is on MELPA and is pulled in
+  automatically through the `Package-Requires` header, so the recipes below do
+  not install it. (`straight` resolves it from its bundled MELPA recipes; run `M-x
   straight-pull-recipe-repositories` if yours predates its addition.)
 - **`latex-to-svg-frontend`** — the shared preview core (detection, overlays,
   numbering, refresh), markup-agnostic.
@@ -229,9 +229,9 @@ differ:
 (add-hook 'markdown-ts-mode-hook #'my/latex-to-svg-markdown-setup)
 ```
 
-### Renderer
+### Engine
 
-`latex-to-svg-frontend-renderer` chooses the program that typesets the
+`latex-to-svg-frontend-engine` chooses the program that typesets the
 previews:
 
 | Value | Program | Typesets |
@@ -242,16 +242,16 @@ previews:
 The choice is passed to the backend with each equation. Where the programs
 are is a backend setting (`latex-to-svg-backend-latex-program`,
 `latex-to-svg-backend-ratex-program`); the backend README's
-[Renderers](https://github.com/alberti42/latex-to-svg-backend#renderers)
+[Engines](https://github.com/alberti42/latex-to-svg-backend#engines)
 section covers installing RaTeX and what changes with it. The option is safe
 as a file- or directory-local variable, so a project can choose RaTeX in its
 `.dir-locals.el`:
 
 ```elisp
-((nil . ((latex-to-svg-frontend-renderer . ratex))))
+((nil . ((latex-to-svg-frontend-engine . ratex))))
 ```
 
-Each renderer has its own cache entries. After changing the option, run
+Each engine has its own cache entries. After changing the option, run
 `C-u C-c C-x C-l` to re-render the buffer.
 
 What works with `ratex`:
@@ -263,32 +263,32 @@ What works with `ratex`:
 - **Environments:** `equation`, `align`, `alignat`, `gather`, and their starred
   forms. `multline`, `eqnarray`, `flalign` and the other environments RaTeX
   does not have fail to compile: the backend warns with a link to RaTeX's
-  output, and the source stays visible. A `% renderer=latex` cookie sends one
+  output, and the source stays visible. A `% engine=latex` cookie sends one
   such equation to LaTeX (see below).
 - **An `\eqref` or `\ref` inside an equation fails** (`a = b \text{ by }
   \eqref{x}`). A reference in the prose is drawn as buffer text and works.
 
-#### Choosing the renderer for one equation
+#### Choosing the engine for one equation
 
-A LaTeX comment at the top of a display equation chooses its renderer, or
+A LaTeX comment at the top of a display equation chooses its engine, or
 leaves it unrendered:
 
 ```latex
 \[
-% renderer=skip
+% engine=skip
 x=1
 \]
 
-\begin{align}% latex-to-svg: renderer=ratex
+\begin{align}% latex-to-svg: engine=ratex
 a &= b
 \end{align}
 ```
 
 | Cookie | Effect |
 |--------|--------|
-| `renderer=latex`, alias `renderer=tex` | this equation uses the LaTeX renderer |
-| `renderer=ratex` | this equation uses the RaTeX renderer |
-| `renderer=skip`, alias `renderer=none` | no preview: the source stays as text |
+| `engine=latex`, alias `engine=tex` | this equation uses the LaTeX engine |
+| `engine=ratex` | this equation uses the RaTeX engine |
+| `engine=skip`, alias `engine=none` | no preview: the source stays as text |
 
 - **Where:** a `%` comment before any math, either on the opener line
   (after an environment's arguments, if any) or on its own line right after
@@ -297,11 +297,11 @@ a &= b
   blanks allowed around each part.
 - **Display math only.** A `%` inside `$…$` comments out the closing `$`, so an
   inline equation cannot carry a cookie.
-- **An unknown key or value** (`renderer=katex`) warns and leaves the source
-  visible. So does a cookie naming a renderer whose programs are not found.
+- **An unknown key or value** (`engine=katex`) warns and leaves the source
+  visible. So does a cookie naming an engine whose programs are not found.
 - **A skipped equation still takes its numbers**, as in the exported document,
   so the equations after it keep theirs, and a `\label` in it still resolves.
-- The cookie stays in what the engine receives; both renderers treat it as a
+- The cookie stays in what the backend receives; both engines treat it as a
   comment.
 
 ### Colors and box
@@ -371,7 +371,7 @@ any environment). It defaults to the standalone math environments —
 `displaymath`, `math`, `subequations`, and the `breqn` / `empheq` displays —
 matched ignoring a trailing `*`, so `equation` covers `equation*` too.
 
-Two things follow from the engine compiling each preview's source **verbatim**
+Two things follow from the backend compiling each preview's source **verbatim**
 in a `standalone` document:
 
 - Nothing is wrapped in `\[…\]`. An environment renders as whatever it
@@ -436,7 +436,7 @@ they never show a stale number. See [`docs/numbering.md`](docs/numbering.md).
 Two principles keep previews responsive on large documents:
 
 1. **LaTeX runs in the background.** Emacs never waits for a compile. The
-   engine hands back a cached picture *instantly* if it has one; if not, it
+   backend hands back a cached picture *instantly* if it has one; if not, it
    returns nothing, draws the picture in the background, and drops it in when
    ready. So even renumbering a hundred equations starts those pictures drawing
    in the background and hands control straight back to you — no freeze.
@@ -491,10 +491,10 @@ Pull requests adding adaptors for other major modes are welcome.
 
 - **`\tag`-based references and `subequations` sub-lettering** aren't modelled
   (see [`docs/numbering.md`](docs/numbering.md)).
-- **With the `ratex` renderer, numbers come from the front-end's row count
+- **With the `ratex` engine, numbers come from the front-end's row count
   alone.** Where that count is wrong (a `\\` inside `\substack`, for one),
   the preview numbers differently from the exported document; the `latex`
-  renderer corrects such a count from what LaTeX reports.
+  engine corrects such a count from what LaTeX reports.
 
 ## Tests
 
@@ -503,7 +503,7 @@ emacs -batch -l ert -L . -L ../latex-to-svg-backend \
       -l tests/latex-to-svg-frontend-tests.el -f ert-run-tests-batch-and-exit
 ```
 
-The engine is stubbed and detection is a regexp scanner, so the suite needs no
+The backend is stubbed and detection is a regexp scanner, so the suite needs no
 TeX toolchain, no graphical display, and (bar one guarded fenced-code test) no
 tree-sitter grammar. Point `LATEX_TO_SVG_DIR` at a `latex-to-svg-backend`
 checkout if it isn't a sibling directory.
