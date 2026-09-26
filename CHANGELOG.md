@@ -30,8 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the opener line or alone on the line after it, optionally written
   `% latex-to-svg: engine=…`. A skipped equation still takes its numbers.
   An unknown key or value, or an engine whose programs are not found, warns
-  and leaves the source visible. The cookie is passed to the backend with the
-  rest of the source.
+  and leaves the source visible. The cookie is removed from what the backend
+  receives, so a cookie that selects the engine an equation would get anyway
+  shares the cached picture of the same equation written without it.
 - `latex-to-svg-frontend-fallback` (default `t`): an equation whose engine
   is not `latex` and rejects it, such as one using siunitx's `\SI` under
   RaTeX, is typeset with LaTeX instead, passed to the backend as

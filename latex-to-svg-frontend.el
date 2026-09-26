@@ -1375,29 +1375,53 @@ checked by `latex-to-svg-frontend--cookie'.")
     ("skip" . skip) ("none" . skip))
   "The values of a `engine=' cookie, and what each one selects.")
 
-(defun latex-to-svg-frontend--cookie (source)
-  "Return the cookie of display math SOURCE as (KEY . VALUE), or nil.
+(defun latex-to-svg-frontend--cookie-bounds (source)
+  "Return the cookie of display math SOURCE as (KEY VALUE BEG END), or nil.
 A cookie is a `%' comment before any math: on the opener line, with only
 blanks (and an environment's arguments) between the opener and the `%',
 or alone on the line right after a blank opener line.  A `%' comment
-further down is an ordinary comment."
+further down is an ordinary comment.
+
+BEG..END is the text of SOURCE that removing the cookie deletes: on the
+opener line, from after the opener to the end of the line, keeping the
+newline; on its own line, that line and its newline.  Either way SOURCE
+without it is what it would be had the cookie never been written."
   (let ((case-fold-search nil)
         (cookie (concat "\\`[ \t]*" latex-to-svg-frontend--cookie-regexp)))
     (when (string-match latex-to-svg-frontend--cookie-opener-regexp source)
       (let* ((start (match-end 0))
              (eol (or (string-search "\n" source start) (length source)))
              (line (substring source start eol))
-             (next (and (< eol (length source))
-                        (substring source (1+ eol)
-                                   (or (string-search "\n" source (1+ eol))
-                                       (length source))))))
+             (next-eol (and (< eol (length source))
+                            (or (string-search "\n" source (1+ eol))
+                                (length source))))
+             (next (and next-eol (substring source (1+ eol) next-eol))))
         (cond
          ((string-match cookie line)
-          (cons (match-string 1 line) (match-string 2 line)))
+          (list (match-string 1 line) (match-string 2 line) start eol))
          ((and next
                (string-match-p "\\`[ \t]*\\'" line)
                (string-match cookie next))
-          (cons (match-string 1 next) (match-string 2 next))))))))
+          (list (match-string 1 next) (match-string 2 next)
+                (1+ eol) (min (1+ next-eol) (length source)))))))))
+
+(defun latex-to-svg-frontend--cookie (source)
+  "Return the cookie of display math SOURCE as (KEY . VALUE), or nil.
+See `latex-to-svg-frontend--cookie-bounds' for where a cookie may stand."
+  (when-let* ((bounds (latex-to-svg-frontend--cookie-bounds source)))
+    (cons (nth 0 bounds) (nth 1 bounds))))
+
+(defun latex-to-svg-frontend--remove-cookie (source)
+  "Return SOURCE without its cookie, or SOURCE when it has none.
+The cookie is an instruction to this package, not LaTeX, so it is not
+sent to the backend: an equation with a cookie that selects the engine
+it would get anyway shares the cache entry of the same equation written
+without one.  See `latex-to-svg-frontend--cookie-bounds'."
+  (if-let* (((latex-to-svg-frontend--display-p source))
+            (bounds (latex-to-svg-frontend--cookie-bounds source)))
+      (concat (substring source 0 (nth 2 bounds))
+              (substring source (nth 3 bounds)))
+    source))
 
 (defun latex-to-svg-frontend--missing-tools-message (engine)
   "Return the warning for a cookie requesting ENGINE, whose programs are missing."
@@ -1441,17 +1465,19 @@ are not found.  For `skip' and a string, nothing is sent to the backend."
 (defun latex-to-svg-frontend--backend-value (k source engine)
   "Return the string handed to the backend for SOURCE, numbered from K.
 ENGINE is the engine that typesets it.  K is the counter before SOURCE;
-nil means SOURCE is not numbered.  For `latex', a numbered SOURCE gets
-`--setcounter-value' and any other SOURCE is passed verbatim.  For
+nil means SOURCE is not numbered.  The cookie, if any, is removed first
+\(see `--remove-cookie').  For `latex', a numbered SOURCE then gets
+`--setcounter-value' and any other SOURCE is passed as it is.  For
 `ratex', a numbered SOURCE gets `--tagged-value', and every `\\label' is
 removed, because RaTeX has no `\\label'.  The overlay keeps SOURCE, so
 the label map, built from the source, still sees the labels."
-  (if (eq engine 'ratex)
-      (replace-regexp-in-string
-       "\\\\label{[^}]*}" ""
-       (if k (latex-to-svg-frontend--tagged-value k source) source)
-       t t)
-    (if k (latex-to-svg-frontend--setcounter-value k source) source)))
+  (let ((source (latex-to-svg-frontend--remove-cookie source)))
+    (if (eq engine 'ratex)
+        (replace-regexp-in-string
+         "\\\\label{[^}]*}" ""
+         (if k (latex-to-svg-frontend--tagged-value k source) source)
+         t t)
+      (if k (latex-to-svg-frontend--setcounter-value k source) source))))
 
 (defun latex-to-svg-frontend--numbered-value (el source table)
   "Return the exact string handed to the backend for EL: SOURCE, numbered.

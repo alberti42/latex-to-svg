@@ -1307,13 +1307,32 @@ merely *contains* inline math) is left untouched."
                         "$x % engine=ratex$"))
         (should (eq (latex-to-svg-frontend--engine-for source) 'latex))))))
 
-(ert-deftest l2sf-cookie-value-passed-verbatim ()
-  ;; The backend receives the cookie with the rest of the source, and the
-  ;; cookie's engine as `:engine'.
+(ert-deftest l2sf-cookie-removed-from-value ()
+  ;; The backend receives the source without the cookie, and the cookie's
+  ;; engine as `:engine'.  The tooltip still shows the source as written.
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\[% engine=ratex\nx\\]\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (should (equal l2sf-tests--calls '(("\\[% engine=ratex\nx\\]" . ratex)))))))
+      (should (equal l2sf-tests--calls '(("\\[\nx\\]" . ratex))))
+      (should (equal (substitute-command-keys
+                      (overlay-get (car (l2sf-tests--overlays)) 'help-echo))
+                     "Typeset with RaTeX: \\[% engine=ratex\nx\\]")))))
+
+(ert-deftest l2sf-cookie-shares-cache-entry ()
+  ;; A cookie that selects the engine the equation would get anyway leaves
+  ;; the string sent to the backend unchanged, so it shares the cache entry
+  ;; of the same equation written without one.  On its own line, the cookie
+  ;; goes with its newline; on the opener line, the newline stays.
+  (should (equal (latex-to-svg-frontend--backend-value
+                  nil "\\[\n% engine=ratex\nE=mc^2\n\\]" 'ratex)
+                 "\\[\nE=mc^2\n\\]"))
+  (should (equal (latex-to-svg-frontend--backend-value
+                  nil "\\begin{align*}% latex-to-svg: engine=ratex\na &= b\n\\end{align*}" 'ratex)
+                 "\\begin{align*}\na &= b\n\\end{align*}"))
+  ;; A comment further down is not a cookie and stays.
+  (should (equal (latex-to-svg-frontend--backend-value
+                  nil "\\begin{align*}\na \\\\% engine=latex\n\\end{align*}" 'ratex)
+                 "\\begin{align*}\na \\\\% engine=latex\n\\end{align*}")))
 
 (ert-deftest l2sf-cookie-skip-leaves-source ()
   ;; `skip' and `none' send nothing to the backend; the source stays as text.
@@ -1407,7 +1426,7 @@ merely *contains* inline math) is left untouched."
     (l2sf-tests--md "\\begin{equation}% engine=ratex\nx\n\\end{equation}\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (should (equal (l2sf-tests--values)
-                     '("\\begin{equation}% engine=ratex\nx\n\\tag{1}\\end{equation}")))
+                     '("\\begin{equation}\nx\n\\tag{1}\\end{equation}")))
       (should (eq (plist-get l2sf-tests--last-args :engine) 'ratex)))))
 
 (ert-deftest l2sf-cookie-removed-then-rendered ()
@@ -1422,7 +1441,7 @@ merely *contains* inline math) is left untouched."
       (replace-match "latex")
       (goto-char (point-max))
       (latex-to-svg-frontend--heal-modified)
-      (should (equal l2sf-tests--calls '(("\\[% engine=latex\nx\\]" . latex))))
+      (should (equal l2sf-tests--calls '(("\\[\nx\\]" . latex))))
       (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
                   'fake-image)))))
 

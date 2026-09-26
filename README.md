@@ -341,8 +341,10 @@ a &= b
 - **Mixing engines mixes styles.** An equation a cookie sends to the other
   engine is typeset in that engine's style, so a document can show LaTeX's
   Computer Modern next to RaTeX's KaTeX fonts.
-- The cookie stays in what the backend receives; both engines treat it as a
-  comment.
+- **The cookie is not sent to the backend.** The front-end removes it before
+  the equation is compiled and hashed, so a cookie that selects the engine an
+  equation would get anyway shares the cached picture of the same equation
+  written without it. Hovering still shows the source with its cookie.
 
 ### Colors and box
 
