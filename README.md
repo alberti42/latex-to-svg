@@ -197,6 +197,11 @@ With the mode on, all math renders when the buffer opens. See
 [`docs/example.md`](docs/example.md) / [`docs/example.org`](docs/example.org)
 for ready-to-open demos.
 
+In Org, `latex-to-svg-for-org-mode` turns off Org's own LaTeX preview while it
+is on: `org-latex-preview` (`C-c C-x C-l`, or whatever key runs it) only says
+so. Org's preview would draw its own images over these, with no numbering, no
+reveal on cursor and a separate cache. To use Org's preview, turn the mode off.
+
 - `M-x latex-to-svg-frontend-clear` — clear previews (region or buffer).
 - `M-x latex-to-svg-frontend-refresh` — bring the current buffer's previews up
   to date: render equations that have none (except the one the cursor is in),

@@ -859,6 +859,20 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend))
       (should (equal (l2sf-tests--values) '("$a$"))))))
 
+(ert-deftest l2sf-org-mode-remaps-org-latex-preview ()
+  ;; In an Org buffer with the mode on, `org-latex-preview' is remapped to a
+  ;; message, whatever key runs it; with the mode off, Org's own command is
+  ;; back.  The Markdown adaptor remaps nothing.
+  (l2sf-tests--with-stub
+    (with-temp-buffer
+      (org-mode)
+      (latex-to-svg-for-org-mode 1)
+      (should (eq (command-remapping 'org-latex-preview)
+                  #'latex-to-svg-for-org-preview-disabled))
+      (latex-to-svg-for-org-mode -1)
+      (should-not (command-remapping 'org-latex-preview))))
+  (should-not (assq 'latex-to-svg-for-markdown-mode minor-mode-map-alist)))
+
 (ert-deftest l2sf-mode-binds-no-key ()
   ;; The core mode binds no key, so it shadows none of the markup mode's own
   ;; (`markdown-mode' binds C-c C-x C-l).

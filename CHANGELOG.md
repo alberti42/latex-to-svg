@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fallback engine's picture and the record of the engine's failure, so the
   engine is tried again. Requires the backend's `:fallback`, `:quiet` and
   `latex-to-svg-backend-engine-used`.
+- Org: while `latex-to-svg-for-org-mode` is on, `org-latex-preview` is
+  remapped to `latex-to-svg-for-org-preview-disabled`, which says that Org's
+  preview is off and that turning the mode off brings it back. Org's preview
+  would draw its own images over this package's. The remap lives in the Org
+  adaptor's own keymap, so it applies whatever key runs `org-latex-preview`,
+  only in Org buffers with the mode on.
 - Tests: a drift guard over the release metadata — the three `Version:` headers
   must agree, and the newest dated `CHANGELOG.md` section must not claim a
   version the sources have not reached.

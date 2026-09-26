@@ -111,14 +111,37 @@ the buffer's `latex-to-svg-frontend-exclude-function'."
                      regions))))
     regions))
 
+(defun latex-to-svg-for-org-preview-disabled ()
+  "Say that Org's LaTeX preview is off while `latex-to-svg-for-org-mode' is on.
+The mode remaps `org-latex-preview' to this command, whatever key runs
+it: Org's preview would draw its own images over this package's, with no
+numbering, no reveal on cursor and a separate cache.  To use Org's
+preview, turn `latex-to-svg-for-org-mode' off."
+  (interactive)
+  (message "Org's LaTeX preview is off while `latex-to-svg-for-org-mode' \
+is on; turn that mode off to use it"))
+
+(defvar latex-to-svg-for-org-mode-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [remap org-latex-preview]
+                #'latex-to-svg-for-org-preview-disabled)
+    map)
+  "Keymap for `latex-to-svg-for-org-mode'.
+It only remaps `org-latex-preview' (see
+`latex-to-svg-for-org-preview-disabled'), and is active only in Org
+buffers where the mode is on.")
+
 ;;;###autoload
 (define-minor-mode latex-to-svg-for-org-mode
   "Preview Org LaTeX math as SVG images (a `latex-to-svg-frontend' adaptor).
 
 Installs the Org code/comment exclusions and `org-fold-show-context' as
 the jump-reveal, then turns on `latex-to-svg-frontend-mode', which does
-the rendering.  Enable it from `org-mode-hook'."
+the rendering.  Enable it from `org-mode-hook'.  While it is on,
+`org-latex-preview' only says that it is off (see
+`latex-to-svg-for-org-preview-disabled')."
   :lighter nil
+  :keymap latex-to-svg-for-org-mode-map
   (if latex-to-svg-for-org-mode
       (if (derived-mode-p 'org-mode)
           (progn
