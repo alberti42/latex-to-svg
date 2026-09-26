@@ -43,6 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   released versions' entries below use "engine" for the backend, as they were
   written.
 
+### Fixed
+
+- Hovering over a preview shows its LaTeX source as written. Emacs passes a
+  `help-echo` string through `substitute-command-keys`, which read `\[` as a
+  key reference and `\{` as a keymap, so `\[E=mc^2\]` showed as
+  "M-x, E=mc^2, \"; the source is now quoted with `\=`. The same quoting
+  fixes four docstrings that `C-h` showed with "M-x" in place of `\[…\]`.
+
 ## [0.16.2] - 2026-09-18
 
 ### Added

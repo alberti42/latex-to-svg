@@ -166,7 +166,7 @@ prefix argument to apply in every buffer at once)."
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-display-rescale 1.0
-  "Size multiplier for display math previews (`\\[…\\]', `$$…$$', environments).
+  "Size multiplier for display math previews (`\\=\\[…\\=\\]', `$$…$$', environments).
 Applied on top of the backend's global `latex-to-svg-font-scale' via
 `latex-to-svg-backend's `:rescale-by' — e.g. set to 1.1 for display equations a
 touch larger than inline.  Re-scales from cache (no recompile); after
@@ -301,7 +301,7 @@ off: a doubled `$$' is unlikely to occur by accident in prose."
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-detect-bracket-display t
-  "Whether to detect display LaTeX bracket math `\\[…\\]'."
+  "Whether to detect display LaTeX bracket math `\\=\\[…\\=\\]'."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
@@ -329,7 +329,7 @@ environment that must sit inside a display (`cases', `matrix', `pmatrix',
 *inside* a detected span, which is why they are absent from the default.
 
 Whether the environment then typesets as math is up to the environment
-itself; nothing here wraps the source in `\\[…\\]'.  The whole family can be
+itself; nothing here wraps the source in `\\=\\[…\\=\\]'.  The whole family can be
 switched off with `latex-to-svg-frontend-detect-environments'.
 
 An environment opener is also only recognised when nothing but whitespace
@@ -432,7 +432,7 @@ property of raw math source by `latex-to-svg-frontend--suppress-emphasis'.")
   "Math element types rendered as equations.")
 
 (defun latex-to-svg-frontend--display-p (source)
-  "Non-nil when math SOURCE is display (environment, `\\[…\\]', or `$$…$$').
+  "Non-nil when math SOURCE is display (environment, `\\=\\[…\\=\\]', or `$$…$$').
 Inline `$…$' / `\\(…\\)' return nil."
   (let ((s (string-trim-left source)))
     (or (string-prefix-p "\\begin" s)
@@ -827,6 +827,16 @@ by a leftover stretch."
   "Delete this package's preview overlays intersecting BEG..END."
   (mapc #'delete-overlay (latex-to-svg-frontend--overlays-in beg end)))
 
+(defun latex-to-svg-frontend--help-echo-text (latex)
+  "Return LATEX quoted so that `help-echo' shows it as written.
+Emacs passes a `help-echo' string through `substitute-command-keys'
+before showing it, which reads `\\=\\[' as the start of a key reference,
+`\\=\\{' as a keymap, and turns quotes into curved ones: `\\=\\[x=1\\=\\]'
+would show as the key binding of a command named \"x=1\\\".  A `\\=\\='
+before each backslash, backquote and apostrophe makes
+`substitute-command-keys' copy it literally."
+  (replace-regexp-in-string "[\\`']" "\\\\=\\&" latex))
+
 (defun latex-to-svg-frontend--set-overlay (beg end value image &optional source enums-fallback display-p engine)
   "Overlay BEG..END (positions or markers) with IMAGE, keyed to render VALUE.
 VALUE is the exact string handed to the backend (a numbered environment
@@ -848,7 +858,8 @@ existing preview overlay in the span."
         ;; renumbered from itself, without re-scanning buffer text.
         (overlay-put ov 'latex-to-svg-frontend-source (or source value))
         (overlay-put ov 'evaporate t)
-        (overlay-put ov 'help-echo (or source value))
+        (overlay-put ov 'help-echo
+                     (latex-to-svg-frontend--help-echo-text (or source value)))
         ;; Keep markup font-lock (Org emphasis, ...) from drawing a
         ;; strike-through / underline across the rendered image.
         (overlay-put ov 'face latex-to-svg-frontend--neutralize-face)

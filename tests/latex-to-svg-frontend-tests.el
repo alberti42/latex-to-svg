@@ -1056,13 +1056,20 @@ merely *contains* inline math) is left untouched."
                                  (nth 2 values)))))))
 
 (ert-deftest l2sf-help-echo-is-plain-source ()
+  ;; Emacs shows a `help-echo' string after `substitute-command-keys', so
+  ;; that is what the user reads: the source as written, with no
+  ;; `\setcounter' prefix.  Unquoted, `\[' would start a key reference and
+  ;; `\[E=mc^2\]' would read "M-x E=mc^2\".
   (l2sf-tests--with-stub
-    (l2sf-tests--md "\\begin{equation}\nx\n\\end{equation}\n"
-      (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (let ((ov (car (l2sf-tests--overlays))))
-        (should (equal (overlay-get ov 'help-echo)
-                       "\\begin{equation}\nx\n\\end{equation}"))
-        (should-not (string-match-p "setcounter" (overlay-get ov 'help-echo)))))))
+    (dolist (source '("\\begin{equation}\nx\n\\end{equation}"
+                      "\\[\nE=mc^2\n\\]"
+                      "$\\{ x \\}$"
+                      "$f`(x)$"))
+      (l2sf-tests--md (concat source "\n")
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((ov (car (l2sf-tests--overlays))))
+          (should (equal (substitute-command-keys (overlay-get ov 'help-echo))
+                         source)))))))
 
 (ert-deftest l2sf-numbering-can-be-disabled ()
   (l2sf-tests--with-stub
