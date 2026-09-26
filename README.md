@@ -206,9 +206,12 @@ reveal on cursor and a separate cache. To use Org's preview, turn the mode off.
 - `M-x latex-to-svg-frontend-refresh` — bring the current buffer's previews up
   to date: render equations that have none (except the one the cursor is in),
   render again those whose engine changed, and redraw the rest from cache for
-  the current theme, font, colors and size. Run it after changing an option.
-  (Redrawing also happens on its own on theme, buffer-display and zoom
-  changes.)
+  the current theme, font, colors and size. You rarely need it: setting an
+  option of this package (with `setq`, `setq-local` or Customize) updates the
+  previews on its own — every buffer for a global value, one buffer for a
+  buffer-local one — and redrawing happens on its own on theme,
+  buffer-display and zoom changes. Run it after a change those cannot see,
+  such as a backend option (`latex-to-svg-backend-font-scale`).
   - With a prefix argument (`C-u M-x latex-to-svg-frontend-refresh`), it does
     this in **every** buffer with previews — useful after changing a global
     setting such as `latex-to-svg-frontend-foreground-color`.
@@ -258,9 +261,8 @@ as a file- or directory-local variable, so a project can choose RaTeX in its
 ((nil . ((latex-to-svg-frontend-engine . ratex))))
 ```
 
-Each engine has its own cache entries. After changing the option, run
-`M-x latex-to-svg-frontend-refresh`, which renders again the equations the
-change affects.
+Each engine has its own cache entries. Setting the option renders again the
+equations it affects, on its own.
 
 What works with `ratex`:
 
@@ -358,15 +360,14 @@ a &= b
 
 By default previews use the buffer foreground (so they track your theme) on a
 transparent background. You can override any of three appearance options — they
-apply instantly from cache (no recompiling); after changing one, run `C-u M-x
-latex-to-svg-frontend-refresh` (the prefix argument covers every preview
-buffer, not just the current one):
+apply from cache (no recompiling), and setting one updates the previews on its
+own:
 
 | Option | Default | Description |
 |--------|---------|-------------|
 | `latex-to-svg-frontend-foreground-color` | `nil` | Fixed ink color; `nil` follows the buffer foreground (tracks the theme). |
 | `latex-to-svg-frontend-background-color` | `nil` | Box color behind previews; `nil` is transparent. A very light gray reads best (e.g. `gray97` / `#f7f7f7`). |
-| `latex-to-svg-frontend-center-display-math` | `nil` | Center display-math previews in the window (inline math is never centered). A display-time indent — redisplay re-centers on resize, split or font change; run `C-u M-x latex-to-svg-frontend-refresh` after changing the option itself. |
+| `latex-to-svg-frontend-center-display-math` | `nil` | Center display-math previews in the window (inline math is never centered). A display-time indent — redisplay re-centers on resize, split or font change, and setting the option updates the previews on its own. |
 | `latex-to-svg-frontend-padding` | `nil` | Padding (pt) between the equation and the box edge. A number applies to all four sides; a list of four numbers pads each side separately — `(TOP RIGHT BOTTOM LEFT)`, so `(0 0 0 6)` is a left gutter. `nil`/`0` crops to the ink. |
 
 ### Refreshing on appearance changes

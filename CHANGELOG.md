@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   fallback engine's picture and the record of the engine's failure, so the
   engine is tried again. Requires the backend's `:fallback`, `:quiet` and
   `latex-to-svg-backend-engine-used`.
+- Setting an option that affects the previews (`-engine`, `-fallback`,
+  `-foreground-color`, `-background-color`, `-padding`, `-inline-rescale`,
+  `-display-rescale`, `-center-display-math`) with `setq`, `setq-local` or
+  Customize updates the previews on its own, through a variable watcher: a
+  global value updates every buffer with previews, a buffer-local one that
+  buffer. A let-binding updates nothing. Before, each needed
+  `latex-to-svg-frontend-refresh`.
 - Org: while `latex-to-svg-for-org-mode` is on, `org-latex-preview` is
   remapped to `latex-to-svg-for-org-preview-disabled`, which says that Org's
   preview is off and that turning the mode off brings it back. Org's preview

@@ -102,9 +102,9 @@ programs are is set in the backend (see
 
 Passed to `latex-to-svg-backend' as `:engine'.  Each engine has its
 own cache entries, so switching back and forth does not recompile an
-equation already compiled by both.  After changing it, run
-`latex-to-svg-frontend-refresh', which renders again the equations it
-affects (with a prefix argument, in every buffer at once).
+equation already compiled by both.  Setting it with `setq',
+`setq-local' or Customize updates the previews on its own: the
+equations it affects are rendered again.
 
 With `ratex', a numbered environment gets its numbers as a `\\tag{N}' on
 each numbered row instead of a `\\setcounter' prefix, and every `\\label'
@@ -135,9 +135,8 @@ Two consequences: a fallback equation is typeset in LaTeX's style
 shows which engine typeset it.  The fallback needs `latex' and
 `dvisvgm'; without them the backend warns, and you either install them
 or set this option to nil.  When nil, an equation the engine rejects
-keeps its source as text.  After changing it, run
-`latex-to-svg-frontend-refresh' (with a prefix argument, in every buffer
-at once)."
+keeps its source as text.  Setting it with `setq', `setq-local' or
+Customize updates the previews on its own."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
@@ -197,9 +196,9 @@ full pass.  Set to nil to force the full scan everywhere."
 (defcustom latex-to-svg-frontend-inline-rescale 1.0
   "Size multiplier for inline math previews (`$…$', `\\(…\\)').
 Applied on top of the backend's global `latex-to-svg-backend-font-scale' via
-`latex-to-svg-backend's `:rescale-by'.  Re-scales from cache (no recompile);
-after changing it, run `latex-to-svg-frontend-refresh' to apply (with a
-prefix argument to apply in every buffer at once)."
+`latex-to-svg-backend's `:rescale-by'.  Re-scales from cache (no
+recompile).  Setting it with `setq', `setq-local' or Customize updates
+the previews on its own."
   :type 'number
   :safe #'numberp
   :group 'latex-to-svg-frontend)
@@ -208,9 +207,9 @@ prefix argument to apply in every buffer at once)."
   "Size multiplier for display math previews (`\\=\\[…\\=\\]', `$$…$$', environments).
 Applied on top of the backend's global `latex-to-svg-backend-font-scale' via
 `latex-to-svg-backend's `:rescale-by' — e.g. set to 1.1 for display equations a
-touch larger than inline.  Re-scales from cache (no recompile); after
-changing it, run `latex-to-svg-frontend-refresh' to apply (with a prefix
-argument to apply in every buffer at once)."
+touch larger than inline.  Re-scales from cache (no recompile).  Setting
+it with `setq', `setq-local' or Customize updates the previews on its
+own."
   :type 'number
   :safe #'numberp
   :group 'latex-to-svg-frontend)
@@ -223,9 +222,9 @@ the theme (see `latex-to-svg-backend-foreground-color').  Set to a
 color — a `#rrggbb' string or any name `color-name-to-rgb'
 understands (e.g. \"black\", \"#1a1a1a\") — to tint every preview
 with that fixed color regardless of theme.  Passed to
-`latex-to-svg-backend' as `:color'; re-tints from cache (no recompile),
-so run `latex-to-svg-frontend-refresh' after changing it (with a prefix
-argument to apply in every buffer at once)."
+`latex-to-svg-backend' as `:color'; re-tints from cache (no recompile).
+Setting it with `setq', `setq-local' or Customize updates the previews
+on its own."
   :type '(choice (const :tag "Follow buffer foreground" nil)
                  (color :tag "Fixed color"))
   :safe (lambda (v) (or (null v) (stringp v)))
@@ -240,8 +239,8 @@ buffer.  Set to a color — a `#rrggbb' string or any name
 preview.  A very light gray reads best (e.g. \"gray97\" / \"#f7f7f7\");
 keep it subtle so it doesn't fight the buffer background.  Passed to
 `latex-to-svg-backend' as `:background'; re-boxes from cache (no
-recompile), so run `latex-to-svg-frontend-refresh' after changing it (with
-a prefix argument to apply in every buffer at once)."
+recompile).  Setting it with `setq', `setq-local' or Customize updates
+the previews on its own."
   :type '(choice (const :tag "Transparent" nil)
                  (color :tag "Box color"))
   :safe (lambda (v) (or (null v) (stringp v)))
@@ -271,8 +270,8 @@ but an asymmetric one still shifts the equation within its own image
 \(a left-only pad indents it).
 
 Passed to `latex-to-svg-backend' as `:padding'; applies from cache (no
-recompile), so run `latex-to-svg-frontend-refresh' after changing it
-\(with a prefix argument to apply in every buffer at once)."
+recompile).  Setting it with `setq', `setq-local' or Customize updates
+the previews on its own."
   :type '(choice (const :tag "None" nil)
                  (number :tag "All four sides (pt)")
                  (list :tag "Per side (pt)"
@@ -299,9 +298,8 @@ preview keeps its own size and any `latex-to-svg-frontend-padding' box,
 and a space before it stretches to put its center on the window's
 center.  The stretch is computed by redisplay, so it follows a window
 resize, a split, a font change or `display-line-numbers-mode' on its
-own -- no refresh needed for those.  After changing this option, though, run
-`latex-to-svg-frontend-refresh' to apply it to previews already on
-screen (with a prefix argument, in every buffer at once).
+own -- no refresh needed for those.  Setting the option itself with
+`setq', `setq-local' or Customize updates the previews on its own.
 
 An equation wider than the window, or one that does not start its own
 line, simply stays where it is: the space cannot pull it left."
@@ -1895,7 +1893,10 @@ point; one whose engine or fallback no longer matches the options
 \(`latex-to-svg-frontend-engine', `latex-to-svg-frontend-fallback') is
 rendered again; every other preview is redrawn from the cache for the
 current theme, font, colors and size.  Numbers and references are then
-reconciled.  Run it after changing an option.
+reconciled.  This package's own options do this on their own when set
+\(see `latex-to-svg-frontend--watched-options'); run it after a change
+they cannot see, such as a backend option (`latex-to-svg-backend-font-scale',
+`latex-to-svg-backend-preamble').
 
 With ARG non-nil (interactively, one prefix argument), do this in every
 buffer with previews -- for a global change, such as setting
@@ -1956,6 +1957,58 @@ fallback than the options now give it (see `--engine-for' and
              el (or table (setq table (latex-to-svg-frontend--maybe-table)))))))
       (latex-to-svg-frontend--refresh-buffer buffer)
       (latex-to-svg-frontend--reconcile buffer))))
+
+;;;; Updating after an option changes
+
+(defconst latex-to-svg-frontend--watched-options
+  '(latex-to-svg-frontend-engine
+    latex-to-svg-frontend-fallback
+    latex-to-svg-frontend-foreground-color
+    latex-to-svg-frontend-background-color
+    latex-to-svg-frontend-padding
+    latex-to-svg-frontend-inline-rescale
+    latex-to-svg-frontend-display-rescale
+    latex-to-svg-frontend-center-display-math)
+  "Options whose change updates the previews on its own.
+Each has a variable watcher (`latex-to-svg-frontend--option-changed').")
+
+(defvar latex-to-svg-frontend--option-timer nil
+  "Timer of the pending update after an option changed, or nil.")
+
+(defvar latex-to-svg-frontend--option-buffers nil
+  "Buffers to update after an option changed: a list, or t for all.")
+
+(defun latex-to-svg-frontend--option-changed (_symbol _newval operation where)
+  "Schedule the update after one of `--watched-options' changed.
+A variable watcher: OPERATION is how it changed and WHERE the buffer
+whose local value changed, or nil for the default value.  A change of
+the default value (`setq' of a global value, `setq-default', Customize)
+updates every buffer with previews; a buffer-local one (`setq-local',
+`.dir-locals.el') updates that buffer.  A let-binding updates nothing.
+The watcher runs before the value is set, so the update runs from a
+timer, which also takes several changes in one go (a block of `setq's
+in an init file)."
+  (when (eq operation 'set)
+    (setq latex-to-svg-frontend--option-buffers
+          (if (or (null where) (eq latex-to-svg-frontend--option-buffers t))
+              t
+            (cl-adjoin where latex-to-svg-frontend--option-buffers)))
+    (unless (timerp latex-to-svg-frontend--option-timer)
+      (setq latex-to-svg-frontend--option-timer
+            (run-at-time 0 nil #'latex-to-svg-frontend--update-after-option)))))
+
+(defun latex-to-svg-frontend--update-after-option ()
+  "Update the buffers `--option-changed' collected (see `--update-buffer')."
+  (let ((buffers latex-to-svg-frontend--option-buffers))
+    (setq latex-to-svg-frontend--option-buffers nil
+          latex-to-svg-frontend--option-timer nil)
+    (dolist (buf (if (eq buffers t) (buffer-list) buffers))
+      (when (and (buffer-live-p buf)
+                 (buffer-local-value 'latex-to-svg-frontend-mode buf))
+        (latex-to-svg-frontend--update-buffer buf)))))
+
+(dolist (option latex-to-svg-frontend--watched-options)
+  (add-variable-watcher option #'latex-to-svg-frontend--option-changed))
 
 (defun latex-to-svg-frontend--present-p ()
   "Return non-nil if the current buffer has preview overlays."
@@ -2178,8 +2231,9 @@ This is the shared core; normally you enable it through a per-markup
 adaptor mode (e.g. `latex-to-svg-for-markdown-mode') that first installs
 the buffer-local protocol (`latex-to-svg-frontend-exclude-function' etc.).
 When enabled, all detected math is rendered, and math typed, pasted or
-edited later is rendered as it arrives; disabling clears it.  After
-changing an option, run `latex-to-svg-frontend-refresh'."
+edited later is rendered as it arrives; disabling clears it.  Setting
+an option of this package updates the previews on its own (see
+`latex-to-svg-frontend--watched-options')."
   :lighter " L2S"
   :keymap latex-to-svg-frontend-mode-map
   (if latex-to-svg-frontend-mode

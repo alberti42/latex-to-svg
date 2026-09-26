@@ -934,6 +934,35 @@ merely *contains* inline math) is left untouched."
                                         'ratex))
                         (l2sf-tests--overlays))))))
 
+(ert-deftest l2sf-option-watcher-updates-buffers ()
+  ;; Setting a watched option updates the previews on its own: a buffer-local
+  ;; value updates that buffer, a default value every buffer, and a
+  ;; let-binding nothing.  The update runs from a timer; run it here directly.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text\n\n$a$\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (unwind-protect
+          (progn
+            (setq-local latex-to-svg-frontend-engine 'ratex)
+            (should (equal latex-to-svg-frontend--option-buffers
+                           (list (current-buffer))))
+            (should (timerp latex-to-svg-frontend--option-timer))
+            (latex-to-svg-frontend--update-after-option)
+            (should (eq (overlay-get (car (l2sf-tests--overlays))
+                                     'latex-to-svg-frontend-engine)
+                        'ratex))
+            (should-not latex-to-svg-frontend--option-buffers)
+            (let ((latex-to-svg-frontend-foreground-color nil))
+              (should-not latex-to-svg-frontend--option-buffers)
+              ;; `setq' of a variable with no local value sets its default.
+              (setq latex-to-svg-frontend-foreground-color "red")
+              (should (eq latex-to-svg-frontend--option-buffers t))))
+        (when (timerp latex-to-svg-frontend--option-timer)
+          (cancel-timer latex-to-svg-frontend--option-timer))
+        (setq latex-to-svg-frontend--option-timer nil
+              latex-to-svg-frontend--option-buffers nil)))))
+
 (ert-deftest l2sf-appearance-refresh-only-redraws ()
   ;; The automatic refresh after a theme or zoom change only redraws what is
   ;; on screen: it renders no new equation.
