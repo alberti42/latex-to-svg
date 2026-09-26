@@ -237,6 +237,36 @@ differ:
 (add-hook 'markdown-ts-mode-hook #'my/latex-to-svg-markdown-setup)
 ```
 
+### Changing an option
+
+These options update the previews on their own when you set them, with `setq`,
+`setq-local`, `.dir-locals.el` or Customize:
+
+| Option | What is redone |
+|--------|----------------|
+| `latex-to-svg-frontend-engine` | the equations are typeset again with the new engine |
+| `latex-to-svg-frontend-fallback` | the equations RaTeX rejected are typeset again, or left as text |
+| `latex-to-svg-frontend-foreground-color`, `-background-color`, `-padding` | the pictures are redrawn from cache |
+| `latex-to-svg-frontend-inline-rescale`, `-display-rescale` | the pictures are redrawn from cache |
+| `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
+
+Where the change applies depends on how you make it:
+
+- **A global value** (`setq` of a variable with no buffer-local value,
+  `setq-default`, Customize) updates **every open buffer** with previews.
+- **A buffer-local value** (`setq-local`, `.dir-locals.el`) updates only that
+  buffer.
+- **A `let`-binding** updates nothing.
+
+Redrawing from cache is instant. A new engine typesets from cache every
+equation it has compiled before; the others compile, in about 6 ms each with
+RaTeX and about 300 ms each with LaTeX. So to try LaTeX on one troublesome
+document without re-typesetting everything else, set the engine buffer-locally
+in that buffer — `M-: (setq-local latex-to-svg-frontend-engine 'latex)` — or
+use a cookie for a single equation (see [Engine](#engine)).
+
+Other options apply to equations rendered afterwards.
+
 ### Engine
 
 `latex-to-svg-frontend-engine` chooses the program that typesets the
