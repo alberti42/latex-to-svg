@@ -89,7 +89,7 @@
   :prefix "latex-to-svg-frontend-")
 
 (defcustom latex-to-svg-frontend-engine 'latex
-  "Engine that typesets the previews: `latex' or `ratex'.
+  "Engine that typesets the previews: the symbol `latex' or `ratex'.
 
 `latex' runs `latex' and `dvisvgm': full LaTeX, with any package the
 backend's preamble loads.  `ratex' runs RaTeX's `render-svg': no TeX
