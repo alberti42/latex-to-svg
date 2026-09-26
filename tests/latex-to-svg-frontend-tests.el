@@ -846,35 +846,23 @@ merely *contains* inline math) is left untouched."
 
 ;;;; Command
 
-(ert-deftest l2sf-command-toggles-at-point ()
+(ert-deftest l2sf-old-command-runs-refresh ()
+  ;; `latex-to-svg-frontend' is an obsolete alias: it runs the refresh, which
+  ;; renders an equation with no preview.
+  (should (eq (indirect-function 'latex-to-svg-frontend)
+              (indirect-function 'latex-to-svg-frontend-refresh)))
+  (should (get 'latex-to-svg-frontend 'byte-obsolete-info))
   (l2sf-tests--with-stub
-    (l2sf-tests--md "$a$ text\n"
-      (goto-char (+ (point-min) 1))
-      (latex-to-svg-frontend)
-      (should (= 1 (length (l2sf-tests--overlays))))
-      (goto-char (+ (point-min) 1))
-      (latex-to-svg-frontend)
-      (should (null (l2sf-tests--overlays))))))
+    (l2sf-tests--md "text\n\n$a$\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (with-suppressed-warnings ((obsolete latex-to-svg-frontend))
+        (latex-to-svg-frontend))
+      (should (equal (l2sf-tests--values) '("$a$"))))))
 
-(ert-deftest l2sf-command-rerenders-with-prefix ()
-  (l2sf-tests--with-stub
-    (l2sf-tests--md "$a$ $b$\n"
-      (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (should (= 2 (length (l2sf-tests--overlays))))
-      (let ((l2sf-tests--image 'rebuilt))
-        (latex-to-svg-frontend '(4)))
-      (let ((ovs (l2sf-tests--overlays)))
-        (should (= 2 (length ovs)))
-        (should (cl-every (lambda (o) (eq (overlay-get o 'display) 'rebuilt)) ovs))))))
-
-(ert-deftest l2sf-command-regenerates-with-double-prefix ()
-  (l2sf-tests--with-stub
-    (l2sf-tests--md "$a$ \\[b\\]\n"
-      (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (latex-to-svg-frontend '(16))
-      (should (equal (sort (copy-sequence l2sf-tests--invalidated) #'string<)
-                     '("$a$" "\\[b\\]")))
-      (should (= 2 (length (l2sf-tests--overlays)))))))
+(ert-deftest l2sf-mode-binds-no-key ()
+  ;; The core mode binds no key, so it shadows none of the markup mode's own
+  ;; (`markdown-mode' binds C-c C-x C-l).
+  (should (null (cdr latex-to-svg-frontend-mode-map))))
 
 (ert-deftest l2sf-clear-command ()
   (l2sf-tests--with-stub

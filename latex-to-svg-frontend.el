@@ -812,10 +812,6 @@ enough to run on every command (see `--handle-cursor')."
                      (<= pos (latex-to-svg-frontend--math-end m))))
               (latex-to-svg-frontend--detect (car bounds) (cdr bounds)))))
 
-(defun latex-to-svg-frontend--context ()
-  "Return the math record at point, or nil."
-  (latex-to-svg-frontend--element-at (point)))
-
 (defun latex-to-svg-frontend--element-bounds (el)
   "Return (BEG . END) covering EL's source text."
   (cons (latex-to-svg-frontend--math-begin el)
@@ -1920,6 +1916,11 @@ installing a missing TeX package or upgrading RaTeX."
                    (list (or buffer (current-buffer)))))
       (latex-to-svg-frontend--update-buffer buf))))
 
+(define-obsolete-function-alias 'latex-to-svg-frontend
+  #'latex-to-svg-frontend-refresh "0.17.0"
+  "The mode renders the math, and `latex-to-svg-frontend-refresh' brings
+it up to date after an option changes.")
+
 (defun latex-to-svg-frontend--needs-render-p (el)
   "Non-nil when math element EL has to be rendered to be up to date.
 That is when it has no preview, or a preview made for another engine or
@@ -2110,49 +2111,10 @@ this for the whole buffer."
                "run `latex-to-svg-frontend-refresh' with two prefix arguments."
                "0.17.0")
 
-;;;###autoload
-(defun latex-to-svg-frontend (&optional arg)
-  "Preview LaTeX math as SVG images.
-
-With no prefix ARG: toggle the fragment at point; or, with an active
-region, render that region; or, failing both, render the whole buffer.
-
-With a `\\[universal-argument]' prefix, re-render the whole buffer (clear
-then render) — rebuilds overlays from cache, fixing a stale display.
-
-With a `\\[universal-argument] \\[universal-argument]' prefix, regenerate
-the whole buffer: a fresh recompile bypassing the cache (see
-`latex-to-svg-frontend-regenerate')."
-  (interactive "P")
-  (cond
-   ((equal arg '(16))
-    (latex-to-svg-frontend--regenerate (point-min) (point-max))
-    (message "Regenerated LaTeX previews"))
-   ((equal arg '(4))
-    (latex-to-svg-frontend--clear-region (point-min) (point-max))
-    (latex-to-svg-frontend--render-region (point-min) (point-max))
-    (message "Re-rendered LaTeX previews"))
-   ((use-region-p)
-    (latex-to-svg-frontend--render-region (region-beginning) (region-end))
-    (latex-to-svg-frontend--reconcile)
-    (deactivate-mark))
-   ((latex-to-svg-frontend--context)
-    (let* ((el (latex-to-svg-frontend--context))
-           (b (latex-to-svg-frontend--math-begin el))
-           (e (latex-to-svg-frontend--math-end el)))
-      (if (latex-to-svg-frontend--overlays-in b e)
-          (latex-to-svg-frontend--clear-region b e)
-        (latex-to-svg-frontend--render-element el)
-        (latex-to-svg-frontend--reconcile))))
-   (t
-    (latex-to-svg-frontend--render-region (point-min) (point-max))
-    (latex-to-svg-frontend--reconcile))))
-
-(defvar latex-to-svg-frontend-mode-map
-  (let ((map (make-sparse-keymap)))
-    (define-key map (kbd "C-c C-x C-l") #'latex-to-svg-frontend)
-    map)
-  "Keymap for `latex-to-svg-frontend-mode'.")
+(defvar latex-to-svg-frontend-mode-map (make-sparse-keymap)
+  "Keymap for `latex-to-svg-frontend-mode'.
+Empty: the mode binds no key, so it shadows no command of the markup's
+own mode, such as `markdown-toggle-url-hiding'.")
 
 ;;;###autoload
 ;;;; Emphasis suppression (font-lock)
@@ -2215,8 +2177,9 @@ not colour -- matters.)"
 This is the shared core; normally you enable it through a per-markup
 adaptor mode (e.g. `latex-to-svg-for-markdown-mode') that first installs
 the buffer-local protocol (`latex-to-svg-frontend-exclude-function' etc.).
-When enabled, all detected math is rendered; disabling clears it.  See
-`latex-to-svg-frontend' for the command bound to \\[latex-to-svg-frontend]."
+When enabled, all detected math is rendered, and math typed, pasted or
+edited later is rendered as it arrives; disabling clears it.  After
+changing an option, run `latex-to-svg-frontend-refresh'."
   :lighter " L2S"
   :keymap latex-to-svg-frontend-mode-map
   (if latex-to-svg-frontend-mode

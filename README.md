@@ -197,9 +197,6 @@ With the mode on, all math renders when the buffer opens. See
 [`docs/example.md`](docs/example.md) / [`docs/example.org`](docs/example.org)
 for ready-to-open demos.
 
-- `C-c C-x C-l` (`latex-to-svg-frontend`) — toggle the fragment at point; or
-  render the active region; or (failing both) the whole buffer. In Org this
-  shadows the classic `org-latex-preview` while the mode is on.
 - `M-x latex-to-svg-frontend-clear` — clear previews (region or buffer).
 - `M-x latex-to-svg-frontend-refresh` — bring the current buffer's previews up
   to date: render equations that have none (except the one the cursor is in),

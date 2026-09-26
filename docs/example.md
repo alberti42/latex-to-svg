@@ -6,11 +6,11 @@ latex-to-svg-for-markdown-mode` (or add `(add-hook 'markdown-ts-mode-hook
 [latex-to-svg-backend](https://github.com/alberti42/latex-to-svg-backend) package
 on your `load-path`, plus `latex` and `dvisvgm`.
 
-While the mode is on, `C-c C-x C-l` (`latex-to-svg-frontend`) toggles the
-fragment at point, renders the region, or — failing both — the whole buffer.
-`C-u C-c C-x C-l` re-renders from cache; `C-u C-u C-c C-x C-l` regenerates
-(recompiles). `M-x latex-to-svg-frontend-refresh` re-tints / re-scales for the
-current theme and font size straight from cache (no LaTeX).
+While the mode is on, math renders by itself: when the buffer opens, when the
+cursor leaves an equation, and a moment after a paste. After changing an
+option, `M-x latex-to-svg-frontend-refresh` brings the previews up to date;
+`C-u C-u M-x latex-to-svg-frontend-refresh` recompiles them, bypassing the
+cache.
 
 Three things to try as you read:
 

@@ -73,6 +73,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `latex-to-svg-frontend-regenerate`: run `latex-to-svg-frontend-refresh`
   with two prefix arguments.
+- The command `latex-to-svg-frontend` is an obsolete alias for
+  `latex-to-svg-frontend-refresh`. The mode renders math as it arrives, and
+  the refresh brings it up to date after an option changes, so its toggle at
+  point and its prefix arguments had no remaining use.
+
+### Removed
+
+- The `C-c C-x C-l` binding in `latex-to-svg-frontend-mode-map`, which is now
+  empty. It shadowed `markdown-toggle-url-hiding` in `markdown-mode`.
 
 ### Fixed
 

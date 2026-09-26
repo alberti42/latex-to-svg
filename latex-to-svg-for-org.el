@@ -117,8 +117,7 @@ the buffer's `latex-to-svg-frontend-exclude-function'."
 
 Installs the Org code/comment exclusions and `org-fold-show-context' as
 the jump-reveal, then turns on `latex-to-svg-frontend-mode', which does
-the rendering.  Enable it from `org-mode-hook'.  While on, its
-\\[latex-to-svg-frontend] shadows Org's classic `org-latex-preview'."
+the rendering.  Enable it from `org-mode-hook'."
   :lighter nil
   (if latex-to-svg-for-org-mode
       (if (derived-mode-p 'org-mode)
