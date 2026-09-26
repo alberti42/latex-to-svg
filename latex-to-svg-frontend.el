@@ -93,7 +93,9 @@
 
 `latex' runs `latex' and `dvisvgm': full LaTeX, with any package the
 backend's preamble loads.  `ratex' runs RaTeX's `render-svg': no TeX
-installation, for the math KaTeX supports and no packages.  Where the
+installation, for the math KaTeX supports and no packages.  An
+equation RaTeX cannot parse is typeset with LaTeX instead, or keeps its
+source as text when `latex-to-svg-frontend-fallback' is nil.  Where the
 programs are is set in the backend (see
 `latex-to-svg-backend-latex-program' and
 `latex-to-svg-backend-ratex-program').
@@ -121,8 +123,9 @@ a comment at its top: `% engine=latex', `% engine=ratex' or
 
 When non-nil and an equation's engine is not `latex' (the option
 `latex-to-svg-frontend-engine' or its cookie chose `ratex'), a formula
-that engine rejects, such as one using siunitx's `\\SI' or
-`\\DeclareMathOperator', is typeset with LaTeX instead: passed to
+that engine rejects, such as one using siunitx's `\\SI',
+`\\DeclareMathOperator' or an environment RaTeX lacks (`multline',
+`eqnarray', ...), is typeset with LaTeX instead: passed to
 `latex-to-svg-backend' as `:fallback'.  The backend records the failure,
 so a later request goes straight to the LaTeX picture in the cache.
 
@@ -179,7 +182,7 @@ any downstream preview whose number changed (see
   "When non-nil, renumber incrementally on a cursor-leave render.
 Leaving a just-typed or edited equation renumbers only from that equation
 downward, seeding the counter from the nearest preceding overlay and
-stopping as soon as numbers realign \=-- no whole-buffer scan (see
+stopping as soon as numbers realign -- no whole-buffer scan (see
 `latex-to-svg-frontend--reconcile-from').  The equation's own number is
 likewise computed from that preceding overlay rather than by a full scan.
 Falls back to a full `latex-to-svg-frontend--reconcile' on any structural
@@ -191,7 +194,7 @@ full pass.  Set to nil to force the full scan everywhere."
 
 (defcustom latex-to-svg-frontend-inline-rescale 1.0
   "Size multiplier for inline math previews (`$…$', `\\(…\\)').
-Applied on top of the backend's global `latex-to-svg-font-scale' via
+Applied on top of the backend's global `latex-to-svg-backend-font-scale' via
 `latex-to-svg-backend's `:rescale-by'.  Re-scales from cache (no recompile);
 after changing it, run `latex-to-svg-frontend-refresh' to apply (with a
 prefix argument to apply in every buffer at once)."
@@ -201,7 +204,7 @@ prefix argument to apply in every buffer at once)."
 
 (defcustom latex-to-svg-frontend-display-rescale 1.0
   "Size multiplier for display math previews (`\\=\\[…\\=\\]', `$$…$$', environments).
-Applied on top of the backend's global `latex-to-svg-font-scale' via
+Applied on top of the backend's global `latex-to-svg-backend-font-scale' via
 `latex-to-svg-backend's `:rescale-by' — e.g. set to 1.1 for display equations a
 touch larger than inline.  Re-scales from cache (no recompile); after
 changing it, run `latex-to-svg-frontend-refresh' to apply (with a prefix
@@ -292,10 +295,9 @@ belongs in the run of text.
 The indent is applied at display time, not baked into the image: the
 preview keeps its own size and any `latex-to-svg-frontend-padding' box,
 and a space before it stretches to put its center on the window's
-center.  The
-stretch is computed by redisplay, so it follows a window resize, a
-split, a font change or `display-line-numbers-mode' on its own -- no
-refresh needed for those.  After changing this option, though, run
+center.  The stretch is computed by redisplay, so it follows a window
+resize, a split, a font change or `display-line-numbers-mode' on its
+own -- no refresh needed for those.  After changing this option, though, run
 `latex-to-svg-frontend-refresh' to apply it to previews already on
 screen (with a prefix argument, in every buffer at once).
 
@@ -1755,7 +1757,7 @@ lies wholly inside the equation it just reconciled (`--maybe-cancel-reconcile').
 Called after a clean cursor-leave has reconciled the equation spanning
 BEG..END: if nothing changed outside it, the whole-buffer catch-up pass is
 moot.  When changes also happened elsewhere (e.g. a paste), the range is
-wider and the pass is kept \=-- the incremental leave cannot see undrawn
+wider and the pass is kept -- the incremental leave cannot see undrawn
 equations, so the full scan is still needed."
   (when (and latex-to-svg-frontend--dirty
              (>= (car latex-to-svg-frontend--dirty) beg)
@@ -1861,7 +1863,7 @@ option are on."
 (defun latex-to-svg-frontend-refresh (&optional buffer all)
   "Re-render previews in BUFFER (default current) for the current theme and font.
 With ALL non-nil (interactively, a prefix argument), re-render every
-buffer with previews instead \=-- for a global change no appearance check
+buffer with previews instead -- for a global change no appearance check
 can see, such as setting `latex-to-svg-frontend-foreground-color'."
   (interactive (list nil current-prefix-arg))
   (dolist (buf (if all

@@ -69,6 +69,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   key reference and `\{` as a keymap, so `\[E=mc^2\]` showed as
   "M-x, E=mc^2, \"; the source is now quoted with `\=`. The same quoting
   fixes four docstrings that `C-h` showed with "M-x" in place of `\[…\]`.
+- The docstrings of `latex-to-svg-frontend-inline-rescale` and
+  `-display-rescale` named `latex-to-svg-font-scale`, which does not exist;
+  the backend's option is `latex-to-svg-backend-font-scale`. Three docstrings
+  showed "=--" where "--" was meant.
 
 ## [0.16.2] - 2026-09-18
 
