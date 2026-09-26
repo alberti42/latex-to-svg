@@ -213,7 +213,9 @@ for ready-to-open demos.
 Move point into a preview to reveal its LaTeX source for editing; leaving
 re-shows the image, or re-renders if you changed the text. **Newly typed math
 renders the moment the cursor leaves it** — never while you're still inside, so
-half-typed equations aren't compiled.
+half-typed equations aren't compiled. Math you paste, yank or restore with an
+undo renders a moment later (`latex-to-svg-frontend-reconcile-idle`, 0.4 s),
+except an equation the cursor is in.
 
 ### Per-mode configuration
 
@@ -493,7 +495,7 @@ What happens, action by action:
 | **move the cursor out** of a *new or just-edited* equation | notices this by looking at **only the one paragraph around the cursor**; draws that equation (LaTeX in the background); then fixes the numbers of the equations **below** it by reading the previews' own ordered list, and stops as soon as the numbers line up again | grows with the number of equations *below* the edit; usually under a millisecond |
 | **move the cursor out** of an equation you did *not* change | just shows its picture again | none |
 | **edit without changing any equation's number** (fix a body, a label) | the number check below the edit lines up immediately and stops | ~instant |
-| **paste / undo / delete** equations, or stop typing without stepping out | a fraction of a second later, one left-to-right pass over the whole buffer catches what stepping out didn't | one pass over the buffer |
+| **paste / undo / delete** equations, or stop typing without stepping out | a fraction of a second later, one left-to-right pass over the whole buffer catches what stepping out didn't: it draws the equations that arrived without a picture in the changed range (not the one the cursor is in) and fixes the numbers | one pass over the buffer |
 | **open the buffer / render on request** | one pass over the buffer, then draw | one pass over the buffer |
 
 Stepping out of an equation — the everyday case — never re-reads the whole

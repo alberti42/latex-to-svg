@@ -1804,8 +1804,10 @@ the pending-change range.  No-op unless the mode and numbering are on."
   "Debounce a numbering reconcile of the current buffer (see `--reconcile').
 Hooked to `after-change-functions' (which passes BEG END _LEN) and also
 fired with no arguments when ground truth corrects a heuristic guess.  A
-backstop that re-renders any preview edited and left (`--heal-modified')
-and renumbers downstream; the initial render of newly typed math is handled
+backstop, run by `--debounced-pass': it re-renders any preview edited
+and left (`--heal-modified'), renders math that arrived with no preview
+\(a paste, a yank, an undo: `--render-undrawn'), and renumbers
+downstream; the initial render of newly typed math is handled
 event-driven, on cursor leave (`--render-on-leave'), not here.  Records the
 changed range so a clean leave can cancel this pass when it covered
 everything (`--maybe-cancel-reconcile').  No-op unless the mode and the idle
@@ -1823,13 +1825,40 @@ option are on."
       (setq latex-to-svg-frontend--reconcile-timer
             (run-with-idle-timer
              latex-to-svg-frontend-reconcile-idle nil
-             (lambda ()
-               (when (buffer-live-p buf)
-                 (with-current-buffer buf
-                   (setq latex-to-svg-frontend--reconcile-timer nil)
-                   (when (bound-and-true-p latex-to-svg-frontend-mode)
-                     (latex-to-svg-frontend--heal-modified))
-                   (latex-to-svg-frontend--reconcile buf)))))))))
+             #'latex-to-svg-frontend--debounced-pass buf)))))
+
+(defun latex-to-svg-frontend--debounced-pass (buffer)
+  "Run the debounced pass `--schedule-reconcile' armed for BUFFER.
+Re-render previews edited and left, render the math in the changed range
+that has no preview, then reconcile numbers and references."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (setq latex-to-svg-frontend--reconcile-timer nil)
+      ;; `--reconcile' clears the range, so take it first.
+      (let ((dirty latex-to-svg-frontend--dirty))
+        (when (bound-and-true-p latex-to-svg-frontend-mode)
+          (latex-to-svg-frontend--heal-modified)
+          (when dirty
+            (latex-to-svg-frontend--render-undrawn (car dirty) (cdr dirty)))))
+      (latex-to-svg-frontend--reconcile buffer))))
+
+(defun latex-to-svg-frontend--render-undrawn (beg end)
+  "Render the math overlapping BEG..END that has no preview.
+Math pasted, yanked or restored by an undo arrives with no preview, and
+`--render-on-leave' renders only math that point entered and left.  The
+equation containing point is skipped, as `--render-on-leave' skips it,
+so math still being typed is never compiled."
+  (let ((beg (max (point-min) beg))
+        (end (min (point-max) end))
+        (table nil))
+    (when (< beg end)
+      (dolist (el (latex-to-svg-frontend--elements beg end))
+        (let ((b (latex-to-svg-frontend--math-begin el))
+              (e (latex-to-svg-frontend--math-end el)))
+          (unless (or (<= b (point) e)
+                      (latex-to-svg-frontend--overlays-in b e))
+            (latex-to-svg-frontend--render-element
+             el (or table (setq table (latex-to-svg-frontend--maybe-table))))))))))
 
 ;;;; Refresh (theme / font tracking)
 

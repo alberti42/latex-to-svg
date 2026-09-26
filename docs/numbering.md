@@ -78,7 +78,9 @@ for edits that produce no clean cursor-leave (paste, undo, delete). After an
 ordinary type-then-leave, the incremental leave has already reconciled, so that
 pending pass is wasted work. But it cannot be cancelled blindly: the incremental
 walk only sees *drawn* equations, so an **undrawn** one (e.g. a pasted block)
-would be miscounted, and only the full scan catches it. So `--schedule-reconcile`
+would be miscounted, and only the full scan catches it. The same pass also draws
+such equations: `--debounced-pass` runs `--render-undrawn` over the dirty range
+before reconciling, skipping the equation that contains point. So `--schedule-reconcile`
 accumulates a **dirty range** (`--dirty`, the union of changed regions since the
 last full pass), and a clean leave cancels the pending pass only when that range
 lies wholly inside the equation it just reconciled (`--maybe-cancel-reconcile`).

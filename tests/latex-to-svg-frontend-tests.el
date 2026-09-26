@@ -1445,6 +1445,40 @@ merely *contains* inline math) is left untouched."
       (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
                   'fake-image)))))
 
+(ert-deftest l2sf-debounced-pass-renders-pasted-math ()
+  ;; Math that arrives with no preview (a paste, a yank, an undo) is rendered
+  ;; by the debounced pass over the changed range, except the equation that
+  ;; contains point, which may still be half typed.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text\n\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (goto-char (point-max))
+      (let ((beg (point)))
+        (insert "$a$\n\n$b$\n")
+        (latex-to-svg-frontend--mark-dirty beg (point)))
+      (goto-char (point-min))
+      (search-forward "$b")
+      (latex-to-svg-frontend--debounced-pass (current-buffer))
+      (should (equal (l2sf-tests--values) '("$a$")))
+      (should-not latex-to-svg-frontend--dirty)
+      ;; Once point is elsewhere, the next pass over the range renders $b$.
+      (goto-char (point-min))
+      (latex-to-svg-frontend--mark-dirty (point-min) (point-max))
+      (latex-to-svg-frontend--debounced-pass (current-buffer))
+      (should (equal (l2sf-tests--values) '("$a$" "$b$"))))))
+
+(ert-deftest l2sf-debounced-pass-keeps-drawn-previews ()
+  ;; A preview already on screen is not rendered again by the pass.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (setq l2sf-tests--calls nil)
+      (goto-char (point-max))
+      (latex-to-svg-frontend--mark-dirty (point-min) (point-max))
+      (latex-to-svg-frontend--debounced-pass (current-buffer))
+      (should-not l2sf-tests--calls))))
+
 ;;;; Fallback engine and quiet failures
 
 (ert-deftest l2sf-fallback-passed-for-ratex ()
