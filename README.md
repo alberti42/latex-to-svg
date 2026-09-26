@@ -261,12 +261,49 @@ What works with `ratex`:
   what RaTeX receives. The numbers come from the front-end's own count of
   rows (see [`docs/numbering.md`](docs/numbering.md)).
 - **Environments:** `equation`, `align`, `alignat`, `gather`, and their starred
-  forms. `multline`, `eqnarray`, `flalign` and the other environments RaTeX
-  does not have fail to compile: the backend warns with a link to RaTeX's
-  output, and the source stays visible. A `% engine=latex` cookie sends one
-  such equation to LaTeX (see below).
-- **An `\eqref` or `\ref` inside an equation fails** (`a = b \text{ by }
-  \eqref{x}`). A reference in the prose is drawn as buffer text and works.
+  forms. RaTeX does not have `multline`, `eqnarray`, `flalign` and the other
+  environments LaTeX offers; LaTeX typesets those instead (see the fallback
+  below), or a `% engine=latex` cookie sends one such equation to LaTeX.
+- **An `\eqref` or `\ref` inside an equation fails** in RaTeX (`a = b \text{
+  by } \eqref{x}`). A reference in the prose is drawn as buffer text and
+  works.
+
+Hovering over a preview shows which engine typeset it, then its source:
+"Typeset with RaTeX: \[ E=mc^2 \]".
+
+#### When RaTeX cannot typeset an equation
+
+RaTeX has no packages, so an equation using siunitx's `\SI`,
+`\DeclareMathOperator` or an environment RaTeX lacks fails there. With
+`latex-to-svg-frontend-fallback` on (the default), LaTeX typesets such an
+equation instead, and the backend records the failure, so the next time the
+LaTeX picture comes straight from the cache.
+
+- **The styles differ.** A fallback equation is typeset in LaTeX's style
+  (Computer Modern) next to RaTeX's (KaTeX's fonts). The tooltip of a
+  fallback equation says why: "Typeset with LaTeX (RaTeX could not parse
+  it): …", and the backend reports once per buffer how many equations fell
+  back.
+- **A fallback equation compiles in about 300 ms**, a RaTeX one in about
+  6 ms.
+- **The fallback needs `latex` and `dvisvgm`.** Without them the backend
+  warns once per session; install them, or set
+  `latex-to-svg-frontend-fallback` to nil. With the fallback off, an
+  equation RaTeX rejects keeps its source as text.
+
+#### Failed equations and warnings
+
+When no engine can typeset an equation, its source stays as text, and the
+backend warns once per equation per buffer, naming the buffer and linking to
+the log. The failure is recorded, so the equation is not compiled again:
+editing it, or changing the preamble or `latex-to-svg-backend-ratex-macros`,
+tries again. After a fix outside those (installing a missing TeX package,
+upgrading RaTeX), regenerate with `C-u C-u C-c C-x C-l`.
+
+To silence these warnings, set `latex-to-svg-frontend-quiet` to `t`. It is
+nil by default, and safe as a file- or directory-local variable, so it can be
+set for one kind of document in a mode hook or in `.dir-locals.el`.
+Configuration problems, such as a missing program, still warn.
 
 #### Choosing the engine for one equation
 
@@ -301,6 +338,9 @@ a &= b
   visible. So does a cookie naming an engine whose programs are not found.
 - **A skipped equation still takes its numbers**, as in the exported document,
   so the equations after it keep theirs, and a `\label` in it still resolves.
+- **Mixing engines mixes styles.** An equation a cookie sends to the other
+  engine is typeset in that engine's style, so a document can show LaTeX's
+  Computer Modern next to RaTeX's KaTeX fonts.
 - The cookie stays in what the backend receives; both engines treat it as a
   comment.
 

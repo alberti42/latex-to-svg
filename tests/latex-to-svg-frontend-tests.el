@@ -67,6 +67,7 @@
          (l2sf-tests--last-args nil)
          (l2sf-tests--calls nil)
          (l2sf-tests--missing-engines nil)
+         (l2sf-tests--engine-used nil)
          (latex-to-svg-backend-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
                 (lambda (latex &rest args)
@@ -74,6 +75,9 @@
                         l2sf-tests--last-args args)
                   (push (cons latex (plist-get args :engine)) l2sf-tests--calls)
                   l2sf-tests--image))
+               ((symbol-function 'latex-to-svg-backend-engine-used)
+                (lambda (_latex &optional engine _fallback)
+                  (or l2sf-tests--engine-used engine)))
                ((symbol-function 'latex-to-svg-backend-tools-available-p)
                 (lambda (&optional engine)
                   (not (memq engine l2sf-tests--missing-engines))))
@@ -1057,9 +1061,9 @@ merely *contains* inline math) is left untouched."
 
 (ert-deftest l2sf-help-echo-is-plain-source ()
   ;; Emacs shows a `help-echo' string after `substitute-command-keys', so
-  ;; that is what the user reads: the source as written, with no
-  ;; `\setcounter' prefix.  Unquoted, `\[' would start a key reference and
-  ;; `\[E=mc^2\]' would read "M-x E=mc^2\".
+  ;; that is what the user reads: the engine, then the source as written,
+  ;; with no `\setcounter' prefix.  Unquoted, `\[' would start a key
+  ;; reference and `\[E=mc^2\]' would read "M-x E=mc^2\".
   (l2sf-tests--with-stub
     (dolist (source '("\\begin{equation}\nx\n\\end{equation}"
                       "\\[\nE=mc^2\n\\]"
@@ -1069,7 +1073,7 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend--render-region (point-min) (point-max))
         (let ((ov (car (l2sf-tests--overlays))))
           (should (equal (substitute-command-keys (overlay-get ov 'help-echo))
-                         source)))))))
+                         (concat "Typeset with LaTeX: " source))))))))
 
 (ert-deftest l2sf-numbering-can-be-disabled ()
   (l2sf-tests--with-stub
@@ -1252,7 +1256,8 @@ merely *contains* inline math) is left untouched."
         (should (eq (overlay-get (car (l2sf-tests--overlays))
                                  'latex-to-svg-frontend-engine)
                     'ratex))
-        (latex-to-svg-frontend-regenerate)
+        (let ((latex-to-svg-frontend-fallback nil))
+          (latex-to-svg-frontend-regenerate))
         (should (equal l2sf-tests--invalidated-engines '(ratex))))
       (setq l2sf-tests--last-args nil)
       (let ((latex-to-svg-frontend-engine 'latex))
@@ -1420,6 +1425,86 @@ merely *contains* inline math) is left untouched."
       (should (equal l2sf-tests--calls '(("\\[% engine=latex\nx\\]" . latex))))
       (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
                   'fake-image)))))
+
+;;;; Fallback engine and quiet failures
+
+(ert-deftest l2sf-fallback-passed-for-ratex ()
+  ;; With the fallback on (the default), a RaTeX equation is sent with
+  ;; `:fallback latex'; a LaTeX one gets none, since LaTeX has nothing to
+  ;; fall back to.  With the option off, neither gets one.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[x\\]\n"
+      (let ((latex-to-svg-frontend-engine 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (eq (plist-get l2sf-tests--last-args :fallback) 'latex))
+        (should (eq (overlay-get (car (l2sf-tests--overlays))
+                                 'latex-to-svg-frontend-fallback)
+                    'latex)))
+      (let ((latex-to-svg-frontend-engine 'latex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should-not (plist-get l2sf-tests--last-args :fallback)))
+      (let ((latex-to-svg-frontend-engine 'ratex)
+            (latex-to-svg-frontend-fallback nil))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should-not (plist-get l2sf-tests--last-args :fallback))))))
+
+(ert-deftest l2sf-quiet-passed ()
+  ;; `:quiet' follows the option: nil by default, t when set, including in
+  ;; a refresh.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$x$\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should (memq :quiet l2sf-tests--last-args))
+      (should-not (plist-get l2sf-tests--last-args :quiet))
+      (setq-local latex-to-svg-frontend-quiet t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should (eq (plist-get l2sf-tests--last-args :quiet) t))
+      (setq l2sf-tests--last-args nil)
+      (latex-to-svg-frontend-refresh)
+      (should (eq (plist-get l2sf-tests--last-args :quiet) t)))))
+
+(ert-deftest l2sf-refresh-uses-recorded-fallback ()
+  ;; A refresh fetches the picture the overlay was rendered with: the same
+  ;; engine and fallback, even after the option changed.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[x\\]\n"
+      (let ((latex-to-svg-frontend-engine 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (setq l2sf-tests--last-args nil)
+      (let ((latex-to-svg-frontend-fallback nil))
+        (latex-to-svg-frontend-refresh))
+      (should (eq (plist-get l2sf-tests--last-args :engine) 'ratex))
+      (should (eq (plist-get l2sf-tests--last-args :fallback) 'latex)))))
+
+(ert-deftest l2sf-help-echo-names-engine ()
+  ;; The tooltip names the engine that typeset the picture; a fallback
+  ;; picture says which engine could not.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[x\\]\n"
+      (let ((latex-to-svg-frontend-engine 'ratex))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (equal (substitute-command-keys
+                        (overlay-get (car (l2sf-tests--overlays)) 'help-echo))
+                       "Typeset with RaTeX: \\[x\\]"))
+        (setq l2sf-tests--engine-used 'latex)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (equal (substitute-command-keys
+                        (overlay-get (car (l2sf-tests--overlays)) 'help-echo))
+                       "Typeset with LaTeX (RaTeX could not parse it): \\[x\\]"))))))
+
+(ert-deftest l2sf-regenerate-invalidates-fallback ()
+  ;; Regenerate deletes the engine's entry (and with it the failure
+  ;; record) and the fallback's, so both are compiled again.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[x\\]\n"
+      (let ((latex-to-svg-frontend-engine 'ratex))
+        (latex-to-svg-frontend-regenerate))
+      (should (equal l2sf-tests--invalidated-engines '(latex ratex)))
+      (setq l2sf-tests--invalidated-engines nil)
+      (let ((latex-to-svg-frontend-engine 'ratex)
+            (latex-to-svg-frontend-fallback nil))
+        (latex-to-svg-frontend-regenerate))
+      (should (equal l2sf-tests--invalidated-engines '(ratex))))))
 
 ;;;; Inline / display rescale
 

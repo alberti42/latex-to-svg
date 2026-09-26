@@ -116,6 +116,40 @@ a comment at its top: `% engine=latex', `% engine=ratex' or
   :safe (lambda (v) (memq v '(latex ratex)))
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-fallback t
+  "Whether LaTeX typesets an equation the chosen engine cannot.
+
+When non-nil and an equation's engine is not `latex' (the option
+`latex-to-svg-frontend-engine' or its cookie chose `ratex'), a formula
+that engine rejects, such as one using siunitx's `\\SI' or
+`\\DeclareMathOperator', is typeset with LaTeX instead: passed to
+`latex-to-svg-backend' as `:fallback'.  The backend records the failure,
+so a later request goes straight to the LaTeX picture in the cache.
+
+Two consequences: a fallback equation is typeset in LaTeX's style
+\(Computer Modern) next to RaTeX's (KaTeX's fonts), and it takes about
+300 ms to compile instead of about 6 ms.  Hovering over an equation
+shows which engine typeset it.  The fallback needs `latex' and
+`dvisvgm'; without them the backend warns, and you either install them
+or set this option to nil.  When nil, an equation the engine rejects
+keeps its source as text."
+  :type 'boolean
+  :safe #'booleanp
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-quiet nil
+  "Whether the backend stays silent about an equation it cannot typeset.
+
+When nil (the default), the backend warns once per equation per buffer
+about an equation it cannot typeset, naming the buffer and linking to
+the log.  When non-nil, it does not; the equation keeps its source as
+text.  Passed to `latex-to-svg-backend' as `:quiet'.  Configuration
+problems, such as missing programs, still warn.  Set it buffer-locally,
+in a mode hook or in `.dir-locals.el', to silence one kind of document."
+  :type 'boolean
+  :safe #'booleanp
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-number-equations t
   "Whether to compute and bake equation numbers into display-math previews.
 
@@ -837,15 +871,38 @@ before each backslash, backquote and apostrophe makes
 `substitute-command-keys' copy it literally."
   (replace-regexp-in-string "[\\`']" "\\\\=\\&" latex))
 
-(defun latex-to-svg-frontend--set-overlay (beg end value image &optional source enums-fallback display-p engine)
+(defun latex-to-svg-frontend--engine-name (engine)
+  "Return the name of ENGINE for display: \"LaTeX\" or \"RaTeX\"."
+  (if (eq engine 'ratex) "RaTeX" "LaTeX"))
+
+(defun latex-to-svg-frontend--help-echo (value source engine fallback)
+  "Return the `help-echo' of a preview of SOURCE, sent as VALUE.
+It names the engine that typeset the picture, then shows SOURCE:
+\"Typeset with RaTeX: SOURCE\".  ENGINE and FALLBACK are the ones VALUE
+was sent with; when the picture came from FALLBACK, because ENGINE
+could not typeset VALUE (see `latex-to-svg-backend-engine-used'), it
+says so: \"Typeset with LaTeX (RaTeX could not parse it): SOURCE\"."
+  (let* ((engine (or engine 'latex))
+         (used (or (latex-to-svg-backend-engine-used value engine fallback)
+                   engine)))
+    (concat (if (eq used engine)
+                (format "Typeset with %s"
+                        (latex-to-svg-frontend--engine-name used))
+              (format "Typeset with %s (%s could not parse it)"
+                      (latex-to-svg-frontend--engine-name used)
+                      (latex-to-svg-frontend--engine-name engine)))
+            ": "
+            (latex-to-svg-frontend--help-echo-text source))))
+
+(defun latex-to-svg-frontend--set-overlay (beg end value image &optional source enums-fallback display-p engine fallback)
   "Overlay BEG..END (positions or markers) with IMAGE, keyed to render VALUE.
 VALUE is the exact string handed to the backend (a numbered environment
 carries its `\\setcounter' prefix); SOURCE, if given, is the human-readable
 LaTeX shown in `help-echo'.  ENUMS-FALLBACK, when non-nil, marks this as a
 numbered equation and records its (INITIAL . FINAL) number range in
-`latex-to-svg-frontend-enums'.  ENGINE is the engine VALUE was sent
-to, recorded so a refresh fetches the same cache entry.  Replaces any
-existing preview overlay in the span."
+`latex-to-svg-frontend-enums'.  ENGINE and FALLBACK are the engine and
+fallback engine VALUE was sent with, recorded so a refresh fetches the
+same cache entry.  Replaces any existing preview overlay in the span."
   (let ((b (if (markerp beg) (marker-position beg) beg))
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
@@ -854,12 +911,14 @@ existing preview overlay in the span."
         (overlay-put ov 'latex-to-svg-frontend t)
         (overlay-put ov 'latex-to-svg-frontend-value value)
         (overlay-put ov 'latex-to-svg-frontend-engine engine)
+        (overlay-put ov 'latex-to-svg-frontend-fallback fallback)
         ;; Raw LaTeX (no `\setcounter' prefix) so a numbered overlay can be
         ;; renumbered from itself, without re-scanning buffer text.
         (overlay-put ov 'latex-to-svg-frontend-source (or source value))
         (overlay-put ov 'evaporate t)
         (overlay-put ov 'help-echo
-                     (latex-to-svg-frontend--help-echo-text (or source value)))
+                     (latex-to-svg-frontend--help-echo
+                      value (or source value) engine fallback))
         ;; Keep markup font-lock (Org emphasis, ...) from drawing a
         ;; strike-through / underline across the rendered image.
         (overlay-put ov 'face latex-to-svg-frontend--neutralize-face)
@@ -1404,19 +1463,29 @@ TABLE is a (OFFSETS . LABELS) scan."
 
 ;;;; Rendering
 
+(defun latex-to-svg-frontend--fallback-for (engine)
+  "Return the fallback engine for an equation typeset by ENGINE, or nil.
+That is `latex' when `latex-to-svg-frontend-fallback' is on and ENGINE is
+not already `latex'."
+  (and latex-to-svg-frontend-fallback
+       (not (memq engine '(nil latex)))
+       'latex))
+
 (defun latex-to-svg-frontend--place (buffer beg end value &optional source enums-fallback display-p engine)
   "Ensure BEG..END in BUFFER shows the current image for render VALUE.
 Overlays immediately on a cache hit, else schedules an async compile and
 overlays when it finishes.  BEG / END should be markers.  ENGINE is
-passed to the backend as `:engine' (nil means `latex').  Any other
-ENGINE (`skip', or a warning string: see `--engine-for') sends
+passed to the backend as `:engine' (nil means `latex'), with `:fallback'
+from `--fallback-for' and `:quiet' from `latex-to-svg-frontend-quiet'.
+Any other ENGINE (`skip', or a warning string: see `--engine-for') sends
 nothing to the backend and installs `--set-unrendered-overlay' instead."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (if (not (memq engine '(nil latex ratex)))
           (latex-to-svg-frontend--set-unrendered-overlay
            beg end source enums-fallback engine)
-      (let ((image (latex-to-svg-backend
+      (let* ((fallback (latex-to-svg-frontend--fallback-for engine))
+             (image (latex-to-svg-backend
                     value
                     :rescale-by (latex-to-svg-frontend--rescale-for display-p)
                     :color latex-to-svg-frontend-foreground-color
@@ -1425,13 +1494,16 @@ nothing to the backend and installs `--set-unrendered-overlay' instead."
                     :font-height (latex-to-svg-frontend--font-height buffer)
                     :metadata (car enums-fallback)
                     :engine engine
+                    :fallback fallback
+                    :quiet latex-to-svg-frontend-quiet
                     :callback (lambda ()
                                 (latex-to-svg-frontend--place
                                  buffer beg end value source enums-fallback display-p
                                  engine)))))
         (when image
           (latex-to-svg-frontend--set-overlay
-           beg end value image source enums-fallback display-p engine)))))))
+           beg end value image source enums-fallback display-p engine
+           fallback)))))))
 
 (defun latex-to-svg-frontend--render-numbered (el k)
   "Render numbered environment EL starting at counter K."
@@ -1749,7 +1821,10 @@ option are on."
                               :padding latex-to-svg-frontend-padding
                               :font-height font-height
                               :engine (overlay-get
-                                         ov 'latex-to-svg-frontend-engine))))
+                                       ov 'latex-to-svg-frontend-engine)
+                              :fallback (overlay-get
+                                         ov 'latex-to-svg-frontend-fallback)
+                              :quiet latex-to-svg-frontend-quiet)))
             (overlay-put ov 'latex-to-svg-frontend-image image)
             (when (overlay-get ov 'display)
               (latex-to-svg-frontend--show-image ov image))))
@@ -1898,7 +1973,10 @@ Interactively acts on the active region, or the whole buffer."
 
 Deletes each equation's cached SVG (via `latex-to-svg-backend-invalidate') and
 clears its overlay, then re-renders — bypassing the content-addressed
-cache.  Interactively acts on the active region, or the whole buffer."
+cache.  With a fallback engine (see `latex-to-svg-frontend-fallback'),
+the fallback's SVG is deleted too, and so is the record of the engine's
+failure, so the engine is tried again.  Interactively acts on the
+active region, or the whole buffer."
   (interactive (if (use-region-p)
                    (list (region-beginning) (region-end))
                  (list (point-min) (point-max))))
@@ -1909,9 +1987,11 @@ cache.  Interactively acts on the active region, or the whole buffer."
       (let* ((source (latex-to-svg-frontend--math-value el))
              (engine (latex-to-svg-frontend--engine-for source)))
         (when (memq engine '(latex ratex))
-          (latex-to-svg-backend-invalidate
-           (latex-to-svg-frontend--numbered-value el source table)
-           engine))))
+          (let ((value (latex-to-svg-frontend--numbered-value el source table))
+                (fallback (latex-to-svg-frontend--fallback-for engine)))
+            (latex-to-svg-backend-invalidate value engine)
+            (when fallback
+              (latex-to-svg-backend-invalidate value fallback))))))
     (latex-to-svg-frontend--clear-region beg end)
     (latex-to-svg-frontend--render-region beg end)))
 

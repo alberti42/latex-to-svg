@@ -204,9 +204,19 @@ source and number range, so `--counter-before`, `--overlay-labels` and
 `alignat` and `gather`, and their starred forms. Detection does not depend on
 the engine, so `math`, `displaymath`, `multline`, `eqnarray`, `flalign`,
 `xalignat`, `xxalignat`, `subequations`, `dmath`, `empheq`, `dseries`,
-`dgroup` and `darray` are still detected; each fails to compile with the
-backend's warning, whose log names the environment, and the source stays
-visible.
+`dgroup` and `darray` are still detected; RaTeX fails to compile each one.
+
+**The LaTeX fallback.** With `latex-to-svg-frontend-fallback` on (the
+default), an equation RaTeX rejects is sent to the backend with
+`:fallback 'latex`, and LaTeX typesets the same value: the tagged one, with
+`\tag{N}` on each numbered row and no `\label`. That is valid LaTeX (the
+backend's preamble loads `amsmath`), and the numbers in the picture are the
+front-end's, as with RaTeX. The value has no `\setcounter` and no
+`\typeout`, so this path has no ground truth either. Numbering sees no
+difference: the overlay records the requested engine, `ratex`, and the
+number range comes from the same count. With the fallback off, the equation
+fails with the backend's warning, whose log names the environment, and the
+source stays visible.
 
 ## Backend boundary
 

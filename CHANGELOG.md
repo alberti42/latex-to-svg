@@ -32,6 +32,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   An unknown key or value, or an engine whose programs are not found, warns
   and leaves the source visible. The cookie is passed to the backend with the
   rest of the source.
+- `latex-to-svg-frontend-fallback` (default `t`): an equation whose engine
+  is not `latex` and rejects it, such as one using siunitx's `\SI` under
+  RaTeX, is typeset with LaTeX instead, passed to the backend as
+  `:fallback`. A fallback equation is typeset in LaTeX's style next to
+  RaTeX's, and compiles in about 300 ms instead of about 6 ms. Without
+  `latex` and `dvisvgm`, the backend warns; install them or set the option to
+  nil.
+- `latex-to-svg-frontend-quiet` (default nil): when non-nil, a failed compile
+  gives no warning, passed to the backend as `:quiet`. Safe as a file- or
+  directory-local variable. Configuration problems still warn.
+- Hovering over a preview names the engine that typeset it before the
+  source: "Typeset with RaTeX: …", or "Typeset with LaTeX (RaTeX could not
+  parse it): …" for a fallback picture, from
+  `latex-to-svg-backend-engine-used`.
+- Regenerate (`C-u C-u C-c C-x C-l`) also deletes the fallback engine's
+  picture and the record of the engine's failure, so the engine is tried
+  again. Requires the backend's `:fallback`, `:quiet` and
+  `latex-to-svg-backend-engine-used`.
 - Tests: a drift guard over the release metadata — the three `Version:` headers
   must agree, and the newest dated `CHANGELOG.md` section must not claim a
   version the sources have not reached.
