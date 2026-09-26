@@ -103,8 +103,8 @@ programs are is set in the backend (see
 Passed to `latex-to-svg-backend' as `:engine'.  Each engine has its
 own cache entries, so switching back and forth does not recompile an
 equation already compiled by both.  After changing it, run
-`\\[universal-argument] \\[latex-to-svg-frontend]' to re-render the
-buffer.
+`latex-to-svg-frontend-refresh', which renders again the equations it
+affects (with a prefix argument, in every buffer at once).
 
 With `ratex', a numbered environment gets its numbers as a `\\tag{N}' on
 each numbered row instead of a `\\setcounter' prefix, and every `\\label'
@@ -135,7 +135,9 @@ Two consequences: a fallback equation is typeset in LaTeX's style
 shows which engine typeset it.  The fallback needs `latex' and
 `dvisvgm'; without them the backend warns, and you either install them
 or set this option to nil.  When nil, an equation the engine rejects
-keeps its source as text."
+keeps its source as text.  After changing it, run
+`latex-to-svg-frontend-refresh' (with a prefix argument, in every buffer
+at once)."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
@@ -1494,9 +1496,10 @@ TABLE is a (OFFSETS . LABELS) scan."
 (defun latex-to-svg-frontend--fallback-for (engine)
   "Return the fallback engine for an equation typeset by ENGINE, or nil.
 That is `latex' when `latex-to-svg-frontend-fallback' is on and ENGINE is
-not already `latex'."
+an engine other than `latex', today `ratex'.  For `skip' or a warning
+string (see `--engine-for') nothing is compiled, so there is none."
   (and latex-to-svg-frontend-fallback
-       (not (memq engine '(nil latex)))
+       (eq engine 'ratex)
        'latex))
 
 (defun latex-to-svg-frontend--place (buffer beg end value &optional source enums-fallback display-p engine)
@@ -1889,19 +1892,69 @@ so math still being typed is never compiled."
               (latex-to-svg-backend-appearance font-height))))))
 
 ;;;###autoload
-(defun latex-to-svg-frontend-refresh (&optional buffer all)
-  "Re-render previews in BUFFER (default current) for the current theme and font.
-With ALL non-nil (interactively, a prefix argument), re-render every
-buffer with previews instead -- for a global change no appearance check
-can see, such as setting `latex-to-svg-frontend-foreground-color'."
+(defun latex-to-svg-frontend-refresh (&optional buffer arg)
+  "Bring the previews in BUFFER (default current) up to date.
+An equation with no preview is rendered, except the one containing
+point; one whose engine or fallback no longer matches the options
+\(`latex-to-svg-frontend-engine', `latex-to-svg-frontend-fallback') is
+rendered again; every other preview is redrawn from the cache for the
+current theme, font, colors and size.  Numbers and references are then
+reconciled.  Run it after changing an option.
+
+With ARG non-nil (interactively, one prefix argument), do this in every
+buffer with previews -- for a global change, such as setting
+`latex-to-svg-frontend-foreground-color'.  With ARG `(16)' (two prefix
+arguments), recompile the previews in BUFFER instead, bypassing the
+cache: the way to retry after a fix the cache cannot see, such as
+installing a missing TeX package or upgrading RaTeX."
   (interactive (list nil current-prefix-arg))
-  (dolist (buf (if all
-                   (seq-filter (lambda (b)
-                                 (buffer-local-value
-                                  'latex-to-svg-frontend-mode b))
-                               (buffer-list))
-                 (list (or buffer (current-buffer)))))
-    (latex-to-svg-frontend--refresh-buffer buf)))
+  (if (equal arg '(16))
+      (with-current-buffer (or buffer (current-buffer))
+        (latex-to-svg-frontend--regenerate (point-min) (point-max))
+        (latex-to-svg-frontend--reconcile))
+    (dolist (buf (if arg
+                     (seq-filter (lambda (b)
+                                   (buffer-local-value
+                                    'latex-to-svg-frontend-mode b))
+                                 (buffer-list))
+                   (list (or buffer (current-buffer)))))
+      (latex-to-svg-frontend--update-buffer buf))))
+
+(defun latex-to-svg-frontend--needs-render-p (el)
+  "Non-nil when math element EL has to be rendered to be up to date.
+That is when it has no preview, or a preview made for another engine or
+fallback than the options now give it (see `--engine-for' and
+`--fallback-for').  The element containing point is never rendered, as
+`--render-on-leave' never renders it."
+  (let ((b (latex-to-svg-frontend--math-begin el))
+        (e (latex-to-svg-frontend--math-end el)))
+    (unless (<= b (point) e)
+      (let ((ovs (latex-to-svg-frontend--overlays-in b e)))
+        (if (null ovs)
+            t
+          (when-let* ((ov (seq-find
+                           (lambda (o)
+                             (or (overlay-get o 'latex-to-svg-frontend-value)
+                                 (overlay-get o 'latex-to-svg-frontend-unrendered)))
+                           ovs)))
+            (let ((engine (latex-to-svg-frontend--engine-for
+                           (latex-to-svg-frontend--math-value el))))
+              (or (not (equal engine
+                              (overlay-get ov 'latex-to-svg-frontend-engine)))
+                  (not (eq (latex-to-svg-frontend--fallback-for engine)
+                           (overlay-get ov 'latex-to-svg-frontend-fallback)))))))))))
+
+(defun latex-to-svg-frontend--update-buffer (buffer)
+  "Bring BUFFER's previews up to date; see `latex-to-svg-frontend-refresh'."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (let ((table nil))
+        (dolist (el (latex-to-svg-frontend--elements (point-min) (point-max)))
+          (when (latex-to-svg-frontend--needs-render-p el)
+            (latex-to-svg-frontend--render-element
+             el (or table (setq table (latex-to-svg-frontend--maybe-table)))))))
+      (latex-to-svg-frontend--refresh-buffer buffer)
+      (latex-to-svg-frontend--reconcile buffer))))
 
 (defun latex-to-svg-frontend--present-p ()
   "Return non-nil if the current buffer has preview overlays."
@@ -1914,7 +1967,7 @@ can see, such as setting `latex-to-svg-frontend-foreground-color'."
              (not (equal (latex-to-svg-backend-appearance
                           (latex-to-svg-frontend--font-height (current-buffer)))
                          latex-to-svg-frontend--rendered-appearance)))
-    (latex-to-svg-frontend-refresh (current-buffer))))
+    (latex-to-svg-frontend--refresh-buffer (current-buffer))))
 
 (defun latex-to-svg-frontend--maybe-refresh (&rest _)
   "Schedule a lazy appearance-changed refresh of the current buffer."
@@ -2024,22 +2077,14 @@ Interactively acts on the active region, or the whole buffer."
                  (list (point-min) (point-max))))
   (latex-to-svg-frontend--clear-region (or beg (point-min)) (or end (point-max))))
 
-;;;###autoload
-(defun latex-to-svg-frontend-regenerate (&optional beg end)
-  "Force a fresh recompile of previews in BEG..END.
-
-Deletes each equation's cached SVG (via `latex-to-svg-backend-invalidate') and
-clears its overlay, then re-renders — bypassing the content-addressed
-cache.  With a fallback engine (see `latex-to-svg-frontend-fallback'),
-the fallback's SVG is deleted too, and so is the record of the engine's
-failure, so the engine is tried again.  Interactively acts on the
-active region, or the whole buffer."
-  (interactive (if (use-region-p)
-                   (list (region-beginning) (region-end))
-                 (list (point-min) (point-max))))
-  (let ((beg (or beg (point-min)))
-        (end (or end (point-max)))
-        (table (latex-to-svg-frontend--maybe-table)))
+(defun latex-to-svg-frontend--regenerate (beg end)
+  "Recompile the previews in BEG..END, bypassing the cache.
+Deletes each equation's cached SVG (via `latex-to-svg-backend-invalidate')
+and clears its overlay, then re-renders.  With a fallback engine (see
+`latex-to-svg-frontend-fallback'), the fallback's SVG is deleted too, and
+so is the record of the engine's failure, so the engine is tried again.
+Run by `latex-to-svg-frontend-refresh' with two prefix arguments."
+  (let ((table (latex-to-svg-frontend--maybe-table)))
     (dolist (el (latex-to-svg-frontend--elements beg end))
       (let* ((source (latex-to-svg-frontend--math-value el))
              (engine (latex-to-svg-frontend--engine-for source)))
@@ -2051,6 +2096,19 @@ active region, or the whole buffer."
               (latex-to-svg-backend-invalidate value fallback))))))
     (latex-to-svg-frontend--clear-region beg end)
     (latex-to-svg-frontend--render-region beg end)))
+
+(defun latex-to-svg-frontend-regenerate (&optional beg end)
+  "Recompile the previews in BEG..END, bypassing the cache.
+Interactively acts on the active region, or the whole buffer.  Obsolete:
+run `latex-to-svg-frontend-refresh' with two prefix arguments, which does
+this for the whole buffer."
+  (interactive (if (use-region-p)
+                   (list (region-beginning) (region-end))
+                 (list (point-min) (point-max))))
+  (latex-to-svg-frontend--regenerate (or beg (point-min)) (or end (point-max))))
+(make-obsolete 'latex-to-svg-frontend-regenerate
+               "run `latex-to-svg-frontend-refresh' with two prefix arguments."
+               "0.17.0")
 
 ;;;###autoload
 (defun latex-to-svg-frontend (&optional arg)
@@ -2068,7 +2126,7 @@ the whole buffer: a fresh recompile bypassing the cache (see
   (interactive "P")
   (cond
    ((equal arg '(16))
-    (latex-to-svg-frontend-regenerate (point-min) (point-max))
+    (latex-to-svg-frontend--regenerate (point-min) (point-max))
     (message "Regenerated LaTeX previews"))
    ((equal arg '(4))
     (latex-to-svg-frontend--clear-region (point-min) (point-max))

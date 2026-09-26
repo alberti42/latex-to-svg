@@ -200,15 +200,18 @@ for ready-to-open demos.
 - `C-c C-x C-l` (`latex-to-svg-frontend`) — toggle the fragment at point; or
   render the active region; or (failing both) the whole buffer. In Org this
   shadows the classic `org-latex-preview` while the mode is on.
-- `C-u C-c C-x C-l` — **re-render** the buffer from cache (fixes a stale
-  display); `C-u C-u C-c C-x C-l` — **regenerate** (recompile, bypass cache).
 - `M-x latex-to-svg-frontend-clear` — clear previews (region or buffer).
-- `M-x latex-to-svg-frontend-refresh` — re-tint / re-scale the current buffer
-  for the current theme / font from cache (also happens lazily on theme,
-  buffer-display, and zoom changes). With a prefix argument
-  (`C-u M-x latex-to-svg-frontend-refresh`) it refreshes **every** buffer with
-  previews — useful after changing a global setting such as
-  `latex-to-svg-frontend-foreground-color`, which no lazy check detects.
+- `M-x latex-to-svg-frontend-refresh` — bring the current buffer's previews up
+  to date: render equations that have none (except the one the cursor is in),
+  render again those whose engine changed, and redraw the rest from cache for
+  the current theme, font, colors and size. Run it after changing an option.
+  (Redrawing also happens on its own on theme, buffer-display and zoom
+  changes.)
+  - With a prefix argument (`C-u M-x latex-to-svg-frontend-refresh`), it does
+    this in **every** buffer with previews — useful after changing a global
+    setting such as `latex-to-svg-frontend-foreground-color`.
+  - With two (`C-u C-u M-x latex-to-svg-frontend-refresh`), it **recompiles**
+    the current buffer's previews, bypassing the cache.
 
 Move point into a preview to reveal its LaTeX source for editing; leaving
 re-shows the image, or re-renders if you changed the text. **Newly typed math
@@ -254,7 +257,8 @@ as a file- or directory-local variable, so a project can choose RaTeX in its
 ```
 
 Each engine has its own cache entries. After changing the option, run
-`C-u C-c C-x C-l` to re-render the buffer.
+`M-x latex-to-svg-frontend-refresh`, which renders again the equations the
+change affects.
 
 What works with `ratex`:
 
@@ -300,7 +304,7 @@ backend warns once per equation per buffer, naming the buffer and linking to
 the log. The failure is recorded, so the equation is not compiled again:
 editing it, or changing the preamble or `latex-to-svg-backend-ratex-macros`,
 tries again. After a fix outside those (installing a missing TeX package,
-upgrading RaTeX), regenerate with `C-u C-u C-c C-x C-l`.
+upgrading RaTeX), recompile with `C-u C-u M-x latex-to-svg-frontend-refresh`.
 
 To silence these warnings, set `latex-to-svg-frontend-quiet` to `t`. It is
 nil by default, and safe as a file- or directory-local variable, so it can be

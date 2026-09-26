@@ -47,9 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source: "Typeset with RaTeX: …", or "Typeset with LaTeX (RaTeX could not
   parse it): …" for a fallback picture, from
   `latex-to-svg-backend-engine-used`.
-- Regenerate (`C-u C-u C-c C-x C-l`) also deletes the fallback engine's
-  picture and the record of the engine's failure, so the engine is tried
-  again. Requires the backend's `:fallback`, `:quiet` and
+- Recompiling (`C-u C-u M-x latex-to-svg-frontend-refresh`) also deletes the
+  fallback engine's picture and the record of the engine's failure, so the
+  engine is tried again. Requires the backend's `:fallback`, `:quiet` and
   `latex-to-svg-backend-engine-used`.
 - Tests: a drift guard over the release metadata — the three `Version:` headers
   must agree, and the newest dated `CHANGELOG.md` section must not claim a
@@ -57,10 +57,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `latex-to-svg-frontend-refresh` brings the buffer's previews up to date:
+  it renders equations with no preview (except the one containing point),
+  renders again those whose engine or fallback no longer matches the options,
+  redraws the rest from cache, and reconciles numbers. It used to only redraw
+  existing previews, so an engine change needed a re-render. With two prefix
+  arguments it recompiles the buffer's previews, bypassing the cache. The
+  automatic refresh after a theme, zoom or display change still only redraws.
 - In the documentation, "engine" now names the program that typesets an
   equation, LaTeX or RaTeX, and "backend" names `latex-to-svg-backend`. The
   released versions' entries below use "engine" for the backend, as they were
   written.
+
+### Deprecated
+
+- `latex-to-svg-frontend-regenerate`: run `latex-to-svg-frontend-refresh`
+  with two prefix arguments.
 
 ### Fixed
 
