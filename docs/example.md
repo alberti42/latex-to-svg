@@ -9,7 +9,7 @@ on your `load-path`, plus `latex` and `dvisvgm`.
 While the mode is on, math renders by itself: when the buffer opens, when the
 cursor leaves an equation, and a moment after a paste. After changing an
 option, `M-x latex-to-svg-frontend-refresh` brings the previews up to date;
-`C-u C-u M-x latex-to-svg-frontend-refresh` recompiles them, bypassing the
+`C-u M-x latex-to-svg-frontend-refresh` recompiles them, bypassing the
 cache.
 
 Three things to try as you read:

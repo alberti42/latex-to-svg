@@ -886,13 +886,13 @@ merely *contains* inline math) is left untouched."
       (latex-to-svg-frontend-clear)
       (should (null (l2sf-tests--overlays))))))
 
-(ert-deftest l2sf-refresh-double-prefix-regenerates ()
-  ;; Two prefix arguments recompile the buffer's previews, bypassing the cache.
+(ert-deftest l2sf-refresh-prefix-recompiles ()
+  ;; A prefix argument recompiles the buffer's previews, bypassing the cache.
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (let ((l2sf-tests--image 'fresh))
-        (latex-to-svg-frontend-refresh nil '(16)))
+        (latex-to-svg-frontend-refresh nil '(4)))
       (should (equal l2sf-tests--invalidated '("$a$")))
       (let ((ovs (l2sf-tests--overlays)))
         (should (= 1 (length ovs)))
@@ -1170,7 +1170,7 @@ merely *contains* inline math) is left untouched."
     (l2sf-tests--md "\\begin{equation}\nx\n\\end{equation}\n"
       (let ((latex-to-svg-frontend-number-equations t))
         (latex-to-svg-frontend--render-region (point-min) (point-max))
-        (latex-to-svg-frontend-refresh nil '(16)))
+        (latex-to-svg-frontend-refresh nil '(4)))
       (should (equal l2sf-tests--invalidated
                      '("\\setcounter{equation}{0}%\n\\begin{equation}\nx\n\\end{equation}\\typeout{L2S=\\arabic{equation}}%\n"))))))
 
@@ -1338,7 +1338,7 @@ merely *contains* inline math) is left untouched."
                                  'latex-to-svg-frontend-engine)
                     'ratex))
         (let ((latex-to-svg-frontend-fallback nil))
-          (latex-to-svg-frontend-refresh nil '(16)))
+          (latex-to-svg-frontend-refresh nil '(4)))
         (should (equal l2sf-tests--invalidated-engines '(ratex))))
       ;; A redraw (theme, zoom) uses the engine recorded on the overlay.
       (setq l2sf-tests--last-args nil)
@@ -1633,12 +1633,12 @@ merely *contains* inline math) is left untouched."
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\[x\\]\n"
       (let ((latex-to-svg-frontend-engine 'ratex))
-        (latex-to-svg-frontend-refresh nil '(16)))
+        (latex-to-svg-frontend-refresh nil '(4)))
       (should (equal l2sf-tests--invalidated-engines '(latex ratex)))
       (setq l2sf-tests--invalidated-engines nil)
       (let ((latex-to-svg-frontend-engine 'ratex)
             (latex-to-svg-frontend-fallback nil))
-        (latex-to-svg-frontend-refresh nil '(16)))
+        (latex-to-svg-frontend-refresh nil '(4)))
       (should (equal l2sf-tests--invalidated-engines '(ratex))))))
 
 ;;;; Inline / display rescale

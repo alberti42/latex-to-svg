@@ -6,7 +6,7 @@
 
 Open this file and turn the previews on with =M-x latex-to-svg-for-org-mode= (or add =(add-hook 'org-mode-hook #'latex-to-svg-for-org-mode)= to your init).  It needs the [[https://github.com/alberti42/latex-to-svg-backend][latex-to-svg-backend]] package on your ~load-path~, plus =latex= and =dvisvgm=.
 
-While the mode is on, math renders by itself: when the buffer opens, when the cursor leaves an equation, and a moment after a paste.  After changing an option, =M-x latex-to-svg-frontend-refresh= brings the previews up to date; =C-u C-u M-x latex-to-svg-frontend-refresh= recompiles them, bypassing the cache.
+While the mode is on, math renders by itself: when the buffer opens, when the cursor leaves an equation, and a moment after a paste.  After changing an option, =M-x latex-to-svg-frontend-refresh= brings the previews up to date; =C-u M-x latex-to-svg-frontend-refresh= recompiles them, bypassing the cache.
 
 Three things to try as you read:
 

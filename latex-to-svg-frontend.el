@@ -1886,7 +1886,7 @@ so math still being typed is never compiled."
               (latex-to-svg-backend-appearance font-height))))))
 
 ;;;###autoload
-(defun latex-to-svg-frontend-refresh (&optional buffer arg)
+(defun latex-to-svg-frontend-refresh (&optional buffer recompile)
   "Bring the previews in BUFFER (default current) up to date.
 An equation with no preview is rendered, except the one containing
 point; one whose engine or fallback no longer matches the options
@@ -1898,24 +1898,17 @@ reconciled.  This package's own options do this on their own when set
 they cannot see, such as a backend option (`latex-to-svg-backend-font-scale',
 `latex-to-svg-backend-preamble').
 
-With ARG non-nil (interactively, one prefix argument), do this in every
-buffer with previews -- for a global change, such as setting
-`latex-to-svg-frontend-foreground-color'.  With ARG `(16)' (two prefix
-arguments), recompile the previews in BUFFER instead, bypassing the
-cache: the way to retry after a fix the cache cannot see, such as
-installing a missing TeX package or upgrading RaTeX."
+With RECOMPILE non-nil (interactively, a prefix argument), recompile
+the previews in BUFFER instead, bypassing the cache: the way to retry
+after a fix the cache cannot see, such as installing a missing TeX
+package or upgrading RaTeX.  Either way only BUFFER is touched."
   (interactive (list nil current-prefix-arg))
-  (if (equal arg '(16))
-      (with-current-buffer (or buffer (current-buffer))
-        (latex-to-svg-frontend--regenerate (point-min) (point-max))
-        (latex-to-svg-frontend--reconcile))
-    (dolist (buf (if arg
-                     (seq-filter (lambda (b)
-                                   (buffer-local-value
-                                    'latex-to-svg-frontend-mode b))
-                                 (buffer-list))
-                   (list (or buffer (current-buffer)))))
-      (latex-to-svg-frontend--update-buffer buf))))
+  (with-current-buffer (or buffer (current-buffer))
+    (if recompile
+        (progn
+          (latex-to-svg-frontend--regenerate (point-min) (point-max))
+          (latex-to-svg-frontend--reconcile))
+      (latex-to-svg-frontend--update-buffer (current-buffer)))))
 
 (define-obsolete-function-alias 'latex-to-svg-frontend
   #'latex-to-svg-frontend-refresh "0.17.0"
@@ -2137,7 +2130,7 @@ Deletes each equation's cached SVG (via `latex-to-svg-backend-invalidate')
 and clears its overlay, then re-renders.  With a fallback engine (see
 `latex-to-svg-frontend-fallback'), the fallback's SVG is deleted too, and
 so is the record of the engine's failure, so the engine is tried again.
-Run by `latex-to-svg-frontend-refresh' with two prefix arguments."
+Run by `latex-to-svg-frontend-refresh' with a prefix argument."
   (let ((table (latex-to-svg-frontend--maybe-table)))
     (dolist (el (latex-to-svg-frontend--elements beg end))
       (let* ((source (latex-to-svg-frontend--math-value el))
@@ -2154,14 +2147,14 @@ Run by `latex-to-svg-frontend-refresh' with two prefix arguments."
 (defun latex-to-svg-frontend-regenerate (&optional beg end)
   "Recompile the previews in BEG..END, bypassing the cache.
 Interactively acts on the active region, or the whole buffer.  Obsolete:
-run `latex-to-svg-frontend-refresh' with two prefix arguments, which does
+run `latex-to-svg-frontend-refresh' with a prefix argument, which does
 this for the whole buffer."
   (interactive (if (use-region-p)
                    (list (region-beginning) (region-end))
                  (list (point-min) (point-max))))
   (latex-to-svg-frontend--regenerate (or beg (point-min)) (or end (point-max))))
 (make-obsolete 'latex-to-svg-frontend-regenerate
-               "run `latex-to-svg-frontend-refresh' with two prefix arguments."
+               "run `latex-to-svg-frontend-refresh' with a prefix argument."
                "0.17.0")
 
 (defvar latex-to-svg-frontend-mode-map (make-sparse-keymap)

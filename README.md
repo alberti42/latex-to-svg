@@ -212,11 +212,9 @@ reveal on cursor and a separate cache. To use Org's preview, turn the mode off.
   buffer-local one — and redrawing happens on its own on theme,
   buffer-display and zoom changes. Run it after a change those cannot see,
   such as a backend option (`latex-to-svg-backend-font-scale`).
-  - With a prefix argument (`C-u M-x latex-to-svg-frontend-refresh`), it does
-    this in **every** buffer with previews — useful after changing a global
-    setting such as `latex-to-svg-frontend-foreground-color`.
-  - With two (`C-u C-u M-x latex-to-svg-frontend-refresh`), it **recompiles**
-    the current buffer's previews, bypassing the cache.
+  With a prefix argument (`C-u M-x latex-to-svg-frontend-refresh`), it
+  **recompiles** the current buffer's previews instead, bypassing the cache.
+  Either way it touches only the current buffer.
 
 Move point into a preview to reveal its LaTeX source for editing; leaving
 re-shows the image, or re-renders if you changed the text. **Newly typed math
@@ -308,7 +306,7 @@ backend warns once per equation per buffer, naming the buffer and linking to
 the log. The failure is recorded, so the equation is not compiled again:
 editing it, or changing the preamble or `latex-to-svg-backend-ratex-macros`,
 tries again. After a fix outside those (installing a missing TeX package,
-upgrading RaTeX), recompile with `C-u C-u M-x latex-to-svg-frontend-refresh`.
+upgrading RaTeX), recompile with `C-u M-x latex-to-svg-frontend-refresh`.
 
 To silence these warnings, set `latex-to-svg-frontend-quiet` to `t`. It is
 nil by default, and safe as a file- or directory-local variable, so it can be
@@ -395,8 +393,7 @@ covers *buffer-local* zoom). The handler appearance-checks each buffer
 individually, so buffers on an untouched frame cost nothing.
 
 Without it, previews re-tint / rescale on their next redisplay. You can always force a
-refresh with `M-x latex-to-svg-frontend-refresh` (current buffer) or `C-u M-x
-latex-to-svg-frontend-refresh` (every preview buffer).
+refresh with `M-x latex-to-svg-frontend-refresh` (current buffer).
 
 ### Delimiter toggles
 
