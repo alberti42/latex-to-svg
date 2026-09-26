@@ -70,6 +70,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Requires `latex-to-svg-backend` 0.10.0, for `:engine`, `:fallback` and
+  `:quiet`.
 - `latex-to-svg-frontend-refresh` brings the buffer's previews up to date:
   it renders equations with no preview (except the one containing point),
   renders again those whose engine or fallback no longer matches the options,
