@@ -47,6 +47,9 @@
 (require 'latex-to-svg-frontend)
 (require 'latex-to-svg-for-markdown)
 (require 'latex-to-svg-for-org)
+(require 'latex-to-svg-for-latex)
+;; Built-in; defines `latex-mode' and `latex-mode-hook' for the LaTeX adaptor's tests.
+(require 'tex-mode)
 ;; Built-in on Emacs 31+; only needed for the minor-mode enable/disable test,
 ;; which skips itself when it (or the `markdown' grammar) is unavailable.
 (require 'markdown-ts-mode nil t)
@@ -875,6 +878,74 @@ merely *contains* inline math) is left untouched."
       (latex-to-svg-for-org-mode -1)
       (should-not (command-remapping 'org-latex-preview))))
   (should-not (assq 'latex-to-svg-for-markdown-mode minor-mode-map-alist)))
+
+(ert-deftest l2sf-latex-exclusions ()
+  ;; The LaTeX adaptor skips the preamble, comments (not an escaped `\%'),
+  ;; `\verb' with any delimiter, verbatim and `comment' environments,
+  ;; `\iffalse' ... `\fi' (not a commented-out `\iffalse'), and what follows
+  ;; `\end{document}'.
+  (l2sf-tests--md
+      (concat "\\documentclass{article}\n"
+              "\\newcommand{\\ket}[1]{$|#1\\rangle$}\n"
+              "\\begin{document}\n"
+              "Keep $a$. % drop $b$\n"
+              "Escaped \\% keep $c$.\n"
+              "\\verb|$d$| and \\verb*+$e$+ keep $f$.\n"
+              "\\begin{verbatim}\n$g$\n\\end{verbatim}\n"
+              "\\begin{comment}\n$h$\n\\end{comment}\n"
+              "% \\iffalse\n"
+              "Keep $m$.\n"
+              "\\iffalse\n$i$\n\\fi\n"
+              "Keep $j$.\n"
+              "\\end{document}\n"
+              "$k$\n")
+    (setq-local latex-to-svg-frontend-exclude-function
+                #'latex-to-svg-for-latex--exclusions)
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("$a$" "$c$" "$f$" "$m$" "$j$")))))
+
+(ert-deftest l2sf-latex-file-without-document-is-all-body ()
+  ;; A chapter file, with no `\begin{document}', has no preamble to skip.
+  (l2sf-tests--md "\\section{A}\nKeep $a$.\n"
+    (setq-local latex-to-svg-frontend-exclude-function
+                #'latex-to-svg-for-latex--exclusions)
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("$a$")))))
+
+(ert-deftest l2sf-latex-mode-setup ()
+  ;; The adaptor refuses outside LaTeX buffers.  In `latex-mode' it turns
+  ;; the core on, sets the engine to `latex' unless the buffer already has
+  ;; a local value, and remaps the preview-latex commands; turning it off
+  ;; undoes what it set.
+  (l2sf-tests--with-stub
+    (with-temp-buffer
+      (fundamental-mode)
+      (should-error (latex-to-svg-for-latex-mode 1) :type 'user-error)
+      (should-not latex-to-svg-for-latex-mode))
+    (with-temp-buffer
+      (let ((latex-mode-hook nil)) (latex-mode))
+      (let ((latex-to-svg-frontend-engine 'ratex))
+        (latex-to-svg-for-latex-mode 1)
+        (should latex-to-svg-frontend-mode)
+        (should (local-variable-p 'latex-to-svg-frontend-engine))
+        (should (eq latex-to-svg-frontend-engine 'latex))
+        (dolist (command '(preview-at-point preview-region preview-buffer
+                           preview-document preview-environment preview-section))
+          (should (eq (command-remapping command)
+                      #'latex-to-svg-for-latex-preview-disabled)))
+        (latex-to-svg-for-latex-mode -1)
+        (should-not latex-to-svg-frontend-mode)
+        (should-not (local-variable-p 'latex-to-svg-frontend-engine))
+        (should-not (command-remapping 'preview-at-point))))
+    (with-temp-buffer
+      (let ((latex-mode-hook nil)) (latex-mode))
+      (setq-local latex-to-svg-frontend-engine 'ratex)
+      (latex-to-svg-for-latex-mode 1)
+      (should (eq latex-to-svg-frontend-engine 'ratex))
+      (latex-to-svg-for-latex-mode -1)
+      (should (eq latex-to-svg-frontend-engine 'ratex)))))
 
 (ert-deftest l2sf-mode-binds-no-key ()
   ;; The core mode binds no key, so it shadows none of the markup mode's own
