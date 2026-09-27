@@ -1,1 +1,6 @@
 *.elc
+# What compiling docs/example.tex writes next to it
+/docs/example.aux
+/docs/example.log
+/docs/example.dvi
+/docs/example.pdf
