@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `latex-to-svg-for-latex`, an adaptor for AUCTeX's `LaTeX-mode` and the
+  built-in `latex-mode` (see `docs/latex-to-svg-for-latex.md`). It skips
+  comments, `comment` environments, `\iffalse` … `\fi`, the verbatim
+  environments and macros, and the preamble. `\ref` and `\eqref` show the
+  numbers read from the document's `.aux` file, found through AUCTeX or a
+  template (`latex-to-svg-for-latex-aux-file`), and a jump to a label in
+  another file goes through `xref`. It sets the engine to `latex` in its
+  buffers and remaps AUCTeX's preview-latex commands to a message.
 - Setting one of the backend's preambles (`latex-to-svg-backend-preamble`,
   `latex-to-svg-backend-appended-preamble`,
   `latex-to-svg-backend-preamble-not-precompiled`) updates the previews on its

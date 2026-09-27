@@ -10,7 +10,7 @@
 The two MELPA badges are the core, `latex-to-svg-frontend`; the adaptors get
 their own once they are on MELPA.
 
-Render LaTeX math in Emacs Org and Markdown buffers. Inline and display math,
+Render LaTeX math in Emacs Org, Markdown and LaTeX buffers. Inline and display math,
 numbered environments included, is compiled with
 [LaTeX](https://www.latex-project.org/) (`latex` → `dvisvgm`), or with
 [RaTeX](https://github.com/erweixin/RaTeX), by the
@@ -27,14 +27,15 @@ This repo is the **front-end**: a shared core plus thin per-mode adaptors.
   render-on-leave, and theme/zoom refresh. Knows nothing about any markup.
 - **`latex-to-svg-for-markdown`** — Markdown adaptor.
 - **`latex-to-svg-for-org`** — Org adaptor.
+- **`latex-to-svg-for-latex`** — LaTeX adaptor.
 
 The adaptors are described under
 [One adaptor per markup](#one-adaptor-per-markup).
 
 ```
   latex-to-svg-for-markdown ─┐
-                             ├─▶ latex-to-svg-frontend ─▶ latex-to-svg-backend
-  latex-to-svg-for-org ──────┘        (this repo)             (backend)
+  latex-to-svg-for-org ──────┼─▶ latex-to-svg-frontend ─▶ latex-to-svg-backend
+  latex-to-svg-for-latex ────┘        (this repo)             (backend)
 ```
 
 You install an **adaptor**; it pulls in the frontend core and the backend
@@ -112,6 +113,13 @@ gives the recipe, the hook and the details.
   Skips `#+begin_src` / `example` / `export` / `comment` blocks, comment lines
   and inline `~code~` / `=verbatim=` spans. While it is on, `org-latex-preview`
   only says that it is off: Org's preview would draw its own images over these.
+- **[`latex-to-svg-for-latex`](docs/latex-to-svg-for-latex.md)** — for AUCTeX's
+  `LaTeX-mode` or the built-in `latex-mode`. Skips comments, `comment`
+  environments, `\iffalse` … `\fi`, verbatim environments and `\verb`, and the
+  preamble. `\ref` and `\eqref` show the numbers LaTeX printed, read from the
+  document's `.aux` file, so references to sections, figures and other files
+  resolve too. While it is on, AUCTeX's preview-latex commands only say that
+  they are off.
 
 To add an adaptor for another markup, see
 [Writing an adaptor for another markup](#writing-an-adaptor-for-another-markup).
@@ -164,14 +172,16 @@ The stack has three layers:
   straight-pull-recipe-repositories` if yours predates its addition.)
 - **`latex-to-svg-frontend`** — the shared preview core (detection, overlays,
   numbering, refresh), markup-agnostic.
-- **`latex-to-svg-for-markdown`** / **`latex-to-svg-for-org`** — the per-mode
-  adaptors. Install whichever you use; both are optional.
+- **`latex-to-svg-for-markdown`** / **`latex-to-svg-for-org`** /
+  **`latex-to-svg-for-latex`** — the per-mode adaptors. Install whichever you
+  use; all are optional.
 
-This repo is not on MELPA yet, hence the git recipes. The frontend and the two
-adaptors all live here, so each recipe selects a single file. Install the
+This repo is not on MELPA yet, hence the git recipes. The frontend and the
+three adaptors all live here, so each recipe selects a single file. Install the
 frontend with the recipe below, then each adaptor with the recipe on its page
 ([Markdown](docs/latex-to-svg-for-markdown.md#installation),
-[Org](docs/latex-to-svg-for-org.md#installation)).
+[Org](docs/latex-to-svg-for-org.md#installation),
+[LaTeX](docs/latex-to-svg-for-latex.md#installation)).
 
 ### Straight
 
@@ -598,10 +608,17 @@ buffer-local protocol and toggles the core:
   `(beg . end)` regions to ignore (code / verbatim). **The one required piece.**
 - `latex-to-svg-frontend-reveal-function` — `(fn)` run after a jump to unfold
   the target (Org uses `org-fold-show-context`); optional.
+- `latex-to-svg-frontend-labels-function` — `(fn)` → hash table from label to
+  its printed number, a string; `\ref` / `\eqref` resolve against it instead
+  of the buffer's equation labels (LaTeX reads the `.aux` file); optional.
+- `latex-to-svg-frontend-find-label-function` — `(fn LABEL)` → non-nil if it
+  jumped, called when no equation in the buffer defines LABEL (LaTeX asks
+  `xref`); optional.
 - `latex-to-svg-frontend-detect-function` — `(fn BEG END)` → list of math
   records, replacing the scanner entirely. Escape hatch; rarely needed.
 
-See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` as templates.
+See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` /
+`latex-to-svg-for-latex.el` as templates.
 
 Pull requests adding adaptors for other major modes are welcome.
 

@@ -1,0 +1,130 @@
+# latex-to-svg-for-latex
+
+LaTeX adaptor for `latex-to-svg-frontend`: a thin layer that tells the shared
+core which regions of a LaTeX buffer are comments or verbatim (so math inside
+them is not previewed), resolves `\ref` and `\eqref` from the document's
+`.aux` file, and enables the core. All the actual work — detection, overlays,
+numbering, reveal-on-cursor, refresh — lives in `latex-to-svg-frontend`; see
+the [README](../README.md).
+
+## Requirements
+
+Nothing beyond the requirements of the whole stack, in the README's
+[Requirements](../README.md#requirements). AUCTeX is optional: with it, the
+adaptor finds the `.aux` file through `TeX-master` and `TeX-output-dir`, and
+skips the verbatim environments AUCTeX's style files add.
+
+## Installation
+
+Install the core first, as in the README's
+[Installation](../README.md#installation), then the adaptor:
+
+```elisp
+;; LaTeX adaptor
+(use-package latex-to-svg-for-latex
+  :straight (latex-to-svg-for-latex :type git :host github
+                                    :repo "alberti42/latex-to-svg"
+                                    :files ("latex-to-svg-for-latex.el"))
+  :hook ((LaTeX-mode latex-mode) . latex-to-svg-for-latex-mode))
+```
+
+## Usage
+
+Turn on the adaptor mode from your major mode's hook, AUCTeX's `LaTeX-mode`
+or the built-in `latex-mode`:
+
+```elisp
+(add-hook 'LaTeX-mode-hook #'latex-to-svg-for-latex-mode)  ; AUCTeX
+(add-hook 'latex-mode-hook #'latex-to-svg-for-latex-mode)  ; built-in tex-mode.el
+```
+
+In any other major mode, the mode refuses to turn on.
+
+With the mode on, all math renders when the buffer opens. Equations that use
+the project's own macros or packages need the project's preamble, set in its
+`.dir-locals.el`: see the README's
+[Projects with their own macros](../README.md#projects-with-their-own-macros).
+
+While the mode is on, AUCTeX's preview-latex commands (`preview-at-point`,
+`preview-region`, `preview-buffer`, `preview-document`,
+`preview-environment`, `preview-section`) only say that they are off:
+preview-latex would draw its own images over these. To use preview-latex,
+turn the mode off.
+
+The mode sets `latex-to-svg-frontend-engine` to `latex` in the buffer, unless
+it already has a local value. RaTeX ignores every preamble and most packages,
+so in a LaTeX document it fails often. A project's `.dir-locals.el` is applied
+after the mode hook and can still choose `ratex`, and a `% engine=ratex`
+cookie still works for one equation.
+
+## What is not previewed
+
+Math inside these is left as text:
+
+- comments, from an unescaped `%` to the end of the line;
+- `\begin{comment}` … `\end{comment}` and `\iffalse` … `\fi`;
+- verbatim environments and macros: `verbatim`, `verbatim*`, `filecontents`,
+  `filecontents*`, `\verb|…|` with any delimiter. With AUCTeX loaded, the
+  lists are AUCTeX's (`LaTeX-verbatim-environments`,
+  `LaTeX-verbatim-macros-with-delims`, `LaTeX-verbatim-macros-with-braces`),
+  which include what its style files add, such as `lstlisting` for
+  `listings`. To add one, customize AUCTeX's variable;
+- the preamble and what follows `\end{document}`, in a file that has
+  `\begin{document}`. A file without it, such as a chapter, is all body.
+
+## References
+
+`\ref` and `\eqref` show the number LaTeX printed, read from the document's
+`.aux` file: `\ref{sec:model}` shows `2`, `\eqref{eq:energy}` shows `(2.1)`.
+This covers labels of sections, figures and tables, and labels in other files
+of the document. A label the `.aux` file lacks shows `??` / `(??)`, as LaTeX
+does: with no `.aux` file yet, or for a label added since the last compile.
+
+`latex-to-svg-for-latex-aux-file` says where the `.aux` file is:
+
+- **nil** (the default) asks AUCTeX, in `LaTeX-mode`: `TeX-master-output-file`,
+  which follows `TeX-master` (a chapter file finds the main file's `.aux`)
+  and `TeX-output-dir`. Without AUCTeX, the `.aux` next to the file:
+  `paper.tex` → `paper.aux`.
+- **A string** is a template: `%b` is the base name of the buffer's file
+  (`paper` for `paper.tex`) and `%r` the project root, or the file's directory
+  outside a project. A relative result is relative to the file's directory.
+
+| Case | Value |
+|---|---|
+| AUCTeX knows the main file and the output directory | nil |
+| `.aux` files in `._aux/`, set globally | `"._aux/%b.aux"` |
+| Main file `main.tex` with a `build/` directory, in the project's `.dir-locals.el` | `"%r/build/main.aux"` |
+
+Emacs applies a string from `.dir-locals.el` without asking.
+
+**After a compile**, the references follow the `.aux` file at the next
+reconcile (an edit, or leaving an equation), or at once with
+`M-x latex-to-svg-frontend-refresh`. To update them as soon as an AUCTeX
+compile finishes, add:
+
+```elisp
+(add-hook 'TeX-after-compilation-finished-functions
+          #'latex-to-svg-for-latex-update-references)
+```
+
+It updates the references in every buffer where the mode is on; a buffer whose
+`.aux` file did not change keeps its labels.
+
+**Jumping.** Clicking a reference (`mouse-1` or `mouse-2`), or `C-c C-o` on it,
+jumps to its `\label` when the label is in the current buffer. Otherwise, when
+the buffer has an xref backend other than etags — such as eglot running
+[texlab](https://github.com/latex-lsp/texlab) — it asks `xref-find-definitions`,
+which finds the label in any file of the document. The etags backends
+(`etags`, and `tex-etags` in Emacs 31, which AUCTeX enables) are not asked:
+without a `TAGS` file they prompt for one.
+
+## Limitations
+
+- **Numbers inside the previews** come from the front-end's count, which
+  matches the document when it numbers equations straight through in one file.
+  With `\numberwithin{equation}{section}` the previews show (1) … (5) where the
+  document shows (2.1). The same holds for a chapter in its own file, whose
+  count starts at 1, and for a `\setcounter{equation}` in the text. References
+  are right in all three cases, because they come from the `.aux` file.
+- **`\cref`, `\autoref` and `\pageref`** stay as source text.
