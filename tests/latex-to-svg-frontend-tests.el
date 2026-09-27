@@ -2697,12 +2697,13 @@ other buffer BODY opened."
          (match-string 1))))
 
 (ert-deftest l2sf-package-versions-agree ()
-  ;; Drift guard: the repository ships three packages on one version stream,
+  ;; Drift guard: the repository ships four packages on one version stream,
   ;; so their `Version:' headers are bumped together.
   (let ((versions (mapcar #'l2sf-tests--header-version
                           '("latex-to-svg-frontend.el"
                             "latex-to-svg-for-org.el"
-                            "latex-to-svg-for-markdown.el"))))
+                            "latex-to-svg-for-markdown.el"
+                            "latex-to-svg-for-latex.el"))))
     (should (seq-every-p #'stringp versions))
     (should (equal (seq-uniq versions) (list (car versions))))))
 

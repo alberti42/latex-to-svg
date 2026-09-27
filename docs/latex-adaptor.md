@@ -1,6 +1,6 @@
 # LaTeX adaptor — design and plan
 
-Status: built (2026-09-27), unreleased. This page records what was decided
+Status: released in 0.18.0 (2026-09-27). This page records what was decided
 for `latex-to-svg-for-latex` and in what order it was built. The user
 documentation is in [`latex-to-svg-for-latex.md`](latex-to-svg-for-latex.md);
 this page keeps the design.

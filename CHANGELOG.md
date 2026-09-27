@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-09-27
+
 ### Added
 
 - `latex-to-svg-for-latex`, an adaptor for AUCTeX's `LaTeX-mode` and the
@@ -26,18 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-backend-appended-preamble`,
   `latex-to-svg-backend-preamble-not-precompiled`,
   `latex-to-svg-backend-line-width`, `latex-to-svg-backend-ratex-macros`)
-  updates the previews on its own, like this package's own options: a buffer-local value (from
-  `.dir-locals.el`) updates that buffer, a default value every buffer that
-  uses it.
+  updates the previews on its own, like this package's own options: a
+  buffer-local value (from `.dir-locals.el`) updates that buffer, a default
+  value every buffer that uses it.
 - `latex-to-svg-frontend-labels-function`, a protocol variable for
   adaptors: a function returning a table from label to its printed number,
   a string such as `2.1`. When set, `\ref` / `\eqref` resolve against it
   instead of the equation labels in the buffer, and are drawn with
-  numbering off too. The LaTeX adaptor will fill it from the `.aux` file.
+  numbering off too. The LaTeX adaptor fills it from the `.aux` file.
 - `latex-to-svg-frontend-find-label-function`, a protocol variable for
   adaptors: a function the jump from a reference calls, with point on the
   reference, when no equation in the buffer defines the label. The LaTeX
-  adaptor will ask `xref` for labels in other files.
+  adaptor asks `xref` for labels in other files.
 
 ### Changed
 
@@ -52,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the files the preamble loads as they were when it was dumped, so before,
   an edit to one, such as the `macros.tex` of an `\input{macros.tex}`, did
   not reach the recompiled equations. The next compile dumps it again.
+- The README describes each adaptor briefly, under "One adaptor per
+  markup", and leaves the details to a page per adaptor in `docs/`. It has a
+  new section, "Projects with their own macros", on setting a project's
+  preamble in `.dir-locals.el` and trusting its directory.
 
 ### Fixed
 
@@ -64,8 +70,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   variables are applied. Emacs runs a major mode's hooks, where the mode is
   usually turned on, before it applies them, so the first render ignored an
   option set in `.dir-locals.el`, such as
-  `latex-to-svg-backend-preamble-not-precompiled`: every equation using a project macro was compiled without it and failed.
-  The render now runs from a timer. Other buffers render at once, as before.
+  `latex-to-svg-backend-preamble-not-precompiled`: every equation using a
+  project macro was compiled without it and failed. The render now runs from
+  a timer. Other buffers render at once, as before.
 - `normal-mode` and `revert-buffer` no longer leave old previews on screen.
   Changing the major mode kept the overlays, so a preview compiled with the
   old options stayed until its new picture was compiled, and stayed for good
@@ -591,7 +598,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/alberti42/latex-to-svg/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/alberti42/latex-to-svg/compare/v0.16.2...v0.17.0
 [0.16.2]: https://github.com/alberti42/latex-to-svg/compare/v0.16.1...v0.16.2
 [0.16.1]: https://github.com/alberti42/latex-to-svg/compare/v0.16.0...v0.16.1
