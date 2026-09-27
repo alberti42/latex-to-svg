@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asked the backend for the picture without a callback, so the backend
   started no compile and the preview kept its old picture. The redraw after a
   theme or zoom change goes through the same code.
+- In a buffer visiting a file, the first render runs after the file's local
+  variables are applied. Emacs runs a major mode's hooks, where the mode is
+  usually turned on, before it applies them, so the first render ignored an
+  option set in `.dir-locals.el`, such as `latex-to-svg-backend-preamble-local`:
+  every equation using a project macro was compiled without it and failed.
+  The render now runs from a timer. Other buffers render at once, as before.
 
 ## [0.17.0] - 2026-09-27
 

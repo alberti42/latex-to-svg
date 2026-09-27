@@ -1728,6 +1728,10 @@ edited in place.  Skips a reference revealed for editing (`display' nil)."
 (defvar-local latex-to-svg-frontend--reconcile-timer nil
   "Pending debounced reconcile timer for this buffer.")
 
+(defvar-local latex-to-svg-frontend--initial-render-timer nil
+  "Timer of the render that turning the mode on schedules, or nil.
+See `latex-to-svg-frontend--render-when-on'.")
+
 (defvar-local latex-to-svg-frontend--dirty nil
   "Cons (BEG . END) bounding buffer text changed since the last full reconcile.
 Accumulated from `after-change-functions'; nil when nothing is pending.  A
@@ -2241,6 +2245,16 @@ not colour -- matters.)"
   '((latex-to-svg-frontend--suppress-emphasis))
   "Font-lock keywords added while the mode is on (appended, so they run last).")
 
+(defun latex-to-svg-frontend--render-when-on (buffer)
+  "Render all math in BUFFER, if `latex-to-svg-frontend-mode' is still on.
+Run from the timer that turning the mode on schedules in a buffer
+visiting a file (see `latex-to-svg-frontend-mode')."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (setq latex-to-svg-frontend--initial-render-timer nil)
+      (when latex-to-svg-frontend-mode
+        (latex-to-svg-frontend--render-region (point-min) (point-max))))))
+
 (define-minor-mode latex-to-svg-frontend-mode
   "Minor mode previewing LaTeX math as SVG images via `latex-to-svg-backend'.
 
@@ -2248,7 +2262,12 @@ This is the shared core; normally you enable it through a per-markup
 adaptor mode (e.g. `latex-to-svg-for-markdown-mode') that first installs
 the buffer-local protocol (`latex-to-svg-frontend-exclude-function' etc.).
 When enabled, all detected math is rendered, and math typed, pasted or
-edited later is rendered as it arrives; disabling clears it.  Setting
+edited later is rendered as it arrives; disabling clears it.  In a
+buffer visiting a file, the first render runs from a timer, after the
+file's local variables are applied: Emacs runs a major mode's hooks,
+where the mode is usually turned on, before it applies them, and they
+may set an option the render needs, such as
+`latex-to-svg-backend-preamble-local' in `.dir-locals.el'.  Setting
 an option of this package updates the previews on its own (see
 `latex-to-svg-frontend--watched-options')."
   :lighter " L2S"
@@ -2266,7 +2285,12 @@ an option of this package updates the previews on its own (see
         (font-lock-add-keywords
          nil latex-to-svg-frontend--font-lock-keywords 'append)
         (when font-lock-mode (font-lock-flush))
-        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+        (if buffer-file-name
+            (unless (timerp latex-to-svg-frontend--initial-render-timer)
+              (setq latex-to-svg-frontend--initial-render-timer
+                    (run-at-time 0 nil #'latex-to-svg-frontend--render-when-on
+                                 (current-buffer))))
+          (latex-to-svg-frontend--render-region (point-min) (point-max))))
     (remove-hook 'window-buffer-change-functions
                  #'latex-to-svg-frontend--maybe-refresh t)
     (remove-hook 'text-scale-mode-hook
@@ -2283,6 +2307,9 @@ an option of this package updates the previews on its own (see
     (when (timerp latex-to-svg-frontend--reconcile-timer)
       (cancel-timer latex-to-svg-frontend--reconcile-timer)
       (setq latex-to-svg-frontend--reconcile-timer nil))
+    (when (timerp latex-to-svg-frontend--initial-render-timer)
+      (cancel-timer latex-to-svg-frontend--initial-render-timer)
+      (setq latex-to-svg-frontend--initial-render-timer nil))
     (latex-to-svg-frontend--clear-region (point-min) (point-max))
     (setq latex-to-svg-frontend--rendered-appearance nil)))
 

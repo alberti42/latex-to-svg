@@ -1103,6 +1103,55 @@ merely *contains* inline math) is left untouched."
         (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
                     'fake-image))))))
 
+(ert-deftest l2sf-first-render-sees-dir-locals ()
+  ;; Emacs runs a major mode's hooks before it applies `.dir-locals.el'.
+  ;; In a buffer visiting a file the first render runs from a timer, so
+  ;; the backend sees the preamble `.dir-locals.el' sets.
+  (let* ((dir (make-temp-file "l2sf-dir-locals" t))
+         (file (expand-file-name "a.txt" dir))
+         (seen 'none)
+         (buffer nil))
+    (unwind-protect
+        (l2sf-tests--with-stub
+          (with-temp-file (expand-file-name ".dir-locals.el" dir)
+            (prin1 '((text-mode
+                      . ((latex-to-svg-backend-preamble-local . "\\input{m}"))))
+                   (current-buffer)))
+          (with-temp-file file (insert "$a$\n"))
+          (cl-letf (((symbol-function 'latex-to-svg-backend)
+                     (lambda (_latex &rest _args)
+                       (setq seen latex-to-svg-backend-preamble-local)
+                       l2sf-tests--image)))
+            (let ((enable-local-variables :all)
+                  (text-mode-hook (list #'latex-to-svg-frontend-mode)))
+              (setq buffer (find-file-noselect file))
+              (with-current-buffer buffer
+                (should latex-to-svg-frontend-mode)
+                (should (eq seen 'none))
+                (should-not (l2sf-tests--overlays))
+                (sit-for 0.01)
+                (should (equal seen "\\input{m}"))
+                (should (l2sf-tests--overlays))))))
+      (when (buffer-live-p buffer) (kill-buffer buffer))
+      (delete-directory dir t))))
+
+(ert-deftest l2sf-mode-off-cancels-first-render ()
+  ;; Turning the mode off before the scheduled first render cancels it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n"
+      (setq buffer-file-name (expand-file-name "l2sf-none.txt"
+                                               temporary-file-directory))
+      (unwind-protect
+          (progn
+            (latex-to-svg-frontend-mode 1)
+            (should (timerp latex-to-svg-frontend--initial-render-timer))
+            (latex-to-svg-frontend-mode -1)
+            (should-not latex-to-svg-frontend--initial-render-timer)
+            (sit-for 0.01)
+            (should-not (l2sf-tests--overlays)))
+        (set-buffer-modified-p nil)
+        (setq buffer-file-name nil)))))
+
 (ert-deftest l2sf-installs-no-global-hooks ()
   ;; Policy: theme / frame-font tracking is opt-in.  Loading the package
   ;; (and enabling the mode) must never touch a global hook.
