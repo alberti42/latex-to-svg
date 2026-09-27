@@ -301,7 +301,21 @@ For a file of macros, `\input` it:
 Every backslash is doubled, as in any Elisp string. `\input` finds the file in
 the project root (`project-root`), or in `default-directory` outside a
 project. To make the directory holding `.dir-locals.el` a project root, set
-`project-vc-extra-root-markers` to `'(".dir-locals.el")`. The backend README's
+`project-vc-extra-root-markers` to `'(".dir-locals.el")`.
+
+Both options are LaTeX code, so Emacs asks before applying them from
+`.dir-locals.el`, and answering `!` trusts only that exact value: the next
+edit of the string asks again. For a project you started or otherwise trust,
+list its directory, the one holding `.dir-locals.el`, in
+`safe-local-variable-directories` (Emacs 30.1+). Emacs then applies that
+`.dir-locals.el` without asking, whatever it sets:
+
+```elisp
+(add-to-list 'safe-local-variable-directories
+             (expand-file-name "~/papers/thesis/"))
+```
+
+The backend README's
 [A project's preamble](https://github.com/alberti42/latex-to-svg-backend#a-projects-preamble)
 compares the two options and gives the details.
 
