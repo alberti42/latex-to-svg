@@ -64,8 +64,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preamble in `.dir-locals.el` and trusting its directory.
 - The README and the adaptor pages install the Org and Markdown adaptors
   from MELPA, which pulls in the frontend and the backend, instead of from
-  git. Each adaptor's MELPA badges are on its line under "One adaptor per
-  markup". The LaTeX adaptor, not on MELPA yet, keeps a git recipe.
+  git. Under "One adaptor per markup", each adaptor has its own heading, with
+  its MELPA badges below it. The LaTeX adaptor, not on MELPA yet, keeps a git
+  recipe.
 
 ### Deprecated
 

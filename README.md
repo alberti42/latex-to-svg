@@ -101,24 +101,37 @@ a buffer are code, verbatim or comment, so math inside them is not previewed,
 and turns the core on. Install the adaptor for each markup you use; its page
 gives the recipe, the hook and the details.
 
-- **[`latex-to-svg-for-markdown`](docs/latex-to-svg-for-markdown.md)**
-  [![MELPA](https://melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://melpa.org/#/latex-to-svg-for-markdown) [![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-markdown) — for
-  `markdown-ts-mode` (Emacs 31.1+) or classic `markdown-mode` / `gfm-mode`.
-  Skips inline code spans, fenced code blocks and indented code blocks. The
-  `markdown` tree-sitter grammar is optional: it makes code-block exclusion
-  exact; without it a regexp fallback handles fenced and indented blocks.
-- **[`latex-to-svg-for-org`](docs/latex-to-svg-for-org.md)**
-  [![MELPA](https://melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://melpa.org/#/latex-to-svg-for-org) [![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-org) — for `org-mode`.
-  Skips `#+begin_src` / `example` / `export` / `comment` blocks, comment lines
-  and inline `~code~` / `=verbatim=` spans. While it is on, `org-latex-preview`
-  only says that it is off: Org's preview would draw its own images over these.
-- **[`latex-to-svg-for-latex`](docs/latex-to-svg-for-latex.md)** (not on MELPA
-  yet) — for AUCTeX's `LaTeX-mode` or the built-in `latex-mode`. Skips
-  comments, `comment` environments, `\iffalse` … `\fi`, verbatim environments
-  and `\verb`, and the preamble. `\ref` and `\eqref` show the numbers LaTeX printed, read from the
-  document's `.aux` file, so references to sections, figures and other files
-  resolve too. While it is on, AUCTeX's preview-latex commands only say that
-  they are off.
+### `latex-to-svg-for-markdown`
+
+[![MELPA](https://melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://melpa.org/#/latex-to-svg-for-markdown)
+[![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-markdown)
+
+For `markdown-ts-mode` (Emacs 31.1+) or classic `markdown-mode` / `gfm-mode`.
+Skips inline code spans, fenced code blocks and indented code blocks. The
+`markdown` tree-sitter grammar is optional: it makes code-block exclusion
+exact; without it a regexp fallback handles fenced and indented blocks. See
+[its page](docs/latex-to-svg-for-markdown.md).
+
+### `latex-to-svg-for-org`
+
+[![MELPA](https://melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://melpa.org/#/latex-to-svg-for-org)
+[![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-org)
+
+For `org-mode`. Skips `#+begin_src` / `example` / `export` / `comment` blocks,
+comment lines and inline `~code~` / `=verbatim=` spans. While it is on,
+`org-latex-preview` only says that it is off: Org's preview would draw its own
+images over these. See [its page](docs/latex-to-svg-for-org.md).
+
+### `latex-to-svg-for-latex`
+
+Not on MELPA yet.
+
+For AUCTeX's `LaTeX-mode` or the built-in `latex-mode`. Skips comments,
+`comment` environments, `\iffalse` … `\fi`, verbatim environments and `\verb`,
+and the preamble. `\ref` and `\eqref` show the numbers LaTeX printed, read from
+the document's `.aux` file, so references to sections, figures and other files
+resolve too. While it is on, AUCTeX's preview-latex commands only say that they
+are off. See [its page](docs/latex-to-svg-for-latex.md).
 
 To add an adaptor for another markup, see
 [Writing an adaptor for another markup](#writing-an-adaptor-for-another-markup).
