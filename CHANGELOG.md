@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   own, like this package's own options: a buffer-local value (from
   `.dir-locals.el`) updates that buffer, a default value every buffer that
   uses it.
+- `latex-to-svg-frontend-labels-function`, a protocol variable for
+  adaptors: a function returning a table from label to its printed number,
+  a string such as `2.1`. When set, `\ref` / `\eqref` resolve against it
+  instead of the equation labels in the buffer, and are drawn with
+  numbering off too. The LaTeX adaptor will fill it from the `.aux` file.
 
 ### Changed
 

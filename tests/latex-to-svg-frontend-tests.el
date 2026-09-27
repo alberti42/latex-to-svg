@@ -2132,6 +2132,51 @@ merely *contains* inline math) is left untouched."
         (should (equal "(??)" (disp (ref "eq:a"))))    ; old target gone
         (should (equal "(1)"  (disp (ref "eq:c"))))))))  ; new target resolves
 
+(defun l2sf-tests--ref-displays ()
+  "Return the display text of each reference overlay, in buffer order."
+  (delq nil (mapcar (lambda (o)
+                      (and (overlay-get o 'latex-to-svg-frontend-ref)
+                           (substring-no-properties (overlay-get o 'display))))
+                    (l2sf-tests--overlays))))
+
+(ert-deftest l2sf-labels-function-resolves-references ()
+  ;; With `latex-to-svg-frontend-labels-function' set, references resolve
+  ;; against its table, whose numbers are strings: `\ref' -> "2.1",
+  ;; `\eqref' -> "(2.1)", a missing label -> "??".  It replaces the
+  ;; buffer's own equation labels: eq:a, defined in the buffer but not in
+  ;; the table, dangles.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "See \\ref{sec:b}, \\eqref{sec:b}, \\ref{sec:none}, \\eqref{eq:a}.\n")
+      (let ((table (make-hash-table :test 'equal)))
+        (puthash "sec:b" "2.1" table)
+        (setq-local latex-to-svg-frontend-labels-function (lambda () table))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (equal (l2sf-tests--ref-displays)
+                       '("2.1" "(2.1)" "??" "(??)")))))))
+
+(ert-deftest l2sf-labels-function-follows-its-table ()
+  ;; A reconcile re-resolves the references against the table the function
+  ;; returns now, also with numbering off, which without the function
+  ;; draws no reference at all.
+  (dolist (numbering '(t nil))
+    (l2sf-tests--with-stub
+      (l2sf-tests--md "See \\ref{sec:b}.\n"
+        (let ((table (make-hash-table :test 'equal)))
+          (puthash "sec:b" "2.1" table)
+          (setq-local latex-to-svg-frontend-mode t)
+          (setq-local latex-to-svg-frontend-number-equations numbering)
+          (setq-local latex-to-svg-frontend-labels-function (lambda () table))
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (should (equal (l2sf-tests--ref-displays) '("2.1")))
+          (puthash "sec:b" "3.4" table)
+          (latex-to-svg-frontend--reconcile)
+          (should (equal (l2sf-tests--ref-displays) '("3.4")))
+          (remhash "sec:b" table)
+          (latex-to-svg-frontend--reconcile-from (point-min))
+          (should (equal (l2sf-tests--ref-displays) '("??"))))))))
+
 (ert-deftest l2sf-reference-reveals-under-cursor ()
   (l2sf-tests--with-stub
     (l2sf-tests--md

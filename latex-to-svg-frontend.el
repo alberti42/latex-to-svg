@@ -418,6 +418,17 @@ scanner skips math inside them.  nil means no exclusions.")
   "Function of no args, called after a jump to unfold the target.
 E.g. Org sets it to `org-fold-show-context'.  nil means no unfolding.")
 
+(defvar-local latex-to-svg-frontend-labels-function nil
+  "Function of no args -> hash table from label to its printed number.
+The number is a string, such as \"2.1\".  When non-nil, `\\eqref' /
+`\\ref' resolve against this table instead of the equation labels the
+numbering scan finds in the buffer, and are drawn even with
+`latex-to-svg-frontend-number-equations' off.  A label missing from it
+shows \"(??)\" / \"??\".  Called once per reconcile, so it should return
+a table it keeps rather than build one each time.  E.g. the LaTeX
+adaptor reads the document's `.aux' file.  nil means the buffer's own
+equation labels.")
+
 (defvar-local latex-to-svg-frontend-detect-function nil
   "Escape hatch: function (BEG END) -> list of math records.
 When non-nil it replaces the built-in scanner entirely (see
@@ -1286,22 +1297,32 @@ wrapped in `$…$' / `\\(…\\)'."
     (when (string-match "\\`\\\\\\(eqref\\|ref\\){\\([^}]+\\)}\\'" s)
       (cons (match-string 1 s) (match-string 2 s)))))
 
+(defun latex-to-svg-frontend--reference-labels (labels)
+  "Return the table references resolve against, given the scan's LABELS.
+That is the table `latex-to-svg-frontend-labels-function' returns when
+it is set, else LABELS."
+  (if latex-to-svg-frontend-labels-function
+      (funcall latex-to-svg-frontend-labels-function)
+    labels))
+
 (defun latex-to-svg-frontend--reference-display (source labels)
   "If SOURCE is a resolvable `\\eqref' / `\\ref' fragment, return its display text.
 The number is looked up in LABELS.
 `\\eqref' -> \"(N)\", `\\ref' -> \"N\" — plain buffer text — or nil."
   (when-let* ((parsed (latex-to-svg-frontend--reference-parse source))
               (num (gethash (cdr parsed) labels)))
-    (if (equal (car parsed) "eqref") (format "(%d)" num) (number-to-string num))))
+    (if (equal (car parsed) "eqref") (format "(%s)" num) (format "%s" num))))
 
 (defun latex-to-svg-frontend--reference-display-text (kind num)
   "Return the buffer-text display for a KIND (\"eqref\"/\"ref\") reference to NUM.
-NUM nil (an unknown or just-deleted target) shows \"(??)\" / \"??\" so a
-dangling reference is visibly broken rather than stale."
+NUM is an integer from the numbering scan or a string from
+`latex-to-svg-frontend-labels-function'.  NUM nil (an unknown or
+just-deleted target) shows \"(??)\" / \"??\" so a dangling reference is
+visibly broken rather than stale."
   (propertize
    (cond ((null num) (if (equal kind "eqref") "(??)" "??"))
-         ((equal kind "eqref") (format "(%d)" num))
-         (t (number-to-string num)))
+         ((equal kind "eqref") (format "(%s)" num))
+         (t (format "%s" num)))
    'face 'latex-to-svg-frontend-reference))
 
 (defun latex-to-svg-frontend--label-position (label)
@@ -1554,13 +1575,14 @@ number, or `(??)' when the label is unknown), a numbered environment via
          (source (latex-to-svg-frontend--math-value el))
          (table (or table (latex-to-svg-frontend--maybe-table)))
          (offsets (car-safe table))
-         (labels (cdr-safe table))
-         (parsed (and latex-to-svg-frontend-detect-references labels
+         (parsed (and latex-to-svg-frontend-detect-references
                       (eq (latex-to-svg-frontend--math-type el) 'fragment)
                       (latex-to-svg-frontend--reference-parse source)))
+         (labels (and parsed (latex-to-svg-frontend--reference-labels
+                              (cdr-safe table))))
          (k (and offsets (gethash (latex-to-svg-frontend--math-begin el) offsets))))
     (cond
-     (parsed
+     ((and parsed labels)
       (let ((num (gethash (cdr parsed) labels)))
         (latex-to-svg-frontend--set-reference-overlay
          (copy-marker (car bounds)) (copy-marker (cdr bounds))
@@ -1672,10 +1694,11 @@ cursor-leave render).  Walks numbered overlays from POS on, seeding the
 counter from the preceding overlay, re-rendering each whose number shifted,
 and stopping as soon as numbers realign.  Falls back to a full
 `--reconcile' on any structural surprise (a downstream overlay with no
-usable source).  No-op unless the mode and numbering are on."
-  (when (and (bound-and-true-p latex-to-svg-frontend-mode)
-             latex-to-svg-frontend-number-equations)
-    (if (not latex-to-svg-frontend-incremental-reconcile)
+usable source).  No-op unless the mode is on; with numbering off, a
+`--reconcile' (which then only re-resolves references)."
+  (when (bound-and-true-p latex-to-svg-frontend-mode)
+    (if (or (not latex-to-svg-frontend-incremental-reconcile)
+            (not latex-to-svg-frontend-number-equations))
         (latex-to-svg-frontend--reconcile)
       (setq latex-to-svg-backend-metadata-prefix
             latex-to-svg-frontend--metadata-prefix)
@@ -1707,23 +1730,26 @@ usable source).  No-op unless the mode and numbering are on."
 
 (defun latex-to-svg-frontend--reconcile-references (labels)
   "Re-resolve every reference preview against LABELS, patching its text.
-Covers all transitions: a shifted number, a deleted target (number ->
-`(??)'), and a target that became defined (`(??)' -> a number).  Uses the
+LABELS is the numbering scan's; `latex-to-svg-frontend-labels-function'
+replaces it when set (see `--reference-labels').  Covers all
+transitions: a shifted number, a deleted target (number -> `(??)'), and
+a target that became defined (`(??)' -> a number).  Uses the
 reference's current buffer text for the label, so it also follows a label
 edited in place.  Skips a reference revealed for editing (`display' nil)."
-  (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
-    (when-let* ((name (overlay-get ov 'latex-to-svg-frontend-ref))
-                (parsed (latex-to-svg-frontend--reference-parse
-                         (buffer-substring-no-properties
-                          (overlay-start ov) (overlay-end ov)))))
-      (let ((want (gethash (cdr parsed) labels)))
-        (unless (eql want (overlay-get ov 'latex-to-svg-frontend-ref-num))
-          (let ((disp (latex-to-svg-frontend--reference-display-text
-                       (car parsed) want)))
-            (overlay-put ov 'latex-to-svg-frontend-ref-display disp)
-            (when (overlay-get ov 'display)
-              (overlay-put ov 'display disp))
-            (overlay-put ov 'latex-to-svg-frontend-ref-num want)))))))
+  (let ((labels (latex-to-svg-frontend--reference-labels labels)))
+    (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
+      (when-let* ((name (overlay-get ov 'latex-to-svg-frontend-ref))
+                  (parsed (latex-to-svg-frontend--reference-parse
+                           (buffer-substring-no-properties
+                            (overlay-start ov) (overlay-end ov)))))
+        (let ((want (gethash (cdr parsed) labels)))
+          (unless (equal want (overlay-get ov 'latex-to-svg-frontend-ref-num))
+            (let ((disp (latex-to-svg-frontend--reference-display-text
+                         (car parsed) want)))
+              (overlay-put ov 'latex-to-svg-frontend-ref-display disp)
+              (when (overlay-get ov 'display)
+                (overlay-put ov 'display disp))
+              (overlay-put ov 'latex-to-svg-frontend-ref-num want))))))))
 
 (defvar-local latex-to-svg-frontend--reconcile-timer nil
   "Pending debounced reconcile timer for this buffer.")
@@ -1769,8 +1795,15 @@ equations, so the full scan is still needed."
   "Recompute equation numbers and re-render previews whose number changed.
 Operate in BUFFER (default the current buffer).
 A comprehensive pass: also cancels any pending debounced reconcile and clears
-the pending-change range.  No-op unless the mode and numbering are on."
+the pending-change range.  No-op unless the mode is on.  With numbering
+off, only re-resolves the references, and only when
+`latex-to-svg-frontend-labels-function' is set."
   (with-current-buffer (or buffer (current-buffer))
+    (when (and (bound-and-true-p latex-to-svg-frontend-mode)
+               (not latex-to-svg-frontend-number-equations)
+               latex-to-svg-frontend-labels-function)
+      (latex-to-svg-frontend--reconcile-references nil)
+      (latex-to-svg-frontend--cancel-reconcile))
     (when (and (bound-and-true-p latex-to-svg-frontend-mode)
                latex-to-svg-frontend-number-equations)
       (setq latex-to-svg-backend-metadata-prefix latex-to-svg-frontend--metadata-prefix)
