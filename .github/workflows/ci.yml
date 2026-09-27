@@ -12,6 +12,7 @@
 # The suite stubs the backend and detects math with a regexp scanner, so it
 # needs no TeX toolchain, no graphical display and no tree-sitter grammar;
 # the one test that needs a Markdown major mode skips itself without one.
+# AUCTeX is installed from GNU ELPA for the one test that runs it.
 #
 # The matrix is the declared floor (29.1, the `Package-Requires' of all
 # four files), then the newest of each series, then master.
@@ -66,6 +67,26 @@ jobs:
               exit 0
             fi
             echo "MELPA fetch failed (attempt $attempt of 3); retrying in 15s"
+            sleep 15
+          done
+          exit 1
+
+      # AUCTeX, from GNU ELPA, for the one LaTeX adaptor test that runs the
+      # real AUCTeX (the others fake what they need from it).  Retried like
+      # the MELPA fetch above, but allowed to fail: when GNU ELPA is down,
+      # that test skips itself and the rest of the run still counts.
+      - name: Install AUCTeX from GNU ELPA
+        continue-on-error: true
+        run: |
+          for attempt in 1 2 3; do
+            if emacs -Q -batch --eval '(progn
+              (require (quote package))
+              (package-initialize)
+              (package-refresh-contents)
+              (package-install (quote auctex)))'; then
+              exit 0
+            fi
+            echo "GNU ELPA fetch failed (attempt $attempt of 3); retrying in 15s"
             sleep 15
           done
           exit 1
