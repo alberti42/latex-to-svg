@@ -23,10 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Requires `latex-to-svg-backend` 0.11.1, for
-  `latex-to-svg-backend-preamble-not-precompiled` and for the preambles read
-  in the requesting buffer.
+  `latex-to-svg-backend-preamble-not-precompiled`, for the preambles read in
+  the requesting buffer, and for `latex-to-svg-backend-invalidate-format`.
 - A change of an option's default value no longer updates a buffer that has
   its own local value of that option, since the change does not reach it.
+- `C-u M-x latex-to-svg-frontend-refresh` also deletes the buffer's `.fmt`
+  file (`latex-to-svg-backend-invalidate-format`) when an equation is
+  typeset with LaTeX, as the engine or the fallback. The `.fmt` file holds
+  the files the preamble loads as they were when it was dumped, so before,
+  an edit to one, such as the `macros.tex` of an `\input{macros.tex}`, did
+  not reach the recompiled equations. The next compile dumps it again.
 
 ### Fixed
 

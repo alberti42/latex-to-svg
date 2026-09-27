@@ -212,6 +212,9 @@ for ready-to-open demos.
   such as a backend option (`latex-to-svg-backend-font-scale`).
   With a prefix argument (`C-u M-x latex-to-svg-frontend-refresh`), it
   **recompiles** the current buffer's previews instead, bypassing the cache.
+  When an equation is typeset with LaTeX, it also deletes the buffer's `.fmt`
+  file, which the next compile dumps again: run it after editing a file the
+  preamble loads, such as the `macros.tex` of an `\input{macros.tex}`.
   Either way it touches only the current buffer.
 
 Move point into a preview to reveal its LaTeX source for editing; leaving

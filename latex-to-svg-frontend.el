@@ -2176,17 +2176,28 @@ Deletes each equation's cached SVG (via `latex-to-svg-backend-invalidate')
 and clears its overlay, then re-renders.  With a fallback engine (see
 `latex-to-svg-frontend-fallback'), the fallback's SVG is deleted too, and
 so is the record of the engine's failure, so the engine is tried again.
+When an equation is typeset with LaTeX, as the engine or the fallback,
+the buffer's `.fmt' file is deleted too
+\(`latex-to-svg-backend-invalidate-format'): it holds the files the
+preamble loads as they were when it was dumped, so an edit to one, such
+as the `macros.tex' of an `\\input{macros.tex}', would not reach the
+recompiled equations.  The next compile dumps it again.
 Run by `latex-to-svg-frontend-refresh' with a prefix argument."
-  (let ((table (latex-to-svg-frontend--maybe-table)))
+  (let ((table (latex-to-svg-frontend--maybe-table))
+        (latex nil))
     (dolist (el (latex-to-svg-frontend--elements beg end))
       (let* ((source (latex-to-svg-frontend--math-value el))
              (engine (latex-to-svg-frontend--engine-for source)))
         (when (memq engine '(latex ratex))
           (let ((value (latex-to-svg-frontend--numbered-value el source table))
                 (fallback (latex-to-svg-frontend--fallback-for engine)))
+            (when (or (eq engine 'latex) (eq fallback 'latex))
+              (setq latex t))
             (latex-to-svg-backend-invalidate value engine)
             (when fallback
               (latex-to-svg-backend-invalidate value fallback))))))
+    (when latex
+      (latex-to-svg-backend-invalidate-format))
     (latex-to-svg-frontend--clear-region beg end)
     (latex-to-svg-frontend--render-region beg end)))
 

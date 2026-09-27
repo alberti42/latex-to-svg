@@ -61,6 +61,7 @@
   `(let ((l2sf-tests--appearance '("#000" "#fff" 20))
          (l2sf-tests--invalidated nil)
          (l2sf-tests--invalidated-engines nil)
+         (l2sf-tests--formats-invalidated 0)
          (l2sf-tests--metadata nil)
          (l2sf-tests--metadata-engines nil)
          (l2sf-tests--last-rescale nil)
@@ -90,7 +91,9 @@
                ((symbol-function 'latex-to-svg-backend-invalidate)
                 (lambda (latex &optional engine)
                   (push latex l2sf-tests--invalidated)
-                  (push engine l2sf-tests--invalidated-engines))))
+                  (push engine l2sf-tests--invalidated-engines)))
+               ((symbol-function 'latex-to-svg-backend-invalidate-format)
+                (lambda () (cl-incf l2sf-tests--formats-invalidated))))
        ,@body)))
 
 (defmacro l2sf-tests--md (text &rest body)
@@ -1791,6 +1794,22 @@ merely *contains* inline math) is left untouched."
             (latex-to-svg-frontend-fallback nil))
         (latex-to-svg-frontend-refresh nil '(4)))
       (should (equal l2sf-tests--invalidated-engines '(ratex))))))
+
+(ert-deftest l2sf-regenerate-invalidates-format-for-latex ()
+  ;; Regenerate deletes the buffer's `.fmt' file once, so an edit to a file
+  ;; its preamble loads reaches the recompiled equations; only when an
+  ;; equation is typeset with LaTeX, as the engine or the fallback.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n\n\\[x\\]\n"
+      (latex-to-svg-frontend-refresh nil '(4))
+      (should (= l2sf-tests--formats-invalidated 1))
+      (let ((latex-to-svg-frontend-engine 'ratex))
+        (latex-to-svg-frontend-refresh nil '(4)))
+      (should (= l2sf-tests--formats-invalidated 2))
+      (let ((latex-to-svg-frontend-engine 'ratex)
+            (latex-to-svg-frontend-fallback nil))
+        (latex-to-svg-frontend-refresh nil '(4)))
+      (should (= l2sf-tests--formats-invalidated 2)))))
 
 ;;;; Inline / display rescale
 
