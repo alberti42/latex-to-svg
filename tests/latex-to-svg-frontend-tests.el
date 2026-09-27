@@ -966,8 +966,17 @@ merely *contains* inline math) is left untouched."
               latex-to-svg-frontend--option-buffers nil
               latex-to-svg-frontend--option-defaults nil)))))
 
+(ert-deftest l2sf-backend-preambles-are-watched ()
+  ;; The three backend preambles, which a project sets in `.dir-locals.el',
+  ;; update the previews like this package's own options.
+  (dolist (option '(latex-to-svg-backend-preamble
+                    latex-to-svg-backend-appended-preamble
+                    latex-to-svg-backend-preamble-not-precompiled))
+    (should (memq #'latex-to-svg-frontend--option-changed
+                  (get-variable-watchers option)))))
+
 (ert-deftest l2sf-option-default-skips-buffers-with-own-value ()
-  ;; A change of `latex-to-svg-backend-preamble-local''s default updates the
+  ;; A change of `latex-to-svg-backend-preamble-not-precompiled''s default updates the
   ;; buffers that use the default, not a buffer with its own value (set by
   ;; its `.dir-locals.el').  A buffer-local change updates that buffer.
   (l2sf-tests--with-stub
@@ -980,13 +989,13 @@ merely *contains* inline math) is left untouched."
             (dolist (buf (list own uses-default))
               (with-current-buffer buf (setq-local latex-to-svg-frontend-mode t)))
             (with-current-buffer own
-              (setq-local latex-to-svg-backend-preamble-local "\\input{m}"))
+              (setq-local latex-to-svg-backend-preamble-not-precompiled "\\input{m}"))
             (should (equal latex-to-svg-frontend--option-buffers (list own)))
             (latex-to-svg-frontend--update-after-option)
             (should (equal updated (list own)))
             (setq updated nil)
-            (let ((latex-to-svg-backend-preamble-local ""))
-              (setq latex-to-svg-backend-preamble-local "\\input{g}")
+            (let ((latex-to-svg-backend-preamble-not-precompiled ""))
+              (setq latex-to-svg-backend-preamble-not-precompiled "\\input{g}")
               (latex-to-svg-frontend--update-after-option)
               (should (equal updated (list uses-default)))))
         (when (timerp latex-to-svg-frontend--option-timer)
@@ -1149,12 +1158,12 @@ merely *contains* inline math) is left untouched."
         (l2sf-tests--with-stub
           (with-temp-file (expand-file-name ".dir-locals.el" dir)
             (prin1 '((text-mode
-                      . ((latex-to-svg-backend-preamble-local . "\\input{m}"))))
+                      . ((latex-to-svg-backend-preamble-not-precompiled . "\\input{m}"))))
                    (current-buffer)))
           (with-temp-file file (insert "$a$\n"))
           (cl-letf (((symbol-function 'latex-to-svg-backend)
                      (lambda (_latex &rest _args)
-                       (setq seen latex-to-svg-backend-preamble-local)
+                       (setq seen latex-to-svg-backend-preamble-not-precompiled)
                        l2sf-tests--image)))
             (let ((enable-local-variables :all)
                   (text-mode-hook (list #'latex-to-svg-frontend-mode)))

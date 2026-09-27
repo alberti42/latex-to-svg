@@ -139,9 +139,10 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 - Emacs 29.1+ with SVG image support. Each adaptor's page lists the major
   modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.11.0+ (the backend) — the floor is set by
-  `latex-to-svg-backend-preamble-local`, the per-project preamble, which the
-  front-end watches so that setting it updates the previews. The engine
+  0.11.1+ (the backend) — the floor is set by the per-project preambles: the
+  backend reads `latex-to-svg-backend-preamble`, `-appended-preamble` and
+  `-preamble-not-precompiled` in the buffer that asks for an equation, and the
+  front-end watches all three, so that setting one updates the previews. The engine
   choice (`:engine`, behind `latex-to-svg-frontend-engine` and the
   `% engine=` cookie), the LaTeX fallback and quiet failures (`:fallback` /
   `:quiet`, behind `latex-to-svg-frontend-fallback` and `-quiet`), and
@@ -203,8 +204,9 @@ for ready-to-open demos.
   to date: render equations that have none (except the one the cursor is in),
   render again those whose engine changed, and redraw the rest from cache for
   the current theme, font, colors and size. You rarely need it: setting an
-  option of this package (with `setq`, `setq-local` or Customize) updates the
-  previews on its own — every buffer for a global value, one buffer for a
+  option of this package, or one of the backend's preambles (with `setq`,
+  `setq-local` or Customize), updates the previews on its own (see
+  [Changing an option](#changing-an-option)) — every buffer for a global value, one buffer for a
   buffer-local one — and redrawing happens on its own on theme,
   buffer-display and zoom changes. Run it after a change those cannot see,
   such as a backend option (`latex-to-svg-backend-font-scale`).
@@ -245,6 +247,7 @@ These options update the previews on their own when you set them, with `setq`,
 | `latex-to-svg-frontend-foreground-color`, `-background-color`, `-padding` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-inline-rescale`, `-display-rescale` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
+| `latex-to-svg-backend-preamble`, `-appended-preamble`, `-preamble-not-precompiled` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
 
 Where the change applies depends on how you make it:
 

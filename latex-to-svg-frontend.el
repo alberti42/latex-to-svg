@@ -7,7 +7,7 @@
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.17.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.11.0"))
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.11.1"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -1867,8 +1867,9 @@ so math still being typed is never compiled."
   "Fetch preview overlay OV's image again, measured at FONT-HEIGHT.
 Uses the value, engine and fallback recorded on OV.  When the cache has
 no picture for them, because a backend option in the cache key changed
-\(`latex-to-svg-backend-preamble', `latex-to-svg-backend-preamble-local')
-or the entry was collected, the backend compiles it and this runs again
+\(`latex-to-svg-backend-preamble',
+`latex-to-svg-backend-preamble-not-precompiled') or the entry was
+collected, the backend compiles it and this runs again
 when the compile is done.  OV keeps its old image until then; an OV
 deleted in the meantime (edited, renumbered) is left alone."
   (when-let* ((buffer (overlay-buffer ov))
@@ -1920,11 +1921,11 @@ point; one whose engine or fallback no longer matches the options
 rendered again; every other preview is redrawn from the cache for the
 current theme, font, colors and size, or compiled again when the cache
 has no picture for it, as after a change of
-`latex-to-svg-backend-preamble'.  Numbers and references are then
-reconciled.  This package's own options do this on their own when set
-\(see `latex-to-svg-frontend--watched-options'); run it after a change
-they cannot see, such as a backend option (`latex-to-svg-backend-font-scale',
-`latex-to-svg-backend-preamble').
+`latex-to-svg-backend-line-width'.  Numbers and references are then
+reconciled.  The options in `latex-to-svg-frontend--watched-options' do
+this on their own when set; run it after a change they cannot see, such
+as another backend option (`latex-to-svg-backend-font-scale',
+`latex-to-svg-backend-line-width').
 
 With RECOMPILE non-nil (interactively, a prefix argument), recompile
 the previews in BUFFER instead, bypassing the cache: the way to retry
@@ -1990,11 +1991,13 @@ fallback than the options now give it (see `--engine-for' and
     latex-to-svg-frontend-inline-rescale
     latex-to-svg-frontend-display-rescale
     latex-to-svg-frontend-center-display-math
-    latex-to-svg-backend-preamble-local)
+    latex-to-svg-backend-preamble
+    latex-to-svg-backend-appended-preamble
+    latex-to-svg-backend-preamble-not-precompiled)
   "Options whose change updates the previews on its own.
 Each has a variable watcher (`latex-to-svg-frontend--option-changed').
-One is the backend's: `latex-to-svg-backend-preamble-local', which a
-project sets in `.dir-locals.el'.")
+The last three are the backend's preambles, which a project sets in
+`.dir-locals.el'.")
 
 (defvar latex-to-svg-frontend--option-timer nil
   "Timer of the pending update after an option changed, or nil.")
@@ -2292,7 +2295,7 @@ buffer visiting a file, the first render runs from a timer, after the
 file's local variables are applied: Emacs runs a major mode's hooks,
 where the mode is usually turned on, before it applies them, and they
 may set an option the render needs, such as
-`latex-to-svg-backend-preamble-local' in `.dir-locals.el'.  Setting
+`latex-to-svg-backend-preamble-not-precompiled' in `.dir-locals.el'.  Setting
 an option of this package updates the previews on its own (see
 `latex-to-svg-frontend--watched-options')."
   :lighter " L2S"

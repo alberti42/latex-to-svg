@@ -13,15 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Setting `latex-to-svg-backend-preamble-local`, the backend's per-project
-  preamble, updates the previews on its own, like this package's own options:
-  a buffer-local value (from `.dir-locals.el`) updates that buffer, a default
-  value every buffer that uses it.
+- Setting one of the backend's preambles (`latex-to-svg-backend-preamble`,
+  `latex-to-svg-backend-appended-preamble`,
+  `latex-to-svg-backend-preamble-not-precompiled`) updates the previews on its
+  own, like this package's own options: a buffer-local value (from
+  `.dir-locals.el`) updates that buffer, a default value every buffer that
+  uses it.
 
 ### Changed
 
-- Requires `latex-to-svg-backend` 0.11.0, for
-  `latex-to-svg-backend-preamble-local`.
+- Requires `latex-to-svg-backend` 0.11.1, for
+  `latex-to-svg-backend-preamble-not-precompiled` and for the preambles read
+  in the requesting buffer.
 - A change of an option's default value no longer updates a buffer that has
   its own local value of that option, since the change does not reach it.
 
@@ -35,8 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In a buffer visiting a file, the first render runs after the file's local
   variables are applied. Emacs runs a major mode's hooks, where the mode is
   usually turned on, before it applies them, so the first render ignored an
-  option set in `.dir-locals.el`, such as `latex-to-svg-backend-preamble-local`:
-  every equation using a project macro was compiled without it and failed.
+  option set in `.dir-locals.el`, such as
+  `latex-to-svg-backend-preamble-not-precompiled`: every equation using a project macro was compiled without it and failed.
   The render now runs from a timer. Other buffers render at once, as before.
 - `normal-mode` and `revert-buffer` no longer leave old previews on screen.
   Changing the major mode kept the overlays, so a preview compiled with the
