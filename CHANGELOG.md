@@ -38,6 +38,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   option set in `.dir-locals.el`, such as `latex-to-svg-backend-preamble-local`:
   every equation using a project macro was compiled without it and failed.
   The render now runs from a timer. Other buffers render at once, as before.
+- `normal-mode` and `revert-buffer` no longer leave old previews on screen.
+  Changing the major mode kept the overlays, so a preview compiled with the
+  old options stayed until its new picture was compiled, and stayed for good
+  when the equation no longer compiled. The mode now turns itself off before
+  the major mode changes, which clears its previews.
 
 ## [0.17.0] - 2026-09-27
 

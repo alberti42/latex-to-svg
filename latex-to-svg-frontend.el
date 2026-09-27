@@ -2270,6 +2270,16 @@ visiting a file (see `latex-to-svg-frontend-mode')."
       (when latex-to-svg-frontend-mode
         (latex-to-svg-frontend--render-region (point-min) (point-max))))))
 
+(defun latex-to-svg-frontend--before-major-mode-change ()
+  "Turn `latex-to-svg-frontend-mode' off before the major mode changes.
+Run from `change-major-mode-hook', as by `normal-mode' or `revert-buffer'.
+The change resets the buffer's local variables, which turns the mode off
+without running its body, but keeps its overlays: previews compiled with
+the old options would stay, and one whose equation no longer compiles
+would stay for good.  Turning the mode off clears them; the new major
+mode's hook, from which the mode is usually turned on, renders again."
+  (latex-to-svg-frontend-mode -1))
+
 (define-minor-mode latex-to-svg-frontend-mode
   "Minor mode previewing LaTeX math as SVG images via `latex-to-svg-backend'.
 
@@ -2297,6 +2307,8 @@ an option of this package updates the previews on its own (see
                   #'latex-to-svg-frontend--schedule-reconcile nil t)
         (add-hook 'post-command-hook
                   #'latex-to-svg-frontend--handle-cursor nil t)
+        (add-hook 'change-major-mode-hook
+                  #'latex-to-svg-frontend--before-major-mode-change nil t)
         (font-lock-add-keywords
          nil latex-to-svg-frontend--font-lock-keywords 'append)
         (when font-lock-mode (font-lock-flush))
@@ -2313,6 +2325,8 @@ an option of this package updates the previews on its own (see
     (remove-hook 'after-change-functions
                  #'latex-to-svg-frontend--schedule-reconcile t)
     (remove-hook 'post-command-hook #'latex-to-svg-frontend--handle-cursor t)
+    (remove-hook 'change-major-mode-hook
+                 #'latex-to-svg-frontend--before-major-mode-change t)
     (font-lock-remove-keywords
      nil latex-to-svg-frontend--font-lock-keywords)
     (when font-lock-mode (font-lock-flush))

@@ -1169,6 +1169,37 @@ merely *contains* inline math) is left untouched."
       (when (buffer-live-p buffer) (kill-buffer buffer))
       (delete-directory dir t))))
 
+(ert-deftest l2sf-major-mode-change-clears-previews ()
+  ;; `normal-mode' (also run by `revert-buffer') changes the major mode,
+  ;; which keeps overlays.  The mode clears its previews first, so the
+  ;; mode hook renders again: the new picture when there is one, none when
+  ;; the equation no longer compiles.
+  (let* ((dir (make-temp-file "l2sf-normal-mode" t))
+         (file (expand-file-name "a.txt" dir))
+         (buffer nil))
+    (unwind-protect
+        (l2sf-tests--with-stub
+          (with-temp-file file (insert "$a$\n"))
+          (let ((text-mode-hook (list #'latex-to-svg-frontend-mode))
+                (displayed (lambda ()
+                             (mapcar (lambda (ov) (overlay-get ov 'display))
+                                     (l2sf-tests--overlays)))))
+            (setq buffer (find-file-noselect file))
+            (with-current-buffer buffer
+              (sit-for 0.01)
+              (should (equal (funcall displayed) '(fake-image)))
+              (let ((l2sf-tests--image 'new))
+                (normal-mode)
+                (sit-for 0.01)
+                (should latex-to-svg-frontend-mode)
+                (should (equal (funcall displayed) '(new))))
+              (let ((l2sf-tests--image nil))
+                (normal-mode)
+                (sit-for 0.01)
+                (should-not (funcall displayed))))))
+      (when (buffer-live-p buffer) (kill-buffer buffer))
+      (delete-directory dir t))))
+
 (ert-deftest l2sf-mode-off-cancels-first-render ()
   ;; Turning the mode off before the scheduled first render cancels it.
   (l2sf-tests--with-stub
