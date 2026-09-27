@@ -16,13 +16,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `latex-to-svg-for-latex`, an adaptor for AUCTeX's `LaTeX-mode` and the
-  built-in `latex-mode` (see `docs/latex-to-svg-for-latex.md`). It skips
-  comments, `comment` environments, `\iffalse` … `\fi`, the verbatim
-  environments and macros, and the preamble. `\ref` and `\eqref` show the
-  numbers read from the document's `.aux` file, found through AUCTeX or a
-  template (`latex-to-svg-for-latex-aux-file`), and a jump to a label in
-  another file goes through `xref`. It sets the engine to `latex` in its
-  buffers and remaps AUCTeX's preview-latex commands to a message.
+  built-in `latex-mode` (see `docs/latex-to-svg-for-latex.md`, and the demo
+  `docs/example.tex`). It skips comments, `comment` environments, `\iffalse` …
+  `\fi`, the verbatim environments and macros, and the preamble. `\ref` and
+  `\eqref` show the numbers read from the document's `.aux` file, found
+  through AUCTeX or a template (`latex-to-svg-for-latex-aux-file`), and a jump
+  to a label in another file goes through `xref`. It sets the engine to
+  `latex` in its buffers and remaps AUCTeX's preview-latex commands to a
+  message.
 - `latex-to-svg-frontend-padding-inline` and
   `latex-to-svg-frontend-padding-display` set the padding of inline and
   display previews separately, with the values `latex-to-svg-frontend-padding`
