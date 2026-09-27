@@ -1859,29 +1859,51 @@ so math still being typed is never compiled."
 
 ;;;; Refresh (theme / font tracking)
 
+(defun latex-to-svg-frontend--refresh-overlay (ov font-height)
+  "Fetch preview overlay OV's image again, measured at FONT-HEIGHT.
+Uses the value, engine and fallback recorded on OV.  When the cache has
+no picture for them, because a backend option in the cache key changed
+\(`latex-to-svg-backend-preamble', `latex-to-svg-backend-preamble-local')
+or the entry was collected, the backend compiles it and this runs again
+when the compile is done.  OV keeps its old image until then; an OV
+deleted in the meantime (edited, renumbered) is left alone."
+  (when-let* ((buffer (overlay-buffer ov))
+              (value (overlay-get ov 'latex-to-svg-frontend-value)))
+    (with-current-buffer buffer
+      (when-let* ((image (latex-to-svg-backend
+                          value
+                          :rescale-by (latex-to-svg-frontend--rescale-for
+                                       (overlay-get ov 'latex-to-svg-frontend-display-math))
+                          :color latex-to-svg-frontend-foreground-color
+                          :background latex-to-svg-frontend-background-color
+                          :padding latex-to-svg-frontend-padding
+                          :font-height font-height
+                          :metadata (car (overlay-get
+                                          ov 'latex-to-svg-frontend-enums))
+                          :engine (overlay-get
+                                   ov 'latex-to-svg-frontend-engine)
+                          :fallback (overlay-get
+                                     ov 'latex-to-svg-frontend-fallback)
+                          :quiet latex-to-svg-frontend-quiet
+                          :callback
+                          (lambda ()
+                            (when (overlay-buffer ov)
+                              (latex-to-svg-frontend--refresh-overlay
+                               ov (latex-to-svg-frontend--font-height
+                                   (overlay-buffer ov))))))))
+        (overlay-put ov 'latex-to-svg-frontend-image image)
+        (when (overlay-get ov 'display)
+          (latex-to-svg-frontend--show-image ov image))))))
+
 (defun latex-to-svg-frontend--refresh-buffer (buffer)
-  "Re-tint / re-scale BUFFER's previews for the current appearance."
+  "Fetch BUFFER's previews again for the current appearance.
+Each preview is fetched by `--refresh-overlay': from the cache, re-tinted
+and re-scaled, or compiled when the cache has no picture for it."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (let ((font-height (latex-to-svg-frontend--font-height (current-buffer))))
         (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
-          (when-let* ((value (overlay-get ov 'latex-to-svg-frontend-value))
-                      (image (latex-to-svg-backend
-                              value
-                              :rescale-by (latex-to-svg-frontend--rescale-for
-                                           (overlay-get ov 'latex-to-svg-frontend-display-math))
-                              :color latex-to-svg-frontend-foreground-color
-                              :background latex-to-svg-frontend-background-color
-                              :padding latex-to-svg-frontend-padding
-                              :font-height font-height
-                              :engine (overlay-get
-                                       ov 'latex-to-svg-frontend-engine)
-                              :fallback (overlay-get
-                                         ov 'latex-to-svg-frontend-fallback)
-                              :quiet latex-to-svg-frontend-quiet)))
-            (overlay-put ov 'latex-to-svg-frontend-image image)
-            (when (overlay-get ov 'display)
-              (latex-to-svg-frontend--show-image ov image))))
+          (latex-to-svg-frontend--refresh-overlay ov font-height))
         (setq latex-to-svg-frontend--rendered-appearance
               (latex-to-svg-backend-appearance font-height))))))
 
@@ -1892,7 +1914,9 @@ An equation with no preview is rendered, except the one containing
 point; one whose engine or fallback no longer matches the options
 \(`latex-to-svg-frontend-engine', `latex-to-svg-frontend-fallback') is
 rendered again; every other preview is redrawn from the cache for the
-current theme, font, colors and size.  Numbers and references are then
+current theme, font, colors and size, or compiled again when the cache
+has no picture for it, as after a change of
+`latex-to-svg-backend-preamble'.  Numbers and references are then
 reconciled.  This package's own options do this on their own when set
 \(see `latex-to-svg-frontend--watched-options'); run it after a change
 they cannot see, such as a backend option (`latex-to-svg-backend-font-scale',

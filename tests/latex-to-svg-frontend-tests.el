@@ -1030,6 +1030,34 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend-refresh))
       (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display) 'retinted-image)))))
 
+(ert-deftest l2sf-refresh-compiles-a-cache-miss ()
+  ;; After a change of a backend option in the cache key (the preamble),
+  ;; the refresh finds no picture: it passes a callback and the equation's
+  ;; `:metadata', and the callback installs the compiled picture.  A
+  ;; callback for an overlay deleted in the meantime does nothing.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{equation}\nx\n\\end{equation}\n\n$a$\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((callbacks nil)
+            (metadata nil))
+        (cl-letf (((symbol-function 'latex-to-svg-backend)
+                   (lambda (_latex &rest args)
+                     (push (plist-get args :callback) callbacks)
+                     (push (plist-get args :metadata) metadata)
+                     nil)))
+          (latex-to-svg-frontend-refresh))
+        (should (= (length callbacks) 2))
+        (should (seq-every-p #'functionp callbacks))
+        (should (equal (sort (delq nil metadata) #'<) '(1)))
+        (dolist (ov (l2sf-tests--overlays))
+          (should (eq (overlay-get ov 'display) 'fake-image)))
+        (delete-overlay (car (last (l2sf-tests--overlays))))
+        (let ((l2sf-tests--image 'compiled))
+          (mapc #'funcall callbacks))
+        (should (equal (mapcar (lambda (ov) (overlay-get ov 'display))
+                               (l2sf-tests--overlays))
+                       '(compiled)))))))
+
 (ert-deftest l2sf-refresh-if-changed-gated-on-appearance ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$\n"

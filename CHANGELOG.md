@@ -11,6 +11,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `latex-to-svg-frontend-refresh` compiles a preview whose picture is not in
+  the cache, as after a change of `latex-to-svg-backend-preamble`. Before, it
+  asked the backend for the picture without a callback, so the backend
+  started no compile and the preview kept its old picture. The redraw after a
+  theme or zoom change goes through the same code.
+
 ## [0.17.0] - 2026-09-27
 
 ### Added
