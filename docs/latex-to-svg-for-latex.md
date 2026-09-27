@@ -48,9 +48,11 @@ or the built-in `latex-mode`:
 
 In any other major mode, the mode refuses to turn on.
 
-With the mode on, all math renders when the buffer opens. Equations that use
-the project's own macros or packages need the project's preamble, set in its
-`.dir-locals.el`: see the README's
+With the mode on, all math renders when the buffer opens. See
+[`example.tex`](example.tex) for a ready-to-open demo; compile it (`latex
+example.tex`, twice) so its references find their numbers in the `.aux` file.
+Equations that use the project's own macros or packages need the project's
+preamble, set in its `.dir-locals.el`: see the README's
 [Projects with their own macros](../README.md#projects-with-their-own-macros).
 
 While the mode is on, AUCTeX's preview-latex commands (`preview-at-point`,

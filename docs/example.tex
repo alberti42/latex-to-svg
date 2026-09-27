@@ -1,0 +1,164 @@
+\documentclass{article}
+\usepackage{amsmath}
+\usepackage{comment}
+
+% The preamble is not previewed: the $\tfrac{1}{2}$ below stays text.
+\newcommand{\half}{$\tfrac{1}{2}$}
+
+\title{latex-to-svg --- LaTeX demo}
+\author{latex-to-svg}
+\date{}
+
+\begin{document}
+\maketitle
+
+\section{Getting started}
+\label{sec:start}
+
+Open this file and turn the previews on with
+\verb|M-x latex-to-svg-for-latex-mode| (or add
+\verb|(add-hook 'LaTeX-mode-hook #'latex-to-svg-for-latex-mode)| to your init).
+It needs the latex-to-svg-backend package on your load path, plus
+\verb|latex| and \verb|dvisvgm|.
+
+References come from this document's \verb|.aux| file. Until you compile
+it, they show ??; run \verb|latex example.tex| twice (or \verb|C-c C-c| in
+AUCTeX), and they show the numbers LaTeX printed, at the next reconcile or at
+once with \verb|M-x latex-to-svg-frontend-refresh|.
+
+While the mode is on, math renders by itself: when the buffer opens, when the
+cursor leaves an equation, and a moment after a paste.
+\verb|C-u M-x latex-to-svg-frontend-refresh| recompiles the previews,
+bypassing the cache.
+
+Three things to try as you read:
+\begin{itemize}
+\item Move point into any preview: it reveals the LaTeX source for editing;
+  move out and it re-shows the image (or re-renders if you changed the text).
+\item Click a reference like the one to Newton's law below (\verb|mouse-1|,
+  \verb|mouse-2| or \verb|C-c C-o|): it jumps to the label that defines it.
+\item Edit a numbered equation (delete one, or turn \verb|equation| into
+  \verb|equation*|): every number below updates on its own.
+\end{itemize}
+
+\section{Inline math}
+\label{sec:inline}
+
+The mass--energy relation is $E = mc^2$, and Euler's identity
+$e^{i\pi} + 1 = 0$ is often called the most beautiful equation in
+mathematics. A quadratic $ax^2 + bx + c = 0$ has roots
+\( x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a} \).
+
+Inline previews scale with the surrounding font, so a text zoom
+(\verb|C-x C-+|) rescales them from cache with no recompile.
+
+\section{Unnumbered display math}
+
+A centered display equation with \verb|\[ ... \]| consumes no equation
+number:
+
+\[ \int_{-\infty}^{\infty} e^{-x^2}\, dx = \sqrt{\pi} \]
+
+\section{Automatic equation numbering}
+\label{sec:numbering}
+
+The number of each equation is computed from the equations before it, so these
+come out as (1), (2), \dots\ in document order, as in the compiled document:
+
+\begin{equation}
+\label{eq:newton}
+\mathbf{F} = m\mathbf{a}
+\end{equation}
+
+Maxwell's equations number per row: each line gets its own number.
+
+\begin{align}
+\label{eq:gauss-e}
+\nabla \cdot \mathbf{E} &= \frac{\rho}{\varepsilon_0} \\
+\nabla \cdot \mathbf{B} &= 0 \\
+\nabla \times \mathbf{E} &= -\frac{\partial \mathbf{B}}{\partial t} \\
+\nabla \times \mathbf{B} &= \mu_0 \mathbf{J} + \mu_0 \varepsilon_0 \frac{\partial \mathbf{E}}{\partial t}
+\end{align}
+
+\begin{equation}
+\label{eq:schrodinger}
+i\hbar \frac{\partial}{\partial t}\,\Psi(\mathbf{r}, t) = \hat{H}\,\Psi(\mathbf{r}, t)
+\end{equation}
+
+The previews do not read this file's preamble, so a macro defined there, such
+as \verb|\half|, is unknown to them. For a project's own macros, set its
+preamble in \verb|.dir-locals.el| (see the README, ``Projects with their own
+macros'').
+
+\section{Cross-references}
+\label{sec:refs}
+
+References show the number LaTeX printed, read from the \verb|.aux| file, as
+plain buffer text; each is click-to-jump.
+\begin{itemize}
+\item Newton's second law is \eqref{eq:newton}.
+\item Gauss's law for $\mathbf{E}$ is \eqref{eq:gauss-e}, the first row of the
+  Maxwell block.
+\item The time-dependent Schr\"odinger equation is \eqref{eq:schrodinger}.
+\end{itemize}
+
+A bare \verb|\ref| gives just the number: see \ref{eq:schrodinger}. Labels of
+sections and figures resolve too: inline math is in Section~\ref{sec:inline},
+and Figure~\ref{fig:box} is below. A label that is not in the \verb|.aux| file
+shows ??, as in the compiled document: \ref{sec:missing}.
+
+\begin{figure}[h]
+  \centering
+  \fbox{A figure, for its label.}
+  \caption{A figure with a label.}
+  \label{fig:box}
+\end{figure}
+
+\section{Partial numbering, starred, and multline}
+
+Only some rows of an \verb|align| need numbers; mark the rest
+\verb|\nonumber|:
+
+\begin{align}
+a &= b + c \nonumber \\
+  &= d \label{eq:result}
+\end{align}
+
+Result \eqref{eq:result} is the only numbered line above.
+
+A starred environment is never numbered and does not advance the counter:
+
+\begin{equation*}
+\oint_{\partial S} \mathbf{B} \cdot d\boldsymbol{\ell} = \mu_0 I_{\text{enc}}
+\end{equation*}
+
+A \verb|multline| is a single number spanning several lines:
+
+\begin{multline}
+(a + b + c + d + e)^2 = a^2 + b^2 + c^2 + d^2 + e^2 \\
++ 2ab + 2ac + 2ad + 2ae + 2bc + 2bd + 2be + 2cd + 2ce + 2de
+\end{multline}
+
+\section{What is not previewed}
+
+Math in comments, verbatim text and switched-off blocks stays text.
+
+A comment: % $a + b$ is not previewed here.
+
+Verbatim: \verb|$a + b$| and \verb+$c$+ stay as written, and so does
+
+\begin{verbatim}
+$\int_0^1 x\,dx$
+\end{verbatim}
+
+\begin{comment}
+A comment environment: $\sum_i x_i$ is not previewed.
+\end{comment}
+
+\iffalse
+Switched off with iffalse: $\prod_i x_i$ is not previewed.
+\fi
+
+\end{document}
+
+What follows end{document} is not previewed either: $x^2$.

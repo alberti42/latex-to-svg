@@ -220,8 +220,8 @@ this if you never change themes or font sizes at runtime):
 
 Turn on the adaptor mode from your major mode's hook; each adaptor's page gives
 the line. With the mode on, all math renders when the buffer opens. See
-[`docs/example.md`](docs/example.md) / [`docs/example.org`](docs/example.org)
-for ready-to-open demos.
+[`docs/example.md`](docs/example.md) / [`docs/example.org`](docs/example.org) /
+[`docs/example.tex`](docs/example.tex) for ready-to-open demos.
 
 - `M-x latex-to-svg-frontend-clear` — clear previews (region or buffer).
 - `M-x latex-to-svg-frontend-refresh` — bring the current buffer's previews up
