@@ -22,12 +22,11 @@ This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 - **`latex-to-svg-frontend`** — the core: math detection, overlay lifecycle,
   equation numbering, `\ref`/`\eqref` resolution, reveal-on-cursor editing,
   render-on-leave, and theme/zoom refresh. Knows nothing about any markup.
-- **`latex-to-svg-for-markdown`** — Markdown adaptor.
-- **`latex-to-svg-for-org`** — Org adaptor.
-- **`latex-to-svg-for-latex`** — LaTeX adaptor.
+- **`latex-to-svg-for-markdown`** — [Markdown adaptor](docs/latex-to-svg-for-markdown.md).
+- **`latex-to-svg-for-org`** — [Org adaptor](docs/latex-to-svg-for-org.md).
+- **`latex-to-svg-for-latex`** — [LaTeX adaptor](docs/latex-to-svg-for-latex.md).
 
-The adaptors are described under
-[One adaptor per markup](#one-adaptor-per-markup).
+An overview of the adaptors is presented under [One adaptor per markup](#one-adaptor-per-markup).
 
 ```
   latex-to-svg-for-markdown ─┐
