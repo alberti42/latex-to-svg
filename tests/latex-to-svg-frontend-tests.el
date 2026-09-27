@@ -957,11 +957,45 @@ merely *contains* inline math) is left untouched."
               (should-not latex-to-svg-frontend--option-buffers)
               ;; `setq' of a variable with no local value sets its default.
               (setq latex-to-svg-frontend-foreground-color "red")
-              (should (eq latex-to-svg-frontend--option-buffers t))))
+              (should-not latex-to-svg-frontend--option-buffers)
+              (should (equal latex-to-svg-frontend--option-defaults
+                             '(latex-to-svg-frontend-foreground-color)))))
         (when (timerp latex-to-svg-frontend--option-timer)
           (cancel-timer latex-to-svg-frontend--option-timer))
         (setq latex-to-svg-frontend--option-timer nil
-              latex-to-svg-frontend--option-buffers nil)))))
+              latex-to-svg-frontend--option-buffers nil
+              latex-to-svg-frontend--option-defaults nil)))))
+
+(ert-deftest l2sf-option-default-skips-buffers-with-own-value ()
+  ;; A change of `latex-to-svg-backend-preamble-local''s default updates the
+  ;; buffers that use the default, not a buffer with its own value (set by
+  ;; its `.dir-locals.el').  A buffer-local change updates that buffer.
+  (l2sf-tests--with-stub
+    (let ((updated nil)
+          (own (generate-new-buffer " l2sf-own"))
+          (uses-default (generate-new-buffer " l2sf-default")))
+      (unwind-protect
+          (cl-letf (((symbol-function 'latex-to-svg-frontend--update-buffer)
+                     (lambda (buf) (push buf updated))))
+            (dolist (buf (list own uses-default))
+              (with-current-buffer buf (setq-local latex-to-svg-frontend-mode t)))
+            (with-current-buffer own
+              (setq-local latex-to-svg-backend-preamble-local "\\input{m}"))
+            (should (equal latex-to-svg-frontend--option-buffers (list own)))
+            (latex-to-svg-frontend--update-after-option)
+            (should (equal updated (list own)))
+            (setq updated nil)
+            (let ((latex-to-svg-backend-preamble-local ""))
+              (setq latex-to-svg-backend-preamble-local "\\input{g}")
+              (latex-to-svg-frontend--update-after-option)
+              (should (equal updated (list uses-default)))))
+        (when (timerp latex-to-svg-frontend--option-timer)
+          (cancel-timer latex-to-svg-frontend--option-timer))
+        (setq latex-to-svg-frontend--option-timer nil
+              latex-to-svg-frontend--option-buffers nil
+              latex-to-svg-frontend--option-defaults nil)
+        (kill-buffer own)
+        (kill-buffer uses-default)))))
 
 (ert-deftest l2sf-appearance-refresh-only-redraws ()
   ;; The automatic refresh after a theme or zoom change only redraws what is

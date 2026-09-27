@@ -7,7 +7,7 @@
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.17.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.10.0"))
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.11.0"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -1989,43 +1989,58 @@ fallback than the options now give it (see `--engine-for' and
     latex-to-svg-frontend-padding
     latex-to-svg-frontend-inline-rescale
     latex-to-svg-frontend-display-rescale
-    latex-to-svg-frontend-center-display-math)
+    latex-to-svg-frontend-center-display-math
+    latex-to-svg-backend-preamble-local)
   "Options whose change updates the previews on its own.
-Each has a variable watcher (`latex-to-svg-frontend--option-changed').")
+Each has a variable watcher (`latex-to-svg-frontend--option-changed').
+One is the backend's: `latex-to-svg-backend-preamble-local', which a
+project sets in `.dir-locals.el'.")
 
 (defvar latex-to-svg-frontend--option-timer nil
   "Timer of the pending update after an option changed, or nil.")
 
 (defvar latex-to-svg-frontend--option-buffers nil
-  "Buffers to update after an option changed: a list, or t for all.")
+  "Buffers whose local value of a watched option changed, to update.")
 
-(defun latex-to-svg-frontend--option-changed (_symbol _newval operation where)
-  "Schedule the update after one of `--watched-options' changed.
+(defvar latex-to-svg-frontend--option-defaults nil
+  "Watched options whose default value changed, to update the buffers using it.")
+
+(defun latex-to-svg-frontend--option-changed (symbol _newval operation where)
+  "Schedule the update after SYMBOL, one of `--watched-options', changed.
 A variable watcher: OPERATION is how it changed and WHERE the buffer
 whose local value changed, or nil for the default value.  A change of
 the default value (`setq' of a global value, `setq-default', Customize)
-updates every buffer with previews; a buffer-local one (`setq-local',
-`.dir-locals.el') updates that buffer.  A let-binding updates nothing.
-The watcher runs before the value is set, so the update runs from a
-timer, which also takes several changes in one go (a block of `setq's
-in an init file)."
+updates every buffer with previews that has no local value of SYMBOL; a
+buffer-local one (`setq-local', `.dir-locals.el') updates that buffer.
+A let-binding updates nothing.  The watcher runs before the value is
+set, so the update runs from a timer, which also takes several changes
+in one go (a block of `setq's in an init file)."
   (when (eq operation 'set)
-    (setq latex-to-svg-frontend--option-buffers
-          (if (or (null where) (eq latex-to-svg-frontend--option-buffers t))
-              t
-            (cl-adjoin where latex-to-svg-frontend--option-buffers)))
+    (if where
+        (setq latex-to-svg-frontend--option-buffers
+              (cl-adjoin where latex-to-svg-frontend--option-buffers))
+      (setq latex-to-svg-frontend--option-defaults
+            (cl-adjoin symbol latex-to-svg-frontend--option-defaults)))
     (unless (timerp latex-to-svg-frontend--option-timer)
       (setq latex-to-svg-frontend--option-timer
             (run-at-time 0 nil #'latex-to-svg-frontend--update-after-option)))))
 
 (defun latex-to-svg-frontend--update-after-option ()
-  "Update the buffers `--option-changed' collected (see `--update-buffer')."
-  (let ((buffers latex-to-svg-frontend--option-buffers))
+  "Update the buffers `--option-changed' collected (see `--update-buffer').
+That is each buffer with previews whose local value of a watched option
+changed, or that has no local value of an option whose default changed."
+  (let ((buffers latex-to-svg-frontend--option-buffers)
+        (defaults latex-to-svg-frontend--option-defaults))
     (setq latex-to-svg-frontend--option-buffers nil
+          latex-to-svg-frontend--option-defaults nil
           latex-to-svg-frontend--option-timer nil)
-    (dolist (buf (if (eq buffers t) (buffer-list) buffers))
+    (dolist (buf (if defaults (buffer-list) buffers))
       (when (and (buffer-live-p buf)
-                 (buffer-local-value 'latex-to-svg-frontend-mode buf))
+                 (buffer-local-value 'latex-to-svg-frontend-mode buf)
+                 (or (memq buf buffers)
+                     (seq-some (lambda (option)
+                                 (not (local-variable-p option buf)))
+                               defaults)))
         (latex-to-svg-frontend--update-buffer buf)))))
 
 (dolist (option latex-to-svg-frontend--watched-options)

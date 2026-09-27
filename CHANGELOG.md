@@ -11,6 +11,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Setting `latex-to-svg-backend-preamble-local`, the backend's per-project
+  preamble, updates the previews on its own, like this package's own options:
+  a buffer-local value (from `.dir-locals.el`) updates that buffer, a default
+  value every buffer that uses it.
+
+### Changed
+
+- Requires `latex-to-svg-backend` 0.11.0, for
+  `latex-to-svg-backend-preamble-local`.
+- A change of an option's default value no longer updates a buffer that has
+  its own local value of that option, since the change does not reach it.
+
 ### Fixed
 
 - `latex-to-svg-frontend-refresh` compiles a preview whose picture is not in

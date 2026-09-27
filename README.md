@@ -130,12 +130,14 @@ Each adaptor supplies that as a buffer-local `exclude-function`:
   exclusion exact; without it a regexp fallback handles fenced and indented
   blocks).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.10.0+ (the backend) — the floor is set by the engine choice (`:engine`,
-  behind `latex-to-svg-frontend-engine` and the `% engine=` cookie), the LaTeX
-  fallback and quiet failures (`:fallback` / `:quiet`, behind
-  `latex-to-svg-frontend-fallback` and `-quiet`), and
+  0.11.0+ (the backend) — the floor is set by
+  `latex-to-svg-backend-preamble-local`, the per-project preamble, which the
+  front-end watches so that setting it updates the previews. The engine
+  choice (`:engine`, behind `latex-to-svg-frontend-engine` and the
+  `% engine=` cookie), the LaTeX fallback and quiet failures (`:fallback` /
+  `:quiet`, behind `latex-to-svg-frontend-fallback` and `-quiet`), and
   `latex-to-svg-backend-engine-used`, which the tooltip uses to name the
-  engine. The display-time `:color` / `:background` / `:padding` overrides and
+  engine, came with 0.10.0. The display-time `:color` / `:background` / `:padding` overrides and
   `:font-height`, which lets the front-end measure the buffer font against the
   frame that actually displays it, came earlier.
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution), or RaTeX's
