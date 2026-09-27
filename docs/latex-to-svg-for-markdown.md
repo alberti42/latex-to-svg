@@ -18,15 +18,12 @@ in the README's [Requirements](../README.md#requirements).
 
 ## Installation
 
-Install the core first, as in the README's
-[Installation](../README.md#installation), then the adaptor:
+The adaptor is on MELPA; installing it pulls in the frontend and the backend
+(see the README's [Installation](../README.md#installation)):
 
 ```elisp
-;; Markdown adaptor
 (use-package latex-to-svg-for-markdown
-  :straight (latex-to-svg-for-markdown :type git :host github
-                                       :repo "alberti42/latex-to-svg"
-                                       :files ("latex-to-svg-for-markdown.el"))
+  :ensure t                  ; with straight: :straight t
   :hook (markdown-ts-mode . latex-to-svg-for-markdown-mode))
 ```
 

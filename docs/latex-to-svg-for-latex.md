@@ -16,10 +16,13 @@ skips the verbatim environments AUCTeX's style files add.
 
 ## Installation
 
-Install the core first, as in the README's
-[Installation](../README.md#installation), then the adaptor:
+The adaptor is not on MELPA yet. Install the frontend from MELPA (see the
+README's [Installation](../README.md#installation)), then the adaptor from
+git, here with `straight`:
 
 ```elisp
+(use-package latex-to-svg-frontend :straight t)
+
 ;; LaTeX adaptor
 (use-package latex-to-svg-for-latex
   :straight (latex-to-svg-for-latex :type git :host github

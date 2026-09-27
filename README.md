@@ -7,8 +7,8 @@
 [![CI](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/github/license/alberti42/latex-to-svg)](LICENSE)
 
-The two MELPA badges are the core, `latex-to-svg-frontend`; the adaptors get
-their own once they are on MELPA.
+The two MELPA badges are the core, `latex-to-svg-frontend`; the adaptors'
+badges are on their lines under [One adaptor per markup](#one-adaptor-per-markup).
 
 Render LaTeX math in Emacs Org, Markdown and LaTeX buffers. Inline and display math,
 numbered environments included, is compiled with
@@ -104,19 +104,21 @@ a buffer are code, verbatim or comment, so math inside them is not previewed,
 and turns the core on. Install the adaptor for each markup you use; its page
 gives the recipe, the hook and the details.
 
-- **[`latex-to-svg-for-markdown`](docs/latex-to-svg-for-markdown.md)** — for
+- **[`latex-to-svg-for-markdown`](docs/latex-to-svg-for-markdown.md)**
+  [![MELPA](https://melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://melpa.org/#/latex-to-svg-for-markdown) [![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-markdown) — for
   `markdown-ts-mode` (Emacs 31.1+) or classic `markdown-mode` / `gfm-mode`.
   Skips inline code spans, fenced code blocks and indented code blocks. The
   `markdown` tree-sitter grammar is optional: it makes code-block exclusion
   exact; without it a regexp fallback handles fenced and indented blocks.
-- **[`latex-to-svg-for-org`](docs/latex-to-svg-for-org.md)** — for `org-mode`.
+- **[`latex-to-svg-for-org`](docs/latex-to-svg-for-org.md)**
+  [![MELPA](https://melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://melpa.org/#/latex-to-svg-for-org) [![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-org) — for `org-mode`.
   Skips `#+begin_src` / `example` / `export` / `comment` blocks, comment lines
   and inline `~code~` / `=verbatim=` spans. While it is on, `org-latex-preview`
   only says that it is off: Org's preview would draw its own images over these.
-- **[`latex-to-svg-for-latex`](docs/latex-to-svg-for-latex.md)** — for AUCTeX's
-  `LaTeX-mode` or the built-in `latex-mode`. Skips comments, `comment`
-  environments, `\iffalse` … `\fi`, verbatim environments and `\verb`, and the
-  preamble. `\ref` and `\eqref` show the numbers LaTeX printed, read from the
+- **[`latex-to-svg-for-latex`](docs/latex-to-svg-for-latex.md)** (not on MELPA
+  yet) — for AUCTeX's `LaTeX-mode` or the built-in `latex-mode`. Skips
+  comments, `comment` environments, `\iffalse` … `\fi`, verbatim environments
+  and `\verb`, and the preamble. `\ref` and `\eqref` show the numbers LaTeX printed, read from the
   document's `.aux` file, so references to sections, figures and other files
   resolve too. While it is on, AUCTeX's preview-latex commands only say that
   they are off.
@@ -166,36 +168,39 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 The stack has three layers:
 
 - **[`latex-to-svg-backend`](https://melpa.org/#/latex-to-svg-backend)** — the
-  backend, which compiles LaTeX to SVG. It is on MELPA and is pulled in
-  automatically through the `Package-Requires` header, so the recipes below do
-  not install it. (`straight` resolves it from its bundled MELPA recipes; run `M-x
-  straight-pull-recipe-repositories` if yours predates its addition.)
-- **`latex-to-svg-frontend`** — the shared preview core (detection, overlays,
-  numbering, refresh), markup-agnostic.
+  backend, which compiles LaTeX to SVG.
+- **[`latex-to-svg-frontend`](https://melpa.org/#/latex-to-svg-frontend)** — the
+  shared preview core (detection, overlays, numbering, refresh),
+  markup-agnostic.
 - **`latex-to-svg-for-markdown`** / **`latex-to-svg-for-org`** /
   **`latex-to-svg-for-latex`** — the per-mode adaptors. Install whichever you
-  use; all are optional.
+  use.
 
-This repo is not on MELPA yet, hence the git recipes. The frontend and the
-three adaptors all live here, so each recipe selects a single file. Install the
-frontend with the recipe below, then each adaptor with the recipe on its page
-([Markdown](docs/latex-to-svg-for-markdown.md#installation),
-[Org](docs/latex-to-svg-for-org.md#installation),
-[LaTeX](docs/latex-to-svg-for-latex.md#installation)).
-
-### Straight
+Install the adaptor for each markup you use; it pulls in the frontend and the
+backend through its `Package-Requires` header. The Markdown and Org adaptors
+are on MELPA, with `melpa` in `package-archives`:
 
 ```elisp
-;; Frontend — the shared preview core
-(use-package latex-to-svg-frontend
-  :straight (latex-to-svg-frontend :type git :host github
-                                   :repo "alberti42/latex-to-svg"
-                                   :files ("latex-to-svg-frontend.el"))
-  ;; Optional: re-tint previews the instant you switch themes, and
-  ;; rescale them when the frame font changes.  See "Refreshing on
-  ;; appearance changes" below; omit if you never change themes or
-  ;; font sizes at runtime.
-  :config
+(use-package latex-to-svg-for-org
+  :ensure t
+  :hook (org-mode . latex-to-svg-for-org-mode))
+```
+
+With `straight`, which resolves MELPA recipes on its own, write `:straight t`
+instead of `:ensure t` (run `M-x straight-pull-recipe-repositories` if your
+recipes predate the packages). Each adaptor's page gives its lines
+([Markdown](docs/latex-to-svg-for-markdown.md#installation),
+[Org](docs/latex-to-svg-for-org.md#installation)). The LaTeX adaptor is not on
+MELPA yet: its page gives a git recipe
+([LaTeX](docs/latex-to-svg-for-latex.md#installation)).
+
+Optionally, re-tint previews the instant you switch themes, and rescale them
+when the frame font changes (see
+[Refreshing on appearance changes](#refreshing-on-appearance-changes); omit
+this if you never change themes or font sizes at runtime):
+
+```elisp
+(with-eval-after-load 'latex-to-svg-frontend
   (add-hook 'enable-theme-functions
             #'latex-to-svg-frontend-on-appearance-change)
   (add-hook 'after-setting-font-hook

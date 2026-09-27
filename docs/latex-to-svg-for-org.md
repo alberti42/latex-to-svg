@@ -14,15 +14,12 @@ Nothing beyond the requirements of the whole stack, in the README's
 
 ## Installation
 
-Install the core first, as in the README's
-[Installation](../README.md#installation), then the adaptor:
+The adaptor is on MELPA; installing it pulls in the frontend and the backend
+(see the README's [Installation](../README.md#installation)):
 
 ```elisp
-;; Org adaptor
 (use-package latex-to-svg-for-org
-  :straight (latex-to-svg-for-org :type git :host github
-                                  :repo "alberti42/latex-to-svg"
-                                  :files ("latex-to-svg-for-org.el"))
+  :ensure t                  ; with straight: :straight t
   :hook (org-mode . latex-to-svg-for-org-mode))
 ```
 
