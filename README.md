@@ -269,6 +269,45 @@ use a cookie for a single equation (see [Engine](#engine)).
 
 Other options apply to equations rendered afterwards.
 
+### Projects with their own macros
+
+Equations that use a project's own macros or packages fail with the backend's
+default preamble. Set the project's preamble in its `.dir-locals.el`, in one of
+two backend options:
+
+- `latex-to-svg-backend-appended-preamble` is dumped into a `.fmt` file, one
+  per project: the place for packages, which it then reads once.
+- `latex-to-svg-backend-preamble-not-precompiled` is written into every
+  compile and adds no `.fmt` file: enough for macros.
+
+For a file of macros, `\input` it:
+
+```elisp
+((nil . ((latex-to-svg-backend-preamble-not-precompiled . "\\input{macros.tex}"))))
+```
+
+Every backslash is doubled, as in any Elisp string. `\input` finds the file in
+the project root (`project-root`), or in `default-directory` outside a
+project. To make the directory holding `.dir-locals.el` a project root, set
+`project-vc-extra-root-markers` to `'(".dir-locals.el")`. The backend README's
+[A project's preamble](https://github.com/alberti42/latex-to-svg-backend#a-projects-preamble)
+compares the two options and gives the details.
+
+This package follows the setting:
+
+- The first render of a file waits until its `.dir-locals.el` is applied, and
+  setting either option updates the previews (see
+  [Changing an option](#changing-an-option)).
+- **After editing `macros.tex`**, run `C-u M-x latex-to-svg-frontend-refresh`:
+  it deletes the buffer's `.fmt` file and compiles its equations again. It does
+  this for the current buffer only; other open files of the project need their
+  own.
+- The `ratex` engine has no preamble. An equation that uses a project macro
+  fails with RaTeX and, with `latex-to-svg-frontend-fallback` on (the default),
+  is typeset by LaTeX. If you set `latex-to-svg-frontend-engine` to `ratex`,
+  set it back to `latex` for such a project, in the same `.dir-locals.el`;
+  Emacs applies that value without asking.
+
 ### Engine
 
 `latex-to-svg-frontend-engine` chooses the program that typesets the
