@@ -1,8 +1,9 @@
 # Byte-compilation, checkdoc and the ERT suite, on every push to main and
 # every pull request.
 #
-# The three packages in this repository (`latex-to-svg-frontend' and its
-# `latex-to-svg-for-org' / `latex-to-svg-for-markdown' adaptors) all load
+# The four packages in this repository (`latex-to-svg-frontend' and its
+# `latex-to-svg-for-org' / `latex-to-svg-for-markdown' /
+# `latex-to-svg-for-latex' adaptors) all load
 # the backend, `latex-to-svg-backend'.  package.el installs it from MELPA,
 # which is where a user gets it too, so a backend change that breaks this
 # front-end shows up here rather than in a user's report.  Every later step
@@ -13,7 +14,7 @@
 # the one test that needs a Markdown major mode skips itself without one.
 #
 # The matrix is the declared floor (29.1, the `Package-Requires' of all
-# three files), then the newest of each series, then master.
+# four files), then the newest of each series, then master.
 
 name: CI
 
@@ -77,7 +78,8 @@ jobs:
             -L . -f batch-byte-compile \
             latex-to-svg-frontend.el \
             latex-to-svg-for-org.el \
-            latex-to-svg-for-markdown.el
+            latex-to-svg-for-markdown.el \
+            latex-to-svg-for-latex.el
 
       # Docstring conventions, exiting non-zero on any finding.  Both flags
       # are set rather than left at their defaults, so the step reports the
@@ -91,7 +93,8 @@ jobs:
             (setq checkdoc-verb-check-experimental-flag nil)
             (dolist (file (list "latex-to-svg-frontend.el"
                                 "latex-to-svg-for-org.el"
-                                "latex-to-svg-for-markdown.el"))
+                                "latex-to-svg-for-markdown.el"
+                                "latex-to-svg-for-latex.el"))
               (checkdoc-file file))
             (if (get-buffer "*Warnings*")
                 (kill-emacs 1)

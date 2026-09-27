@@ -41,6 +41,8 @@ jobs:
             recipe: '(latex-to-svg-for-org :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-org.el"))'
           - package: latex-to-svg-for-markdown
             recipe: '(latex-to-svg-for-markdown :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-markdown.el"))'
+          - package: latex-to-svg-for-latex
+            recipe: '(latex-to-svg-for-latex :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-latex.el"))'
     name: MELPA checks (${{ matrix.package }})
     steps:
       - uses: actions/checkout@v4
