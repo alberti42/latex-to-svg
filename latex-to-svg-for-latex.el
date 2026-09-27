@@ -462,12 +462,13 @@ It only remaps the preview-latex commands (see
 Installs the LaTeX comment and verbatim exclusions (see
 `latex-to-svg-for-latex--exclusions'), resolves `\\ref' and `\\eqref'
 from the document's `.aux' file (see `latex-to-svg-for-latex-aux-file';
-\"??\" for a label it lacks), sets `latex-to-svg-frontend-engine'
-to `latex' in the buffer unless it already has a local value, and turns
-on `latex-to-svg-frontend-mode', which does the rendering.  RaTeX
-ignores every preamble and most packages, so in a LaTeX document it
-fails often; a project's `.dir-locals.el' is applied after the mode
-hook and can still choose `ratex'.  Enable the mode from
+\"??\" for a label it lacks), and turns on `latex-to-svg-frontend-mode',
+which does the rendering.  In LaTeX buffers the engine is `latex' by
+default, whatever `latex-to-svg-frontend-engine' is set to elsewhere:
+RaTeX ignores every preamble and most packages, so equations that use
+the project's macros fail with it.  To use RaTeX anyway, set
+`latex-to-svg-frontend-engine' buffer-locally, for example in the
+project's `.dir-locals.el'.  Enable the mode from
 `LaTeX-mode-hook' (AUCTeX) or `latex-mode-hook'.  While it is on,
 AUCTeX's preview-latex commands only say that they are off (see
 `latex-to-svg-for-latex-preview-disabled')."

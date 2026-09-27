@@ -51,11 +51,14 @@ While the mode is on, AUCTeX's preview-latex commands (`preview-at-point`,
 preview-latex would draw its own images over these. To use preview-latex,
 turn the mode off.
 
-The mode sets `latex-to-svg-frontend-engine` to `latex` in the buffer, unless
-it already has a local value. RaTeX ignores every preamble and most packages,
-so in a LaTeX document it fails often. A project's `.dir-locals.el` is applied
-after the mode hook and can still choose `ratex`, and a `% engine=ratex`
-cookie still works for one equation.
+In LaTeX buffers the engine is `latex` by default, whatever
+`latex-to-svg-frontend-engine` is set to elsewhere. RaTeX works too, with
+limitations: it ignores every preamble and most packages, so equations that
+use the project's macros fail with it (and, with
+`latex-to-svg-frontend-fallback` on, are typeset by LaTeX instead). To use
+RaTeX anyway, set `latex-to-svg-frontend-engine` buffer-locally, for example
+in the project's `.dir-locals.el`; a `% engine=ratex` cookie chooses it for
+one equation.
 
 ## What is not previewed
 
