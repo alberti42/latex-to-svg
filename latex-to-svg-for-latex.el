@@ -272,6 +272,105 @@ nil when the buffer visits no file.  See
        ((latex-to-svg-for-latex--auctex-aux-file))
        (t (expand-file-name (concat (file-name-base file) ".aux") dir))))))
 
+(defvar-local latex-to-svg-for-latex--aux-mtime nil
+  "Modification time of the `.aux' file when it was last read, or nil.")
+
+(defvar-local latex-to-svg-for-latex--labels nil
+  "Table from label to printed number, read from the `.aux' file.")
+
+(defconst latex-to-svg-for-latex--brace-syntax-table
+  (let ((table (make-syntax-table)))
+    (modify-syntax-entry ?\{ "(}" table)
+    (modify-syntax-entry ?\} "){" table)
+    (modify-syntax-entry ?\\ "\\" table)
+    table)
+  "Syntax table in which braces pair and a backslash escapes, for `.aux' text.")
+
+(defun latex-to-svg-for-latex--group-at-point ()
+  "Return the text of the braced group at point and move past it, or nil.
+Point must be on its `{'."
+  (when (eq (char-after) ?\{)
+    (let ((b (point)))
+      (condition-case nil
+          (progn (forward-sexp)
+                 (buffer-substring-no-properties (1+ b) (1- (point))))
+        (scan-error nil)))))
+
+(defun latex-to-svg-for-latex--clean-number (text)
+  "Return the printed number TEXT with `\\relax' and surrounding space removed."
+  (string-trim (replace-regexp-in-string "\\\\relax\\_>" "" text)))
+
+(defun latex-to-svg-for-latex--read-aux (file labels &optional seen)
+  "Add the labels of the `.aux' FILE to the table LABELS.
+Each `\\newlabel{LABEL}{{NUMBER}…}' adds LABEL -> NUMBER, the first
+group of the second argument: the plain form `{{N}{PAGE}}' and
+hyperref's five groups both start with it.  cleveref's `LABEL@cref'
+entries are skipped.  `\\@input{CHAPTER.aux}', which `\\include' writes,
+is followed, relative to FILE's directory; SEEN holds the files already
+read, so a cycle stops."
+  (let ((file (expand-file-name file)))
+    (unless (or (member file seen) (not (file-readable-p file)))
+      (push file seen)
+      (let ((inputs '()))
+        (with-temp-buffer
+          (insert-file-contents file)
+          (with-syntax-table latex-to-svg-for-latex--brace-syntax-table
+            (goto-char (point-min))
+            (while (re-search-forward "^\\\\\\(newlabel\\|@input\\){" nil t)
+              (backward-char)
+              (let ((kind (match-string 1))
+                    (name (latex-to-svg-for-latex--group-at-point)))
+                (cond
+                 ((null name))
+                 ((equal kind "@input") (push name inputs))
+                 ((string-suffix-p "@cref" name))
+                 ((eq (char-after) ?\{)
+                  (forward-char)
+                  (when-let* ((number (latex-to-svg-for-latex--group-at-point)))
+                    (puthash name (latex-to-svg-for-latex--clean-number number)
+                             labels))))))))
+        (dolist (input (nreverse inputs))
+          (latex-to-svg-for-latex--read-aux
+           (expand-file-name input (file-name-directory file)) labels seen))))
+    labels))
+
+(defun latex-to-svg-for-latex--labels ()
+  "Return the table from label to printed number for this buffer.
+Read from the `.aux' file (see `latex-to-svg-for-latex-aux-file') the
+first time and whenever its modification time changed since; empty
+when there is no `.aux' file, so every reference shows \"??\".  This is
+the buffer's `latex-to-svg-frontend-labels-function'."
+  (let ((mtime (and latex-to-svg-for-latex--aux-path
+                    (file-attribute-modification-time
+                     (file-attributes latex-to-svg-for-latex--aux-path)))))
+    (unless (and latex-to-svg-for-latex--labels
+                 (equal mtime latex-to-svg-for-latex--aux-mtime))
+      (setq latex-to-svg-for-latex--aux-mtime mtime
+            latex-to-svg-for-latex--labels
+            (let ((labels (make-hash-table :test 'equal)))
+              (if mtime
+                  (latex-to-svg-for-latex--read-aux
+                   latex-to-svg-for-latex--aux-path labels)
+                labels))))
+    latex-to-svg-for-latex--labels))
+
+;;;###autoload
+(defun latex-to-svg-for-latex-update-references (&rest _)
+  "Re-resolve the references in every buffer where the LaTeX adaptor is on.
+A buffer whose `.aux' file changed since it last read it reads it
+again (see `latex-to-svg-for-latex--labels'); the others keep their
+labels.  References also follow the `.aux' file at the next reconcile,
+or at once with `latex-to-svg-frontend-refresh'; this is for AUCTeX's
+hook, run when a compile finishes, whose argument (the output file) it
+ignores:
+
+  (add-hook \\='TeX-after-compilation-finished-functions
+            #\\='latex-to-svg-for-latex-update-references)"
+  (dolist (buffer (buffer-list))
+    (when (buffer-local-value 'latex-to-svg-for-latex-mode buffer)
+      (with-current-buffer buffer
+        (latex-to-svg-frontend--reconcile-references nil)))))
+
 ;;;; preview-latex
 
 (defun latex-to-svg-for-latex-preview-disabled ()
@@ -311,7 +410,9 @@ It only remaps the preview-latex commands (see
   "Preview LaTeX math as SVG images (a `latex-to-svg-frontend' adaptor).
 
 Installs the LaTeX comment and verbatim exclusions (see
-`latex-to-svg-for-latex--exclusions'), sets `latex-to-svg-frontend-engine'
+`latex-to-svg-for-latex--exclusions'), resolves `\\ref' and `\\eqref'
+from the document's `.aux' file (see `latex-to-svg-for-latex-aux-file';
+\"??\" for a label it lacks), sets `latex-to-svg-frontend-engine'
 to `latex' in the buffer unless it already has a local value, and turns
 on `latex-to-svg-frontend-mode', which does the rendering.  RaTeX
 ignores every preamble and most packages, so in a LaTeX document it
@@ -329,6 +430,8 @@ AUCTeX's preview-latex commands only say that they are off (see
                         #'latex-to-svg-for-latex--exclusions)
             (setq latex-to-svg-for-latex--aux-path
                   (latex-to-svg-for-latex--aux-file))
+            (setq-local latex-to-svg-frontend-labels-function
+                        #'latex-to-svg-for-latex--labels)
             (unless (local-variable-p 'latex-to-svg-frontend-engine)
               (setq-local latex-to-svg-frontend-engine 'latex)
               (setq latex-to-svg-for-latex--set-engine t))
@@ -337,7 +440,10 @@ AUCTeX's preview-latex commands only say that they are off (see
         (user-error "`latex-to-svg-for-latex-mode' only works in LaTeX buffers"))
     (latex-to-svg-frontend-mode -1)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
+    (kill-local-variable 'latex-to-svg-frontend-labels-function)
     (kill-local-variable 'latex-to-svg-for-latex--aux-path)
+    (kill-local-variable 'latex-to-svg-for-latex--aux-mtime)
+    (kill-local-variable 'latex-to-svg-for-latex--labels)
     (when latex-to-svg-for-latex--set-engine
       (kill-local-variable 'latex-to-svg-frontend-engine)
       (setq latex-to-svg-for-latex--set-engine nil))))

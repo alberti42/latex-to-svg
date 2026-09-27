@@ -990,6 +990,68 @@ merely *contains* inline math) is left untouched."
             (should (equal (latex-to-svg-for-latex--aux-file)
                            "/p/chapters/ch1.aux"))))))))
 
+(ert-deftest l2sf-latex-read-aux ()
+  ;; The number is the first group of `\newlabel''s second argument, in the
+  ;; hyperref form and the plain one, with `\relax' removed; cleveref's
+  ;; `@cref' entries are skipped; `\@input' of a chapter `.aux' is followed,
+  ;; and a cycle stops.  The lines are as LaTeX writes them.
+  (let ((dir (make-temp-file "l2sf-aux" t)))
+    (unwind-protect
+        (progn
+          (make-directory (expand-file-name "chapters" dir))
+          (with-temp-file (expand-file-name "main.aux" dir)
+            (insert "\\relax\n"
+                    "\\@input{chapters/ch1.aux}\n"
+                    "\\newlabel{sec:plain}{{3}{7}}\n"
+                    "\\newlabel{sec:relax}{{\\relax 4.2}{9}}\n"))
+          (with-temp-file (expand-file-name "chapters/ch1.aux" dir)
+            (insert "\\@input{../main.aux}\n"
+                    "\\newlabel{eq:x}{{1.1}{1}{S}{equation.1.1}{}}\n"
+                    "\\newlabel{eq:x@cref}{{[equation][1][1]1.1}{[1][1][]1}{}{}{}}\n"))
+          (let ((labels (latex-to-svg-for-latex--read-aux
+                         (expand-file-name "main.aux" dir)
+                         (make-hash-table :test 'equal)))
+                (pairs nil))
+            (maphash (lambda (k v) (push (cons k v) pairs)) labels)
+            (should (equal (sort pairs (lambda (a b) (string< (car a) (car b))))
+                           '(("eq:x" . "1.1") ("sec:plain" . "3")
+                             ("sec:relax" . "4.2"))))))
+      (delete-directory dir t))))
+
+(ert-deftest l2sf-latex-references-follow-the-aux-file ()
+  ;; References resolve from the `.aux' file, `??' for a label it lacks and
+  ;; for all of them with no `.aux' file.  After the file changes,
+  ;; `latex-to-svg-for-latex-update-references' re-resolves them.
+  (let* ((dir (make-temp-file "l2sf-aux" t))
+         (aux (expand-file-name "paper.aux" dir)))
+    (unwind-protect
+        (l2sf-tests--with-stub
+          (with-temp-buffer
+            (insert "See \\ref{sec:b}, \\eqref{eq:a} and \\ref{fig:none}.\n")
+            (setq buffer-file-name (expand-file-name "paper.tex" dir))
+            (let ((latex-mode-hook nil)) (latex-mode))
+            (unwind-protect
+                (progn
+                  (latex-to-svg-for-latex-mode 1)
+                  (sit-for 0.01)
+                  (should (equal (l2sf-tests--ref-displays) '("??" "(??)" "??")))
+                  (with-temp-file aux
+                    (insert "\\newlabel{sec:b}{{2}{3}{B}{section.2}{}}\n"
+                            "\\newlabel{eq:a}{{2.1}{3}{B}{equation.2.1}{}}\n"))
+                  (latex-to-svg-for-latex-update-references)
+                  (should (equal (l2sf-tests--ref-displays) '("2" "(2.1)" "??")))
+                  (with-temp-file aux
+                    (insert "\\newlabel{sec:b}{{3}{4}{B}{section.3}{}}\n"
+                            "\\newlabel{eq:a}{{3.1}{4}{B}{equation.3.1}{}}\n"))
+                  ;; Two writes within the file system's time resolution.
+                  (set-file-times aux (time-add nil 10))
+                  (latex-to-svg-for-latex-update-references)
+                  (should (equal (l2sf-tests--ref-displays) '("3" "(3.1)" "??"))))
+              (latex-to-svg-for-latex-mode -1)
+              (set-buffer-modified-p nil)
+              (setq buffer-file-name nil))))
+      (delete-directory dir t))))
+
 (ert-deftest l2sf-mode-binds-no-key ()
   ;; The core mode binds no key, so it shadows none of the markup mode's own
   ;; (`markdown-mode' binds C-c C-x C-l).
