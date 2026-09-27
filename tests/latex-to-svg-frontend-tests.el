@@ -1052,6 +1052,42 @@ merely *contains* inline math) is left untouched."
               (setq buffer-file-name nil))))
       (delete-directory dir t))))
 
+(ert-deftest l2sf-latex-jump-to-label ()
+  ;; A reference to a label no equation defines jumps to its `\label'
+  ;; elsewhere in the buffer (not one in a comment); failing that, it asks
+  ;; xref with point on the label's name, unless the backend is etags
+  ;; (which would prompt for a TAGS file); failing that, it is an error.
+  (l2sf-tests--with-stub
+    (with-temp-buffer
+      (insert "% \\label{sec:b}\nSee \\ref{sec:b} and \\ref{sec:far}.\n\n"
+              "\\section{B}\\label{sec:b}\n")
+      (let ((latex-mode-hook nil)) (latex-mode))
+      (latex-to-svg-for-latex-mode 1)
+      (let* ((refs (seq-filter (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                               (l2sf-tests--overlays)))
+             (target (save-excursion (goto-char (point-max))
+                                     (search-backward "\\label{sec:b}")))
+             (backend nil)
+             (asked nil))
+        (cl-letf (((symbol-function 'xref-find-backend) (lambda () backend))
+                  ((symbol-function 'xref-backend-identifier-at-point)
+                   (lambda (_backend) (buffer-substring (point) (+ (point) 7))))
+                  ((symbol-function 'xref-find-definitions)
+                   (lambda (identifier) (push identifier asked))))
+          (goto-char (overlay-start (car refs)))
+          (latex-to-svg-frontend-goto-reference)
+          (should (= (point) target))
+          (dolist (b '(nil etags tex-etags))
+            (setq backend b)
+            (goto-char (overlay-start (cadr refs)))
+            (should-error (latex-to-svg-frontend-goto-reference) :type 'user-error))
+          (should-not asked)
+          (setq backend 'eglot)
+          (goto-char (overlay-start (cadr refs)))
+          (latex-to-svg-frontend-goto-reference)
+          (should (equal asked '("sec:far"))))
+        (latex-to-svg-for-latex-mode -1)))))
+
 (ert-deftest l2sf-mode-binds-no-key ()
   ;; The core mode binds no key, so it shadows none of the markup mode's own
   ;; (`markdown-mode' binds C-c C-x C-l).

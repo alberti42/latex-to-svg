@@ -371,6 +371,56 @@ ignores:
       (with-current-buffer buffer
         (latex-to-svg-frontend--reconcile-references nil)))))
 
+;;;; Jumping to a label
+
+(declare-function xref-find-backend "xref")
+(declare-function xref-backend-identifier-at-point "xref")
+(declare-function xref-find-definitions "xref")
+
+(defun latex-to-svg-for-latex--label-in-buffer (label)
+  "Return the position of `\\label{LABEL}' in the buffer outside comments, or nil."
+  (save-excursion
+    (save-restriction
+      (widen)
+      (goto-char (point-min))
+      (let ((needle (format "\\label{%s}" label))
+            (pos nil))
+        (while (and (not pos) (search-forward needle nil t))
+          (unless (latex-to-svg-for-latex--in-comment-p (match-beginning 0))
+            (setq pos (match-beginning 0))))
+        pos))))
+
+(defun latex-to-svg-for-latex--xref-backend ()
+  "Return the buffer's xref backend if it can find a label, else nil.
+The two etags backends are excluded: without a `TAGS' file they prompt
+for one.  `tex-etags' is Emacs 31's TeX backend, which AUCTeX enables."
+  (when (require 'xref nil t)
+    (let ((backend (xref-find-backend)))
+      (unless (memq backend '(nil etags tex-etags))
+        backend))))
+
+(defun latex-to-svg-for-latex--find-label (label)
+  "Jump to where LABEL is defined; the `find-label-function' of the buffer.
+Called with point on a reference to LABEL that no equation in the
+buffer defines.  Jumps to `\\label{LABEL}' elsewhere in the buffer (a
+section's, a figure's), else asks xref, with point on the label's name
+in the reference: with eglot running texlab, that finds a label in any
+file of the document.  Signals a `user-error' when neither finds it."
+  (cond
+   ((when-let* ((pos (latex-to-svg-for-latex--label-in-buffer label)))
+      (push-mark)
+      (goto-char pos)
+      (when (get-buffer-window (current-buffer)) (recenter))
+      (message "Jumped to \\label{%s}" label)
+      t))
+   ((when-let* ((backend (latex-to-svg-for-latex--xref-backend))
+                (ov (latex-to-svg-frontend--ref-overlay-at (point))))
+      (goto-char (overlay-start ov))
+      (search-forward "{" (overlay-end ov) t)
+      (xref-find-definitions (xref-backend-identifier-at-point backend))
+      t))
+   (t (user-error "\\label{%s} is not in this buffer" label))))
+
 ;;;; preview-latex
 
 (defun latex-to-svg-for-latex-preview-disabled ()
@@ -432,6 +482,8 @@ AUCTeX's preview-latex commands only say that they are off (see
                   (latex-to-svg-for-latex--aux-file))
             (setq-local latex-to-svg-frontend-labels-function
                         #'latex-to-svg-for-latex--labels)
+            (setq-local latex-to-svg-frontend-find-label-function
+                        #'latex-to-svg-for-latex--find-label)
             (unless (local-variable-p 'latex-to-svg-frontend-engine)
               (setq-local latex-to-svg-frontend-engine 'latex)
               (setq latex-to-svg-for-latex--set-engine t))
@@ -441,6 +493,7 @@ AUCTeX's preview-latex commands only say that they are off (see
     (latex-to-svg-frontend-mode -1)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
     (kill-local-variable 'latex-to-svg-frontend-labels-function)
+    (kill-local-variable 'latex-to-svg-frontend-find-label-function)
     (kill-local-variable 'latex-to-svg-for-latex--aux-path)
     (kill-local-variable 'latex-to-svg-for-latex--aux-mtime)
     (kill-local-variable 'latex-to-svg-for-latex--labels)
