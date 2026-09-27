@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a string such as `2.1`. When set, `\ref` / `\eqref` resolve against it
   instead of the equation labels in the buffer, and are drawn with
   numbering off too. The LaTeX adaptor will fill it from the `.aux` file.
+- `latex-to-svg-frontend-find-label-function`, a protocol variable for
+  adaptors: a function the jump from a reference calls, with point on the
+  reference, when no equation in the buffer defines the label. The LaTeX
+  adaptor will ask `xref` for labels in other files.
 
 ### Changed
 

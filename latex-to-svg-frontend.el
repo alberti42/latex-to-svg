@@ -429,6 +429,13 @@ a table it keeps rather than build one each time.  E.g. the LaTeX
 adaptor reads the document's `.aux' file.  nil means the buffer's own
 equation labels.")
 
+(defvar-local latex-to-svg-frontend-find-label-function nil
+  "Function (LABEL) -> non-nil if it jumped to where LABEL is defined.
+`latex-to-svg-frontend-goto-reference' calls it, with point on the
+reference, when LABEL is not defined by an equation in the buffer.
+E.g. the LaTeX adaptor asks `xref' for a label in another file.  nil
+means the jump reports that the label cannot be found.")
+
 (defvar-local latex-to-svg-frontend-detect-function nil
   "Escape hatch: function (BEG END) -> list of math records.
 When non-nil it replaces the built-in scanner entirely (see
@@ -2149,7 +2156,9 @@ and nothing is recompiled \=-- previews are re-fetched from the cache."
 
 (defun latex-to-svg-frontend-goto-reference (&optional event)
   "Jump to the equation defining the label of the reference preview at point.
-EVENT is the triggering input event.
+EVENT is the triggering input event.  When no equation in the buffer
+defines the label, `latex-to-svg-frontend-find-label-function', if set,
+is given the label, with point on the reference.
 Bound in `\\eqref' / `\\ref' preview overlays to `mouse-2' and
 \\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference]
 \(and to RET when `latex-to-svg-frontend-return-follows-reference' is
@@ -2165,6 +2174,8 @@ Emacs' `follow-link' mechanism (see `mouse-1-click-follows-link')."
          (pos (and label (latex-to-svg-frontend--label-position label))))
     (cond
      ((null label) (user-error "No equation reference here"))
+     ((and (null pos) latex-to-svg-frontend-find-label-function
+           (funcall latex-to-svg-frontend-find-label-function label)))
      ((null pos) (user-error "Cannot find an equation labelled %s" label))
      (t (push-mark)
         (goto-char pos)

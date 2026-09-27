@@ -2041,6 +2041,36 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend-goto-reference)
         (should (= (point) target))))))
 
+(ert-deftest l2sf-goto-reference-asks-find-label-function ()
+  ;; A label no equation in the buffer defines goes to
+  ;; `latex-to-svg-frontend-find-label-function', with point on the
+  ;; reference.  It answering nil, or no function, is an error; a label an
+  ;; equation defines never reaches it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "See \\ref{sec:b} and \\eqref{eq:a}.\n\n"
+                "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n")
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let* ((refs (seq-filter (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                               (l2sf-tests--overlays)))
+             (asked nil)
+             (answer t))
+        (setq-local latex-to-svg-frontend-find-label-function
+                    (lambda (label) (push (cons label (point)) asked) answer))
+        (goto-char (overlay-start (car refs)))
+        (latex-to-svg-frontend-goto-reference)
+        (should (equal asked (list (cons "sec:b" (overlay-start (car refs))))))
+        (setq answer nil)
+        (goto-char (overlay-start (car refs)))
+        (should-error (latex-to-svg-frontend-goto-reference) :type 'user-error)
+        (setq asked nil)
+        (goto-char (overlay-start (cadr refs)))
+        (latex-to-svg-frontend-goto-reference)
+        (should-not asked)
+        (kill-local-variable 'latex-to-svg-frontend-find-label-function)
+        (goto-char (overlay-start (car refs)))
+        (should-error (latex-to-svg-frontend-goto-reference) :type 'user-error)))))
+
 (ert-deftest l2sf-eqref-follows-renumber ()
   (l2sf-tests--with-stub
     (l2sf-tests--md
