@@ -28,6 +28,9 @@ This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 - **`latex-to-svg-for-markdown`** — Markdown adaptor.
 - **`latex-to-svg-for-org`** — Org adaptor.
 
+The adaptors are described under
+[One adaptor per markup](#one-adaptor-per-markup).
+
 ```
   latex-to-svg-for-markdown ─┐
                              ├─▶ latex-to-svg-frontend ─▶ latex-to-svg-backend
@@ -93,6 +96,26 @@ cross-references lives in the backend's README, under
 [Related packages](https://github.com/alberti42/latex-to-svg-backend#related-packages)
 — rather than repeat it here.
 
+## One adaptor per markup
+
+The core knows nothing about any markup. An adaptor tells it which regions of
+a buffer are code, verbatim or comment, so math inside them is not previewed,
+and turns the core on. Install the adaptor for each markup you use; its page
+gives the recipe, the hook and the details.
+
+- **[`latex-to-svg-for-markdown`](docs/latex-to-svg-for-markdown.md)** — for
+  `markdown-ts-mode` (Emacs 31.1+) or classic `markdown-mode` / `gfm-mode`.
+  Skips inline code spans, fenced code blocks and indented code blocks. The
+  `markdown` tree-sitter grammar is optional: it makes code-block exclusion
+  exact; without it a regexp fallback handles fenced and indented blocks.
+- **[`latex-to-svg-for-org`](docs/latex-to-svg-for-org.md)** — for `org-mode`.
+  Skips `#+begin_src` / `example` / `export` / `comment` blocks, comment lines
+  and inline `~code~` / `=verbatim=` spans. While it is on, `org-latex-preview`
+  only says that it is off: Org's preview would draw its own images over these.
+
+To add an adaptor for another markup, see
+[Writing an adaptor for another markup](#writing-an-adaptor-for-another-markup).
+
 ## How detection works (and why it's markup-agnostic)
 
 The core finds math with one **regexp scanner** — the LaTeX math delimiters are
@@ -108,27 +131,13 @@ forbids one inside), which keeps detection cheap and stops a half-typed opener
 from running away.
 
 The *only* markup-specific thing is **which regions to skip** (code, verbatim).
-Each adaptor supplies that as a buffer-local `exclude-function`:
-
-- Markdown: inline code spans, fenced code blocks (either fence character) and
-  indented code blocks. Blocks come from the `markdown` tree-sitter grammar
-  when it is installed, else from an equivalent regexp fallback; inline spans
-  are always regexp. The adaptor runs the same in `markdown-ts-mode` **or**
-  classic `markdown-mode` / `gfm-mode` — it uses the `markdown` grammar
-  directly (reusing the buffer's parser if there is one, else creating its
-  own), so the grammar is an optional accuracy boost, not a dependency on the
-  major mode.
-- Org: `#+begin_src` / `example` / `export` / `comment` blocks + comment lines,
-  plus inline `~code~` / `=verbatim=` spans (via Org's own `org-verbatim-re`),
-  so `=\(=` stays literal text.
+Each adaptor supplies that as a buffer-local `exclude-function`; its page lists
+what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 
 ## Requirements
 
-- Emacs 29.1+ with SVG image support. The Markdown adaptor works under
-  `markdown-ts-mode` (Emacs 31.1+) **or** classic `markdown-mode` / `gfm-mode`;
-  the `markdown` tree-sitter grammar is optional (it makes code-block
-  exclusion exact; without it a regexp fallback handles fenced and indented
-  blocks).
+- Emacs 29.1+ with SVG image support. Each adaptor's page lists the major
+  modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
   0.11.0+ (the backend) — the floor is set by
   `latex-to-svg-backend-preamble-local`, the per-project preamble, which the
@@ -158,7 +167,10 @@ The stack has three layers:
   adaptors. Install whichever you use; both are optional.
 
 This repo is not on MELPA yet, hence the git recipes. The frontend and the two
-adaptors all live here, so each recipe selects a single file.
+adaptors all live here, so each recipe selects a single file. Install the
+frontend with the recipe below, then each adaptor with the recipe on its page
+([Markdown](docs/latex-to-svg-for-markdown.md#installation),
+[Org](docs/latex-to-svg-for-org.md#installation)).
 
 ### Straight
 
@@ -177,40 +189,14 @@ adaptors all live here, so each recipe selects a single file.
             #'latex-to-svg-frontend-on-appearance-change)
   (add-hook 'after-setting-font-hook
             #'latex-to-svg-frontend-on-appearance-change))
-
-;; Markdown adaptor
-(use-package latex-to-svg-for-markdown
-  :straight (latex-to-svg-for-markdown :type git :host github
-                                       :repo "alberti42/latex-to-svg"
-                                       :files ("latex-to-svg-for-markdown.el"))
-  :hook (markdown-ts-mode . latex-to-svg-for-markdown-mode))
-
-;; Org adaptor
-(use-package latex-to-svg-for-org
-  :straight (latex-to-svg-for-org :type git :host github
-                                  :repo "alberti42/latex-to-svg"
-                                  :files ("latex-to-svg-for-org.el"))
-  :hook (org-mode . latex-to-svg-for-org-mode))
 ```
 
 ## Usage
 
-Turn on the adaptor mode for your major mode (the Markdown adaptor also works
-in classic `markdown-mode` / `gfm-mode` — hook whichever you use):
-
-```elisp
-(add-hook 'markdown-ts-mode-hook #'latex-to-svg-for-markdown-mode)
-(add-hook 'org-mode-hook         #'latex-to-svg-for-org-mode)
-```
-
-With the mode on, all math renders when the buffer opens. See
+Turn on the adaptor mode from your major mode's hook; each adaptor's page gives
+the line. With the mode on, all math renders when the buffer opens. See
 [`docs/example.md`](docs/example.md) / [`docs/example.org`](docs/example.org)
 for ready-to-open demos.
-
-In Org, `latex-to-svg-for-org-mode` turns off Org's own LaTeX preview while it
-is on: `org-latex-preview` (`C-c C-x C-l`, or whatever key runs it) only says
-so. Org's preview would draw its own images over these, with no numbering, no
-reveal on cursor and a separate cache. To use Org's preview, turn the mode off.
 
 - `M-x latex-to-svg-frontend-clear` — clear previews (region or buffer).
 - `M-x latex-to-svg-frontend-refresh` — bring the current buffer's previews up
@@ -570,8 +556,7 @@ buffer-local protocol and toggles the core:
 - `latex-to-svg-frontend-detect-function` — `(fn BEG END)` → list of math
   records, replacing the scanner entirely. Escape hatch; rarely needed.
 
-See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` (~40 lines each)
-as templates.
+See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` as templates.
 
 Pull requests adding adaptors for other major modes are welcome.
 
