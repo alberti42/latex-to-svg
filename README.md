@@ -10,9 +10,15 @@
 The two MELPA badges are the core, `latex-to-svg-frontend`; the adaptors get
 their own once they are on MELPA.
 
-SVG LaTeX-math previews for Emacs markup buffers, on top of
-[`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend),
-the backend that compiles LaTeX to SVG.
+Render LaTeX math in Emacs Org and Markdown buffers. Inline and display math,
+numbered environments included, is compiled with
+[LaTeX](https://www.latex-project.org/) (`latex` → `dvisvgm`), or with
+[RaTeX](https://github.com/erweixin/RaTeX), by the
+[`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
+backend, into SVG images that match the theme. Each image is a display overlay
+on top of its LaTeX source, which stays in the buffer: when the cursor moves
+into an equation, the overlay shows the source for editing, and when the
+cursor leaves it, the equation is rendered again.
 
 This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 
@@ -36,12 +42,12 @@ as dependencies.
 ## Why
 
 The backend compiles each unique equation **once** (content-addressed on disk),
-**color-independent** (`dvisvgm --currentcolor`, tinted at display) and
+**color-independent** (tinted at display, with either engine) and
 **size-independent** (scaled at display to the buffer font). So the previews do
 what a browser/pandoc pipeline can't:
 
 - **Recolor on theme switch** — flip your OS light/dark theme and previews
-  re-tint straight from cache, **no LaTeX recompile**.
+  re-tint straight from cache, **no recompile**.
 - **Rescale on text zoom** — `C-x C-+` / `C-x C--` re-scale the math with the
   text, again from cache.
 - **Numbered equations + working `\ref` / `\eqref`** — numbered in document
