@@ -1,5 +1,12 @@
 # latex-to-svg-for-org
 
+![Made for GNU Emacs](https://img.shields.io/badge/Made%20for-GNU%20Emacs-7F5AB6?logo=gnuemacs&logoColor=white)
+[![MELPA](https://melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://melpa.org/#/latex-to-svg-for-org)
+[![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-org)
+[![melpazoid](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml)
+[![CI](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml)
+[![License: GPL-3.0](https://img.shields.io/github/license/alberti42/latex-to-svg)](../LICENSE)
+
 Org adaptor for `latex-to-svg-frontend`: a thin layer that tells the shared
 core which Org regions are code / verbatim / comment (so math inside them is
 not previewed) and how to unfold a jump target (`org-fold-show-context`), and

@@ -1,5 +1,12 @@
 # latex-to-svg-for-markdown
 
+![Made for GNU Emacs](https://img.shields.io/badge/Made%20for-GNU%20Emacs-7F5AB6?logo=gnuemacs&logoColor=white)
+[![MELPA](https://melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://melpa.org/#/latex-to-svg-for-markdown)
+[![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-markdown-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-markdown)
+[![melpazoid](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml)
+[![CI](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml)
+[![License: GPL-3.0](https://img.shields.io/github/license/alberti42/latex-to-svg)](../LICENSE)
+
 Markdown adaptor for `latex-to-svg-frontend`: a thin layer that tells the
 shared core what counts as "code" in a Markdown buffer (so math inside code
 is not previewed) and enables the core. All the actual work — detection,
