@@ -1297,12 +1297,16 @@ other buffer BODY opened."
               latex-to-svg-frontend--option-buffers nil
               latex-to-svg-frontend--option-defaults nil)))))
 
-(ert-deftest l2sf-backend-preambles-are-watched ()
-  ;; The three backend preambles, which a project sets in `.dir-locals.el',
-  ;; update the previews like this package's own options.
+(ert-deftest l2sf-backend-options-are-watched ()
+  ;; The backend's options in the cache key that a project sets in
+  ;; `.dir-locals.el' (the three preambles, the width of numbered
+  ;; equations, RaTeX's macros) update the previews like this package's
+  ;; own options.
   (dolist (option '(latex-to-svg-backend-preamble
                     latex-to-svg-backend-appended-preamble
-                    latex-to-svg-backend-preamble-not-precompiled))
+                    latex-to-svg-backend-preamble-not-precompiled
+                    latex-to-svg-backend-line-width
+                    latex-to-svg-backend-ratex-macros))
     (should (memq #'latex-to-svg-frontend--option-changed
                   (get-variable-watchers option)))))
 

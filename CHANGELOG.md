@@ -21,10 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   template (`latex-to-svg-for-latex-aux-file`), and a jump to a label in
   another file goes through `xref`. It sets the engine to `latex` in its
   buffers and remaps AUCTeX's preview-latex commands to a message.
-- Setting one of the backend's preambles (`latex-to-svg-backend-preamble`,
+- Setting one of the backend's options in the cache key that a project sets
+  in `.dir-locals.el` (`latex-to-svg-backend-preamble`,
   `latex-to-svg-backend-appended-preamble`,
-  `latex-to-svg-backend-preamble-not-precompiled`) updates the previews on its
-  own, like this package's own options: a buffer-local value (from
+  `latex-to-svg-backend-preamble-not-precompiled`,
+  `latex-to-svg-backend-line-width`, `latex-to-svg-backend-ratex-macros`)
+  updates the previews on its own, like this package's own options: a buffer-local value (from
   `.dir-locals.el`) updates that buffer, a default value every buffer that
   uses it.
 - `latex-to-svg-frontend-labels-function`, a protocol variable for

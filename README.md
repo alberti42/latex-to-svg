@@ -214,8 +214,8 @@ for ready-to-open demos.
   to date: render equations that have none (except the one the cursor is in),
   render again those whose engine changed, and redraw the rest from cache for
   the current theme, font, colors and size. You rarely need it: setting an
-  option of this package, or one of the backend's preambles (with `setq`,
-  `setq-local` or Customize), updates the previews on its own (see
+  option of this package, or one of the backend options listed there (with
+  `setq`, `setq-local` or Customize), updates the previews on its own (see
   [Changing an option](#changing-an-option)) — every buffer for a global value, one buffer for a
   buffer-local one — and redrawing happens on its own on theme,
   buffer-display and zoom changes. Run it after a change those cannot see,
@@ -261,6 +261,8 @@ These options update the previews on their own when you set them, with `setq`,
 | `latex-to-svg-frontend-inline-rescale`, `-display-rescale` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
 | `latex-to-svg-backend-preamble`, `-appended-preamble`, `-preamble-not-precompiled` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
+| `latex-to-svg-backend-line-width` | the numbered equations are compiled with the new width, or taken from cache if compiled with it before |
+| `latex-to-svg-backend-ratex-macros` | the equations typeset with RaTeX are compiled with the new macros, or taken from cache if compiled with them before |
 
 Where the change applies depends on how you make it:
 

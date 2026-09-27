@@ -1964,8 +1964,7 @@ has no picture for it, as after a change of
 `latex-to-svg-backend-line-width'.  Numbers and references are then
 reconciled.  The options in `latex-to-svg-frontend--watched-options' do
 this on their own when set; run it after a change they cannot see, such
-as another backend option (`latex-to-svg-backend-font-scale',
-`latex-to-svg-backend-line-width').
+as another backend option (`latex-to-svg-backend-font-scale').
 
 With RECOMPILE non-nil (interactively, a prefix argument), recompile
 the previews in BUFFER instead, bypassing the cache: the way to retry
@@ -2033,11 +2032,14 @@ fallback than the options now give it (see `--engine-for' and
     latex-to-svg-frontend-center-display-math
     latex-to-svg-backend-preamble
     latex-to-svg-backend-appended-preamble
-    latex-to-svg-backend-preamble-not-precompiled)
+    latex-to-svg-backend-preamble-not-precompiled
+    latex-to-svg-backend-line-width
+    latex-to-svg-backend-ratex-macros)
   "Options whose change updates the previews on its own.
 Each has a variable watcher (`latex-to-svg-frontend--option-changed').
-The last three are the backend's preambles, which a project sets in
-`.dir-locals.el'.")
+The last five are the backend's options in the cache key that a project
+sets in `.dir-locals.el': its three preambles, the width of numbered
+equations and RaTeX's macros.")
 
 (defvar latex-to-svg-frontend--option-timer nil
   "Timer of the pending update after an option changed, or nil.")
