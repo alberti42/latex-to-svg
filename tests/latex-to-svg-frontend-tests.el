@@ -43,6 +43,20 @@
   (when (file-directory-p dir)
     (add-to-list 'load-path dir)))
 
+;; AUCTeX is optional: the LaTeX adaptor's tests that need it skip
+;; themselves without it.  Point `AUCTEX_DIR' at an AUCTeX checkout or build
+;; to run them.
+(when-let* ((dir (getenv "AUCTEX_DIR")))
+  (add-to-list 'load-path dir))
+
+(defconst l2sf-tests--book
+  (expand-file-name "fixtures/latex-book/"
+                    (file-name-directory (or load-file-name buffer-file-name)))
+  "A LaTeX book with two `\\include'd chapters, and the `.aux' files LaTeX
+wrote for it (with hyperref, cleveref and `\\numberwithin').  To write
+them again: `latex main.tex' twice in that directory, keeping only the
+`.aux' files.")
+
 (require 'latex-to-svg-backend)
 (require 'latex-to-svg-frontend)
 (require 'latex-to-svg-for-markdown)
@@ -1087,6 +1101,108 @@ merely *contains* inline math) is left untouched."
           (latex-to-svg-frontend-goto-reference)
           (should (equal asked '("sec:far"))))
         (latex-to-svg-for-latex-mode -1)))))
+
+(ert-deftest l2sf-latex-reads-latexs-aux-files ()
+  ;; The `.aux' files LaTeX wrote for the fixture book: every label comes
+  ;; out with its printed number, from both chapters' `.aux' files.
+  (let ((labels (latex-to-svg-for-latex--read-aux
+                 (expand-file-name "main.aux" l2sf-tests--book)
+                 (make-hash-table :test 'equal)))
+        (pairs nil))
+    (maphash (lambda (k v) (push (cons k v) pairs)) labels)
+    (should (equal (sort pairs (lambda (a b) (string< (car a) (car b))))
+                   '(("ch:one" . "1") ("eq:a" . "2.1") ("eq:b" . "2.2")
+                     ("eq:x" . "1.1") ("fig:c" . "1.1") ("sec:s" . "1.1"))))))
+
+(defmacro l2sf-tests--visit-book (file &rest body)
+  "Visit FILE of the fixture book in `latex-mode' with the adaptor on; run BODY.
+The backend must be stubbed.  The buffer is killed afterwards, with any
+other buffer BODY opened."
+  (declare (indent 1) (debug t))
+  `(let ((before (buffer-list))
+         (buffer (let ((latex-mode-hook nil)
+                       (enable-local-variables nil))
+                   (find-file-noselect (expand-file-name ,file l2sf-tests--book)))))
+     (unwind-protect
+         (with-current-buffer buffer
+           (let ((latex-mode-hook nil)) (latex-mode))
+           (latex-to-svg-for-latex-mode 1)
+           (sit-for 0.01)
+           ,@body)
+       (dolist (b (buffer-list))
+         (unless (memq b before) (kill-buffer b))))))
+
+(ert-deftest l2sf-latex-book-references ()
+  ;; A chapter of the fixture book, with the template pointing at the main
+  ;; `.aux' file: its `\eqref' to an equation of the other chapter shows
+  ;; the number LaTeX printed.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-for-latex-aux-file "../main.aux"))
+      (l2sf-tests--visit-book "chapters/ch2.tex"
+        (should (equal (l2sf-tests--ref-displays) '("(1.1)")))))))
+
+;; A stand-in for eglot's xref backend: it answers `xref-find-definitions'
+;; with a location in another file, as texlab does.  The backend is only
+;; active in a buffer that puts `l2sf-tests--xref' in its
+;; `xref-backend-functions'.
+(defun l2sf-tests--xref () 'l2sf-tests)
+
+(cl-defmethod xref-backend-identifier-at-point ((_backend (eql 'l2sf-tests)))
+  (save-excursion
+    (let ((b (point)))
+      (skip-chars-forward "^}")
+      (buffer-substring-no-properties b (point)))))
+
+(cl-defmethod xref-backend-definitions ((_backend (eql 'l2sf-tests)) label)
+  (let ((file (expand-file-name "chapters/ch1.tex" l2sf-tests--book)))
+    (with-temp-buffer
+      (insert-file-contents file)
+      (search-forward (format "\\label{%s}" label))
+      (list (xref-make label (xref-make-file-location
+                              file (line-number-at-pos)
+                              (- (match-beginning 0) (line-beginning-position))))))))
+
+(ert-deftest l2sf-latex-book-jump-through-xref ()
+  ;; A reference to a label in another chapter goes through xref: the real
+  ;; `xref-find-definitions', with a backend that answers as eglot running
+  ;; texlab does, opens the other chapter at the `\label'.
+  (require 'xref)
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-for-latex-aux-file "../main.aux"))
+      (l2sf-tests--visit-book "chapters/ch2.tex"
+        (add-hook 'xref-backend-functions #'l2sf-tests--xref nil t)
+        (goto-char (overlay-start
+                    (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                              (l2sf-tests--overlays))))
+        (latex-to-svg-frontend-goto-reference)
+        (should (equal (file-name-nondirectory buffer-file-name) "ch1.tex"))
+        (should (looking-at-p (regexp-quote "\\label{eq:x}")))))))
+
+(ert-deftest l2sf-latex-book-with-auctex ()
+  ;; With the real AUCTeX: a chapter whose `TeX-master' is the main file
+  ;; finds the main `.aux' file, next to it or in `TeX-output-dir', and its
+  ;; references resolve from it.  Skipped without AUCTeX (see `AUCTEX_DIR').
+  (skip-unless (and (require 'tex-site nil t) (require 'latex nil t)))
+  (l2sf-tests--with-stub
+    (let ((before (buffer-list))
+          (buffer (let ((enable-local-variables nil))
+                    (find-file-noselect
+                     (expand-file-name "chapters/ch2.tex" l2sf-tests--book)))))
+      (unwind-protect
+          (with-current-buffer buffer
+            (let ((LaTeX-mode-hook nil)) (LaTeX-mode))
+            (setq-local TeX-master "../main")
+            (dolist (case `((nil . ,(expand-file-name "main.aux" l2sf-tests--book))
+                            ("._aux/" . ,(expand-file-name "._aux/main.aux"
+                                                           l2sf-tests--book))))
+              (setq-local TeX-output-dir (car case))
+              (should (equal (latex-to-svg-for-latex--aux-file) (cdr case))))
+            (setq-local TeX-output-dir nil)
+            (latex-to-svg-for-latex-mode 1)
+            (sit-for 0.01)
+            (should (equal (l2sf-tests--ref-displays) '("(1.1)"))))
+        (dolist (b (buffer-list))
+          (unless (memq b before) (kill-buffer b)))))))
 
 (ert-deftest l2sf-mode-binds-no-key ()
   ;; The core mode binds no key, so it shadows none of the markup mode's own

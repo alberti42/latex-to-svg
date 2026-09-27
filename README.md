@@ -641,7 +641,10 @@ emacs -batch -l ert -L . -L ../latex-to-svg-backend \
 The backend is stubbed and detection is a regexp scanner, so the suite needs no
 TeX toolchain, no graphical display, and (bar one guarded fenced-code test) no
 tree-sitter grammar. Point `LATEX_TO_SVG_DIR` at a `latex-to-svg-backend`
-checkout if it isn't a sibling directory.
+checkout if it isn't a sibling directory. The LaTeX adaptor's tests read the
+`.aux` files in `tests/fixtures/latex-book/`, which LaTeX wrote, and one of them
+needs AUCTeX: point `AUCTEX_DIR` at an AUCTeX checkout or build to run it, or it
+skips itself.
 
 ## License
 
