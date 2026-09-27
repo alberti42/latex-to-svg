@@ -22,10 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   numbered environment gets its numbers as a `\tag{N}` on each numbered row
   instead of a `\setcounter` prefix, and every `\label` is removed from what
   RaTeX receives; `\eqref` / `\ref` resolve as before. Environments RaTeX
-  does not have (`multline`, `eqnarray`, `flalign`, …) fail to compile with
-  the backend's warning. With `latex`, the value sent to the backend is
-  unchanged, so no cached equation is recompiled. Requires the backend's
-  `:engine` argument.
+  does not have (`multline`, `eqnarray`, `flalign`, …) are typeset with LaTeX
+  by the fallback (below), or, with it off, fail with the backend's warning.
+  With `latex`, the value sent to the backend is unchanged, so no cached
+  equation is recompiled.
 - A cookie at the top of a display equation chooses its engine:
   `% engine=latex` (alias `tex`), `% engine=ratex`, or
   `% engine=skip` (alias `none`) to leave the source as text. It stands on
@@ -51,8 +51,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-backend-engine-used`.
 - Recompiling (`C-u M-x latex-to-svg-frontend-refresh`) also deletes the
   fallback engine's picture and the record of the engine's failure, so the
-  engine is tried again. Requires the backend's `:fallback`, `:quiet` and
-  `latex-to-svg-backend-engine-used`.
+  engine is tried again.
 - Setting an option that affects the previews (`-engine`, `-fallback`,
   `-foreground-color`, `-background-color`, `-padding`, `-inline-rescale`,
   `-display-rescale`, `-center-display-math`) with `setq`, `setq-local` or
@@ -79,7 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   renders again those whose engine or fallback no longer matches the options,
   redraws the rest from cache, and reconciles numbers. It used to only redraw
   existing previews, so an engine change needed a re-render. With a prefix
-  argument it recompiles the buffer's previews, bypassing the cache. The
+  argument it recompiles the buffer's previews, bypassing the cache. It
+  touches only the current buffer: `C-u` used to apply it to every buffer,
+  which the variable watcher now does for a global option change. The
   automatic refresh after a theme, zoom or display change still only redraws.
 - In the documentation, "engine" now names the program that typesets an
   equation, LaTeX or RaTeX, and "backend" names `latex-to-svg-backend`. The
@@ -92,8 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a prefix argument.
 - The command `latex-to-svg-frontend` is an obsolete alias for
   `latex-to-svg-frontend-refresh`. The mode renders math as it arrives, and
-  the refresh brings it up to date after an option changes, so its toggle at
-  point and its prefix arguments had no remaining use.
+  options update the previews when set, so its toggle at point and its prefix
+  arguments had no remaining use.
 
 ### Removed
 
