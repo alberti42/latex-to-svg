@@ -14,6 +14,8 @@ enables the core. All the actual work — detection, overlays, numbering,
 references, reveal-on-cursor, refresh — lives in `latex-to-svg-frontend`; see
 the [README](../README.md).
 
+![`docs/example.org` in Org mode: numbered equations, Maxwell's equations numbered per row, click-to-jump `\eqref` references shown as their numbers, and a `#+begin_comment` block left as text.](../Screenshot-Org.png)
+
 ## Requirements
 
 Nothing beyond the requirements of the whole stack, in the README's

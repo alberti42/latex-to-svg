@@ -37,7 +37,7 @@ An overview of the adaptors is presented under [One adaptor per markup](#one-ada
 You install an **adaptor**; it pulls in the frontend core and the backend
 as dependencies.
 
-![`docs/example.md` in `markdown-ts-mode`: rendered display equations, per-line equation numbers, click-to-jump `\ref`/`\eqref` links, and reveal-on-cursor showing the `\label` source at point.](Screenshot.png)
+![`docs/example.org` in Org mode: numbered equations, Maxwell's equations numbered per row, click-to-jump `\eqref` references shown as their numbers, and a `#+begin_comment` block left as text.](Screenshot-Org.png)
 
 ## Why
 

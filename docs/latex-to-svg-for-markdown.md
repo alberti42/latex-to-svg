@@ -13,7 +13,7 @@ is not previewed) and enables the core. All the actual work — detection,
 overlays, numbering, references, reveal-on-cursor, refresh — lives in
 `latex-to-svg-frontend`; see the [README](../README.md).
 
-![`docs/example.md` in `markdown-ts-mode`: rendered display equations, per-line equation numbers, click-to-jump `\ref`/`\eqref` links, and reveal-on-cursor showing the `\label` source at point.](../Screenshot.png)
+![`docs/example.md` in `markdown-mode`: inline math in the prose, `$not math$` left as text in a code span and a fenced block, unnumbered display math, and numbered equations.](../Screenshot-Markdown.png)
 
 ## Requirements
 

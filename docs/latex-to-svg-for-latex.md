@@ -12,6 +12,8 @@ them is not previewed), resolves `\ref` and `\eqref` from the document's
 numbering, reveal-on-cursor, refresh — lives in `latex-to-svg-frontend`; see
 the [README](../README.md).
 
+![`docs/example.tex` in AUCTeX's `LaTeX-mode`: centered display math, numbered equations, and `\eqref` references showing the numbers read from the `.aux` file.](../Screenshot-LaTeX.png)
+
 ## Requirements
 
 Nothing beyond the requirements of the whole stack, in the README's
