@@ -51,8 +51,8 @@ While the mode is on, AUCTeX's preview-latex commands (`preview-at-point`,
 preview-latex would draw its own images over these. To use preview-latex,
 turn the mode off.
 
-In LaTeX buffers the engine is `latex` by default, whatever
-`latex-to-svg-frontend-engine` is set to elsewhere. RaTeX works too, with
+In LaTeX buffers the engine is `latex` by default, overriding the global value
+of `latex-to-svg-frontend-engine`. RaTeX works too, with
 limitations: it ignores every preamble and most packages, so equations that
 use the project's macros fail with it (and, with
 `latex-to-svg-frontend-fallback` on, are typeset by LaTeX instead). To use

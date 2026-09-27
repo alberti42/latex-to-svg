@@ -464,7 +464,7 @@ Installs the LaTeX comment and verbatim exclusions (see
 from the document's `.aux' file (see `latex-to-svg-for-latex-aux-file';
 \"??\" for a label it lacks), and turns on `latex-to-svg-frontend-mode',
 which does the rendering.  In LaTeX buffers the engine is `latex' by
-default, whatever `latex-to-svg-frontend-engine' is set to elsewhere:
+default, overriding the global value of `latex-to-svg-frontend-engine':
 RaTeX ignores every preamble and most packages, so equations that use
 the project's macros fail with it.  To use RaTeX anyway, set
 `latex-to-svg-frontend-engine' buffer-locally, for example in the
