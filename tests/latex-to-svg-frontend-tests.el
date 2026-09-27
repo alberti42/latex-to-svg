@@ -947,6 +947,49 @@ merely *contains* inline math) is left untouched."
       (latex-to-svg-for-latex-mode -1)
       (should (eq latex-to-svg-frontend-engine 'ratex)))))
 
+(ert-deftest l2sf-latex-aux-file-template ()
+  ;; Without AUCTeX the `.aux' is next to the file; a template fills `%b'
+  ;; with the base name and `%r' with the project root, else the file's
+  ;; directory, and a relative result is relative to the file's directory.
+  (with-temp-buffer
+    (setq buffer-file-name "/p/chapters/paper.tex")
+    (let ((project-find-functions nil))
+      (let ((latex-to-svg-for-latex-aux-file nil))
+        (should (equal (latex-to-svg-for-latex--aux-file) "/p/chapters/paper.aux")))
+      (let ((latex-to-svg-for-latex-aux-file "._aux/%b.aux"))
+        (should (equal (latex-to-svg-for-latex--aux-file) "/p/chapters/._aux/paper.aux")))
+      (let ((latex-to-svg-for-latex-aux-file "%r/build/main.aux"))
+        (should (equal (latex-to-svg-for-latex--aux-file) "/p/chapters/build/main.aux"))))
+    (let ((project-find-functions (list (lambda (_dir) (cons 'transient "/p/"))))
+          (latex-to-svg-for-latex-aux-file "%r/build/main.aux"))
+      (should (equal (latex-to-svg-for-latex--aux-file) "/p/build/main.aux")))
+    (setq buffer-file-name nil)
+    (should-not (latex-to-svg-for-latex--aux-file))))
+
+;; AUCTeX's; declared so the test below binds it dynamically without AUCTeX.
+(defvar TeX-output-dir)
+
+(ert-deftest l2sf-latex-aux-file-from-auctex ()
+  ;; In `LaTeX-mode' the `.aux' comes from `TeX-master-output-file', whose
+  ;; name is relative to the master's directory with `TeX-output-dir' set,
+  ;; else to the buffer's.  A template overrides it.
+  (with-temp-buffer
+    (setq buffer-file-name "/p/chapters/ch1.tex"
+          default-directory "/p/chapters/"
+          major-mode 'LaTeX-mode)
+    (cl-letf (((symbol-function 'TeX-master-directory) (lambda () "/p/")))
+      (let ((TeX-output-dir nil))
+        (cl-letf (((symbol-function 'TeX-master-output-file)
+                   (lambda (_ext) "../main.aux")))
+          (should (equal (latex-to-svg-for-latex--aux-file) "/p/main.aux"))))
+      (let ((TeX-output-dir "._aux/"))
+        (cl-letf (((symbol-function 'TeX-master-output-file)
+                   (lambda (_ext) "._aux/main.aux")))
+          (should (equal (latex-to-svg-for-latex--aux-file) "/p/._aux/main.aux"))
+          (let ((latex-to-svg-for-latex-aux-file "%b.aux"))
+            (should (equal (latex-to-svg-for-latex--aux-file)
+                           "/p/chapters/ch1.aux"))))))))
+
 (ert-deftest l2sf-mode-binds-no-key ()
   ;; The core mode binds no key, so it shadows none of the markup mode's own
   ;; (`markdown-mode' binds C-c C-x C-l).

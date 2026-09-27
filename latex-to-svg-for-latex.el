@@ -45,6 +45,8 @@
 ;;; Code:
 
 (require 'latex-to-svg-frontend)
+(require 'format-spec)
+(require 'project)
 
 (declare-function LaTeX-verbatim-environments "latex")
 (declare-function LaTeX-verbatim-macros-with-delims "latex")
@@ -211,6 +213,65 @@ file with `\\begin{document}', the preamble and what follows
                      regions))
         regions))))
 
+;;;; The .aux file
+
+(defvar TeX-output-dir)
+(declare-function TeX-master-output-file "tex")
+(declare-function TeX-master-directory "tex")
+
+(defcustom latex-to-svg-for-latex-aux-file nil
+  "Where the `.aux' file of a LaTeX buffer is, from which references resolve.
+nil asks AUCTeX, in `LaTeX-mode': `TeX-master-output-file', which
+follows `TeX-master' (a chapter file finds the main file's `.aux') and
+`TeX-output-dir'.  Without AUCTeX, the `.aux' next to the file:
+`paper.tex' -> `paper.aux'.
+
+A string is a template, filled with `format-spec': `%b' is the base
+name of the buffer's file (`paper' for `paper.tex') and `%r' the
+project root (`project-root'), or the file's directory outside a
+project.  A relative result is relative to the file's directory.  For
+example \"._aux/%b.aux\", set globally, or \"%r/build/main.aux\", in a
+project's `.dir-locals.el'.
+
+The file is found when the mode turns on."
+  :type '(choice (const :tag "Ask AUCTeX, else next to the file" nil)
+                 (string :tag "Template"))
+  :safe #'stringp
+  :group 'latex-to-svg-frontend)
+
+(defvar-local latex-to-svg-for-latex--aux-path nil
+  "Absolute path of this buffer's `.aux' file, or nil.
+Set when the mode turns on (see `latex-to-svg-for-latex-aux-file').")
+
+(defun latex-to-svg-for-latex--auctex-aux-file ()
+  "Return the `.aux' file AUCTeX names for this buffer, or nil without AUCTeX.
+`TeX-master-output-file' returns a name relative to the master file's
+directory when `TeX-output-dir' is set, else relative to the buffer's."
+  (when (and (derived-mode-p 'LaTeX-mode)
+             (fboundp 'TeX-master-output-file))
+    (expand-file-name (TeX-master-output-file "aux")
+                      (if (bound-and-true-p TeX-output-dir)
+                          (TeX-master-directory)
+                        default-directory))))
+
+(defun latex-to-svg-for-latex--aux-file ()
+  "Return the absolute path of this buffer's `.aux' file, or nil.
+nil when the buffer visits no file.  See
+`latex-to-svg-for-latex-aux-file'."
+  (when-let* ((file buffer-file-name))
+    (let ((dir (file-name-directory file)))
+      (cond
+       ((stringp latex-to-svg-for-latex-aux-file)
+        (expand-file-name
+         (format-spec latex-to-svg-for-latex-aux-file
+                      `((?b . ,(file-name-base file))
+                        (?r . ,(if-let* ((project (project-current)))
+                                   (expand-file-name (project-root project))
+                                 dir))))
+         dir))
+       ((latex-to-svg-for-latex--auctex-aux-file))
+       (t (expand-file-name (concat (file-name-base file) ".aux") dir))))))
+
 ;;;; preview-latex
 
 (defun latex-to-svg-for-latex-preview-disabled ()
@@ -266,6 +327,8 @@ AUCTeX's preview-latex commands only say that they are off (see
           (progn
             (setq-local latex-to-svg-frontend-exclude-function
                         #'latex-to-svg-for-latex--exclusions)
+            (setq latex-to-svg-for-latex--aux-path
+                  (latex-to-svg-for-latex--aux-file))
             (unless (local-variable-p 'latex-to-svg-frontend-engine)
               (setq-local latex-to-svg-frontend-engine 'latex)
               (setq latex-to-svg-for-latex--set-engine t))
@@ -274,6 +337,7 @@ AUCTeX's preview-latex commands only say that they are off (see
         (user-error "`latex-to-svg-for-latex-mode' only works in LaTeX buffers"))
     (latex-to-svg-frontend-mode -1)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
+    (kill-local-variable 'latex-to-svg-for-latex--aux-path)
     (when latex-to-svg-for-latex--set-engine
       (kill-local-variable 'latex-to-svg-frontend-engine)
       (setq latex-to-svg-for-latex--set-engine nil))))
