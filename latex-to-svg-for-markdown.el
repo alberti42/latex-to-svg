@@ -38,7 +38,7 @@
 ;; Per-buffer settings (rescale factors, delimiter toggles, …) are the core's
 ;; buffer-local variables; set them in the same hook, e.g.
 ;;
-;;   (setq-local latex-to-svg-frontend-display-rescale 1.25)
+;;   (setq-local latex-to-svg-frontend-rescale-display 1.25)
 
 ;;; Code:
 

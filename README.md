@@ -242,8 +242,8 @@ differ:
 
 ```elisp
 (defun my/latex-to-svg-markdown-setup ()
-  (setq-local latex-to-svg-frontend-inline-rescale 1.20
-              latex-to-svg-frontend-display-rescale 1.25)
+  (setq-local latex-to-svg-frontend-rescale-inline 1.20
+              latex-to-svg-frontend-rescale-display 1.25)
   (latex-to-svg-for-markdown-mode 1))
 (add-hook 'markdown-ts-mode-hook #'my/latex-to-svg-markdown-setup)
 ```
@@ -258,7 +258,7 @@ These options update the previews on their own when you set them, with `setq`,
 | `latex-to-svg-frontend-engine` | the equations are typeset again with the new engine |
 | `latex-to-svg-frontend-fallback` | the equations RaTeX rejected are typeset again, or left as text |
 | `latex-to-svg-frontend-foreground-color`, `-background-color`, `-padding-inline`, `-padding-display` | the pictures are redrawn from cache |
-| `latex-to-svg-frontend-inline-rescale`, `-display-rescale` | the pictures are redrawn from cache |
+| `latex-to-svg-frontend-rescale-inline`, `-rescale-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
 | `latex-to-svg-backend-preamble`, `-appended-preamble`, `-preamble-not-precompiled` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-line-width` | the numbered equations are compiled with the new width, or taken from cache if compiled with it before |

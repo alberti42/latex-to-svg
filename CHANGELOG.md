@@ -11,18 +11,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- `latex-to-svg-frontend-padding-inline` and
-  `latex-to-svg-frontend-padding-display` set the padding of inline and
-  display previews separately, with the values `latex-to-svg-frontend-padding`
-  takes. They are safe as file-local values and update the previews when set.
-
-### Deprecated
-
-- `latex-to-svg-frontend-padding`, which padded both kinds alike. It still
-  works: a kind whose own option is nil (the default) takes its value.
-
 ## [0.18.0] - 2026-09-27
 
 ### Added
@@ -35,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   template (`latex-to-svg-for-latex-aux-file`), and a jump to a label in
   another file goes through `xref`. It sets the engine to `latex` in its
   buffers and remaps AUCTeX's preview-latex commands to a message.
+- `latex-to-svg-frontend-padding-inline` and
+  `latex-to-svg-frontend-padding-display` set the padding of inline and
+  display previews separately, with the values `latex-to-svg-frontend-padding`
+  takes. They are safe as file-local values and update the previews when set.
 - Setting one of the backend's options in the cache key that a project sets
   in `.dir-locals.el` (`latex-to-svg-backend-preamble`,
   `latex-to-svg-backend-appended-preamble`,
@@ -70,6 +62,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   markup", and leaves the details to a page per adaptor in `docs/`. It has a
   new section, "Projects with their own macros", on setting a project's
   preamble in `.dir-locals.el` and trusting its directory.
+
+### Deprecated
+
+- `latex-to-svg-frontend-padding`, which padded both kinds alike. It still
+  works: a kind whose own option is nil (the default) takes its value.
+- `latex-to-svg-frontend-inline-rescale` and
+  `latex-to-svg-frontend-display-rescale` are renamed
+  `latex-to-svg-frontend-rescale-inline` and
+  `latex-to-svg-frontend-rescale-display`, so the four per-kind options share
+  their roots and complete together. The old names keep working as obsolete
+  aliases.
 
 ### Fixed
 

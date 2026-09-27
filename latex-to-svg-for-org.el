@@ -42,7 +42,7 @@
 ;;   (add-hook 'org-mode-hook #'latex-to-svg-for-org-mode)
 ;;
 ;; Per-buffer settings are the core's buffer-local variables; set them in the
-;; same hook, e.g. `(setq-local latex-to-svg-frontend-display-rescale 1.25)'.
+;; same hook, e.g. `(setq-local latex-to-svg-frontend-rescale-display 1.25)'.
 
 ;;; Code:
 

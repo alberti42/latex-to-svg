@@ -193,7 +193,14 @@ full pass.  Set to nil to force the full scan everywhere."
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-inline-rescale 1.0
+;; Before the defcustoms on purpose, like the padding alias below:
+;; `defvaralias' discards a value the obsolete name already holds.
+(define-obsolete-variable-alias 'latex-to-svg-frontend-inline-rescale
+  'latex-to-svg-frontend-rescale-inline "0.18.0")
+(define-obsolete-variable-alias 'latex-to-svg-frontend-display-rescale
+  'latex-to-svg-frontend-rescale-display "0.18.0")
+
+(defcustom latex-to-svg-frontend-rescale-inline 1.0
   "Size multiplier for inline math previews (`$…$', `\\(…\\)').
 Applied on top of the backend's global `latex-to-svg-backend-font-scale' via
 `latex-to-svg-backend's `:rescale-by'.  Re-scales from cache (no
@@ -203,7 +210,7 @@ the previews on its own."
   :safe #'numberp
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-display-rescale 1.0
+(defcustom latex-to-svg-frontend-rescale-display 1.0
   "Size multiplier for display math previews (`\\=\\[…\\=\\]', `$$…$$', environments).
 Applied on top of the backend's global `latex-to-svg-backend-font-scale' via
 `latex-to-svg-backend's `:rescale-by' — e.g. set to 1.1 for display equations a
@@ -284,7 +291,7 @@ The values are the same as theirs."
  'latex-to-svg-frontend-padding
  "set `latex-to-svg-frontend-padding-inline' and \
 `latex-to-svg-frontend-padding-display'."
- "0.19.0")
+ "0.18.0")
 
 (defcustom latex-to-svg-frontend-padding-inline nil
   "Padding (in pt) added around inline math previews (`$…$', `\\(…\\)').
@@ -537,8 +544,8 @@ Inline `$…$' / `\\(…\\)' return nil."
 (defun latex-to-svg-frontend--rescale-for (display-p)
   "Return the `:rescale-by' factor for a DISPLAY-P (else inline) preview."
   (if display-p
-      latex-to-svg-frontend-display-rescale
-    latex-to-svg-frontend-inline-rescale))
+      latex-to-svg-frontend-rescale-display
+    latex-to-svg-frontend-rescale-inline))
 
 (defun latex-to-svg-frontend--padding-for (display-p)
   "Return the `:padding' for a DISPLAY-P (else inline) preview.
@@ -2082,8 +2089,8 @@ fallback than the options now give it (see `--engine-for' and
     latex-to-svg-frontend-padding
     latex-to-svg-frontend-padding-inline
     latex-to-svg-frontend-padding-display
-    latex-to-svg-frontend-inline-rescale
-    latex-to-svg-frontend-display-rescale
+    latex-to-svg-frontend-rescale-inline
+    latex-to-svg-frontend-rescale-display
     latex-to-svg-frontend-center-display-math
     latex-to-svg-backend-preamble
     latex-to-svg-backend-appended-preamble

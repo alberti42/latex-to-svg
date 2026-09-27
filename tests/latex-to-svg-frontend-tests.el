@@ -2154,8 +2154,8 @@ other buffer BODY opened."
 
 (ert-deftest l2sf-passes-inline-and-display-rescale ()
   (l2sf-tests--with-stub
-    (let ((latex-to-svg-frontend-inline-rescale 1.0)
-          (latex-to-svg-frontend-display-rescale 1.4)
+    (let ((latex-to-svg-frontend-rescale-inline 1.0)
+          (latex-to-svg-frontend-rescale-display 1.4)
           (latex-to-svg-frontend-number-equations nil))
       (l2sf-tests--md "inline $a$ end\n"
         (latex-to-svg-frontend--render-region (point-min) (point-max))
@@ -2163,6 +2163,32 @@ other buffer BODY opened."
       (l2sf-tests--md "\\[b\\]\n"
         (latex-to-svg-frontend--render-region (point-min) (point-max))
         (should (equal l2sf-tests--last-rescale 1.4))))))
+
+(ert-deftest l2sf-rescale-obsolete-aliases-track-the-new-names ()
+  ;; The pre-0.18.0 names `-inline-rescale' / `-display-rescale' stay
+  ;; usable as obsolete aliases of `-rescale-inline' / `-rescale-display',
+  ;; and setting an old name still updates the previews through the
+  ;; watcher on the new one.
+  (dolist (pair '((latex-to-svg-frontend-inline-rescale
+                   . latex-to-svg-frontend-rescale-inline)
+                  (latex-to-svg-frontend-display-rescale
+                   . latex-to-svg-frontend-rescale-display)))
+    (should (eq (indirect-variable (car pair)) (cdr pair)))
+    (should (get (car pair) 'byte-obsolete-variable)))
+  (with-suppressed-warnings ((obsolete latex-to-svg-frontend-inline-rescale))
+    (let ((latex-to-svg-frontend-inline-rescale 1.3))
+      (should (equal latex-to-svg-frontend-rescale-inline 1.3)))
+    (with-temp-buffer
+      (unwind-protect
+          (progn
+            (setq-local latex-to-svg-frontend-inline-rescale 1.3)
+            (should (memq (current-buffer)
+                          latex-to-svg-frontend--option-buffers)))
+        (when (timerp latex-to-svg-frontend--option-timer)
+          (cancel-timer latex-to-svg-frontend--option-timer))
+        (setq latex-to-svg-frontend--option-timer nil
+              latex-to-svg-frontend--option-buffers nil
+              latex-to-svg-frontend--option-defaults nil)))))
 
 (ert-deftest l2sf-padding-obsolete-alias-tracks-the-new-name ()
   ;; The pre-0.16.0 name stays usable: it is an alias for the new one, so a
@@ -2328,8 +2354,8 @@ other buffer BODY opened."
 
 (ert-deftest l2sf-refresh-rescales-by-kind ()
   (l2sf-tests--with-stub
-    (let ((latex-to-svg-frontend-inline-rescale 1.0)
-          (latex-to-svg-frontend-display-rescale 1.4)
+    (let ((latex-to-svg-frontend-rescale-inline 1.0)
+          (latex-to-svg-frontend-rescale-display 1.4)
           (latex-to-svg-frontend-number-equations nil))
       (l2sf-tests--md "\\[b\\]\n"
         (latex-to-svg-frontend--render-region (point-min) (point-max))
