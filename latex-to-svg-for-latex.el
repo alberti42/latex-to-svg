@@ -297,8 +297,12 @@ Point must be on its `{'."
         (scan-error nil)))))
 
 (defun latex-to-svg-for-latex--clean-number (text)
-  "Return the printed number TEXT with `\\relax' and surrounding space removed."
-  (string-trim (replace-regexp-in-string "\\\\relax\\_>" "" text)))
+  "Return the printed number TEXT with `\\relax' and surrounding space removed.
+Most numbers hold neither a backslash nor a space; they are returned as
+they are, without the two regexp passes."
+  (if (string-match-p "[\\[:space:]]" text)
+      (string-trim (replace-regexp-in-string "\\\\relax\\_>" "" text))
+    text))
 
 (defun latex-to-svg-for-latex--read-aux (file labels &optional seen)
   "Add the labels of the `.aux' FILE to the table LABELS.
@@ -318,11 +322,11 @@ read, so a cycle stops."
             (goto-char (point-min))
             (while (re-search-forward "^\\\\\\(newlabel\\|@input\\){" nil t)
               (backward-char)
-              (let ((kind (match-string 1))
+              (let ((input (eq (char-after (match-beginning 1)) ?@))
                     (name (latex-to-svg-for-latex--group-at-point)))
                 (cond
                  ((null name))
-                 ((equal kind "@input") (push name inputs))
+                 (input (push name inputs))
                  ((string-suffix-p "@cref" name))
                  ((eq (char-after) ?\{)
                   (forward-char)

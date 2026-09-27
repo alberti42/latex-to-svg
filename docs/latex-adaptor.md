@@ -95,7 +95,7 @@ still choose `ratex`, and a `% engine=ratex` cookie still works.
   modification time at its last read, and the labels. A reconcile compares the
   file's modification time with the stored one and reads the file again when
   they differ. Several buffers sharing one `.aux` file (chapters of a book)
-  each read it: 7.6 ms for 5,000 labels, once per compile.
+  each read it: 13 ms for 5,000 labels, once per compile.
 - **After a compile.** References follow at the next reconcile, or at once
   with `M-x latex-to-svg-frontend-refresh`. The page shows the line that makes
   it immediate after an AUCTeX compile:
