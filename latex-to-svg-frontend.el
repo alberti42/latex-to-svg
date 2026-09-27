@@ -252,16 +252,52 @@ the previews on its own."
 (define-obsolete-variable-alias 'latex-to-svg-frontend-background-padding
   'latex-to-svg-frontend-padding "0.16.0")
 
+(defconst latex-to-svg-frontend--padding-type
+  '(choice (const :tag "None" nil)
+           (number :tag "All four sides (pt)")
+           (list :tag "Per side (pt)"
+                 (number :tag "Top   ")
+                 (number :tag "Right ")
+                 (number :tag "Bottom")
+                 (number :tag "Left  ")))
+  "Customize type of the padding options.")
+
+(defun latex-to-svg-frontend--padding-p (value)
+  "Non-nil when VALUE is a padding the backend accepts: nil, or 1-4 numbers.
+The `:safe' predicate of the padding options.  A file-local value is
+hand-written Lisp, so it accepts every shape the backend does, not just
+the two Customize offers."
+  (or (null value) (numberp value)
+      (and (consp value) (<= 1 (length value) 4)
+           (seq-every-p #'numberp value))))
+
 (defcustom latex-to-svg-frontend-padding nil
-  "Padding (in pt) added around equation previews.
+  "Padding (in pt) added around every equation preview.
+Obsolete: set `latex-to-svg-frontend-padding-inline' and
+`latex-to-svg-frontend-padding-display' instead.  A kind whose own
+option is nil takes this value, so setting it still pads both kinds.
+The values are the same as theirs."
+  :type latex-to-svg-frontend--padding-type
+  :safe #'latex-to-svg-frontend--padding-p
+  :group 'latex-to-svg-frontend)
+(make-obsolete-variable
+ 'latex-to-svg-frontend-padding
+ "set `latex-to-svg-frontend-padding-inline' and \
+`latex-to-svg-frontend-padding-display'."
+ "0.19.0")
+
+(defcustom latex-to-svg-frontend-padding-inline nil
+  "Padding (in pt) added around inline math previews (`$…$', `\\(…\\)').
 
 Grows the box beyond the equation ink, and scales with the equation.
 Either a number of pt (e.g. 3) applied to all four sides, or a list of
 four numbers (TOP RIGHT BOTTOM LEFT) to pad each side separately -- so
-a left gutter and nothing else is (0 0 0 6).  nil or 0 crops the box to
-the ink.  Set from Lisp, the shorter CSS forms the backend accepts work
-too (one, two or three numbers: see `latex-to-svg-backend'), but
-Customize offers only the number and the four-side list.
+a left gutter and nothing else is (0 0 0 6).  0 crops the box to the
+ink.  nil takes the value of the obsolete `latex-to-svg-frontend-padding',
+which crops too unless it is set.  Set from Lisp, the shorter CSS forms
+the backend accepts work too (one, two or three numbers: see
+`latex-to-svg-backend'), but Customize offers only the number and the
+four-side list.
 
 This mainly matters with `latex-to-svg-frontend-background-color' set,
 since padding is what separates the ink from the box edge.  Without a
@@ -271,19 +307,23 @@ but an asymmetric one still shifts the equation within its own image
 
 Passed to `latex-to-svg-backend' as `:padding'; applies from cache (no
 recompile).  Setting it with `setq', `setq-local' or Customize updates
-the previews on its own."
-  :type '(choice (const :tag "None" nil)
-                 (number :tag "All four sides (pt)")
-                 (list :tag "Per side (pt)"
-                       (number :tag "Top   ")
-                       (number :tag "Right ")
-                       (number :tag "Bottom")
-                       (number :tag "Left  ")))
-  ;; A file-local value is hand-written Lisp, so accept every shape the
-  ;; backend does (1-4 numbers), not just the two Customize offers.
-  :safe (lambda (v) (or (null v) (numberp v)
-                        (and (consp v) (<= 1 (length v) 4)
-                             (seq-every-p #'numberp v))))
+the previews on its own.  See `latex-to-svg-frontend-padding-display'
+for display math."
+  :type latex-to-svg-frontend--padding-type
+  :safe #'latex-to-svg-frontend--padding-p
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-padding-display nil
+  "Padding (in pt) added around display math previews.
+Display math is `\\=\\[…\\=\\]', `$$…$$' and environments.  The values
+are those of `latex-to-svg-frontend-padding-inline', which pads inline
+math: a number for all four sides, a list (TOP RIGHT BOTTOM LEFT), 0
+to crop to the ink, or nil for the value of the obsolete
+`latex-to-svg-frontend-padding'.  Applies from cache (no recompile).
+Setting it with `setq', `setq-local' or Customize updates the previews
+on its own."
+  :type latex-to-svg-frontend--padding-type
+  :safe #'latex-to-svg-frontend--padding-p
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-center-display-math nil
@@ -294,11 +334,12 @@ than starting at the left margin.  Inline math is never centered: it
 belongs in the run of text.
 
 The indent is applied at display time, not baked into the image: the
-preview keeps its own size and any `latex-to-svg-frontend-padding' box,
-and a space before it stretches to put its center on the window's
-center.  The stretch is computed by redisplay, so it follows a window
-resize, a split, a font change or `display-line-numbers-mode' on its
-own -- no refresh needed for those.  Setting the option itself with
+preview keeps its own size and any
+`latex-to-svg-frontend-padding-display' box, and a space before it
+stretches to put its center on the window's center.  The stretch is
+computed by redisplay, so it follows a window resize, a split, a font
+change or `display-line-numbers-mode' on its own -- no refresh needed
+for those.  Setting the option itself with
 `setq', `setq-local' or Customize updates the previews on its own.
 
 An equation wider than the window, or one that does not start its own
@@ -498,6 +539,17 @@ Inline `$…$' / `\\(…\\)' return nil."
   (if display-p
       latex-to-svg-frontend-display-rescale
     latex-to-svg-frontend-inline-rescale))
+
+(defun latex-to-svg-frontend--padding-for (display-p)
+  "Return the `:padding' for a DISPLAY-P (else inline) preview.
+That is `latex-to-svg-frontend-padding-display' or
+`latex-to-svg-frontend-padding-inline', or, when it is nil, the
+obsolete `latex-to-svg-frontend-padding'."
+  (or (if display-p
+          latex-to-svg-frontend-padding-display
+        latex-to-svg-frontend-padding-inline)
+      (with-suppressed-warnings ((obsolete latex-to-svg-frontend-padding))
+        latex-to-svg-frontend-padding)))
 
 (defvar-local latex-to-svg-frontend--font-warned nil
   "Non-nil once an unmeasurable buffer font has been reported in this buffer.")
@@ -1543,7 +1595,7 @@ nothing to the backend and installs `--set-unrendered-overlay' instead."
                     :rescale-by (latex-to-svg-frontend--rescale-for display-p)
                     :color latex-to-svg-frontend-foreground-color
                     :background latex-to-svg-frontend-background-color
-                    :padding latex-to-svg-frontend-padding
+                    :padding (latex-to-svg-frontend--padding-for display-p)
                     :font-height (latex-to-svg-frontend--font-height buffer)
                     :metadata (car enums-fallback)
                     :engine engine
@@ -1921,7 +1973,8 @@ deleted in the meantime (edited, renumbered) is left alone."
                                        (overlay-get ov 'latex-to-svg-frontend-display-math))
                           :color latex-to-svg-frontend-foreground-color
                           :background latex-to-svg-frontend-background-color
-                          :padding latex-to-svg-frontend-padding
+                          :padding (latex-to-svg-frontend--padding-for
+                                    (overlay-get ov 'latex-to-svg-frontend-display-math))
                           :font-height font-height
                           :metadata (car (overlay-get
                                           ov 'latex-to-svg-frontend-enums))
@@ -2027,6 +2080,8 @@ fallback than the options now give it (see `--engine-for' and
     latex-to-svg-frontend-foreground-color
     latex-to-svg-frontend-background-color
     latex-to-svg-frontend-padding
+    latex-to-svg-frontend-padding-inline
+    latex-to-svg-frontend-padding-display
     latex-to-svg-frontend-inline-rescale
     latex-to-svg-frontend-display-rescale
     latex-to-svg-frontend-center-display-math

@@ -2256,16 +2256,55 @@ other buffer BODY opened."
   ;; A file-local padding is hand-written Lisp, so the `:safe' predicate
   ;; accepts every shape the backend takes (1-4 numbers) and nothing else --
   ;; a value Customize cannot express must still not need a y/n prompt.
-  (let ((safe (get 'latex-to-svg-frontend-padding 'safe-local-variable)))
-    (should safe)
-    (dolist (ok (list nil 3 3.5 '(0 0 0 6) '(2 6) '(1 2 3)))
-      (should (funcall safe ok)))
-    (dolist (bad (list "3" '(1 2 3 4 5) '(1 "2") 'x))
-      (should-not (funcall safe bad))))
+  (dolist (option '(latex-to-svg-frontend-padding-inline
+                    latex-to-svg-frontend-padding-display
+                    latex-to-svg-frontend-padding))
+    (let ((safe (get option 'safe-local-variable)))
+      (should safe)
+      (dolist (ok (list nil 3 3.5 '(0 0 0 6) '(2 6) '(1 2 3)))
+        (should (funcall safe ok)))
+      (dolist (bad (list "3" '(1 2 3 4 5) '(1 "2") 'x))
+        (should-not (funcall safe bad)))))
   ;; The colors it is threaded with are safe as data too.
   (dolist (v '(latex-to-svg-frontend-foreground-color
                latex-to-svg-frontend-background-color))
     (should (get v 'safe-local-variable))))
+
+(ert-deftest l2sf-padding-by-kind ()
+  ;; Inline and display math take their own padding, on the first render
+  ;; and on a refresh.  A kind whose option is nil takes the obsolete
+  ;; `latex-to-svg-frontend-padding', so an old config still pads both; an
+  ;; explicit 0 does not fall back.
+  (l2sf-tests--with-stub
+    (let ((paddings nil))
+      (cl-letf (((symbol-function 'latex-to-svg-backend)
+                 (lambda (latex &rest args)
+                   (push (cons latex (plist-get args :padding)) paddings)
+                   l2sf-tests--image)))
+        (l2sf-tests--md "$a$\n\n\\[b\\]\n"
+          (setq-local latex-to-svg-frontend-number-equations nil)
+          (with-suppressed-warnings ((obsolete latex-to-svg-frontend-padding))
+            (dolist (case '((2 6 nil (("$a$" . 2) ("\\[b\\]" . 6)))
+                            (nil nil (4 0 4 0) (("$a$" . (4 0 4 0))
+                                                ("\\[b\\]" . (4 0 4 0))))
+                            (0 nil 5 (("$a$" . 0) ("\\[b\\]" . 5)))))
+              (setq-local latex-to-svg-frontend-padding-inline (nth 0 case)
+                          latex-to-svg-frontend-padding-display (nth 1 case)
+                          latex-to-svg-frontend-padding (nth 2 case))
+              (setq paddings nil)
+              (latex-to-svg-frontend--render-region (point-min) (point-max))
+              (should (equal (reverse paddings) (nth 3 case)))
+              (setq paddings nil)
+              (latex-to-svg-frontend--refresh-buffer (current-buffer))
+              (should (equal (reverse paddings) (nth 3 case))))))))))
+
+(ert-deftest l2sf-padding-is-obsolete ()
+  ;; The one option for both kinds is obsolete; the two per kind are
+  ;; watched, like the other appearance options.
+  (should (get 'latex-to-svg-frontend-padding 'byte-obsolete-variable))
+  (dolist (option '(latex-to-svg-frontend-padding-inline
+                    latex-to-svg-frontend-padding-display))
+    (should (memq option latex-to-svg-frontend--watched-options))))
 
 (ert-deftest l2sf-passes-color-background-padding ()
   ;; The three appearance defcustoms are threaded to the backend as

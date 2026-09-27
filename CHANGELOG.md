@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `latex-to-svg-frontend-padding-inline` and
+  `latex-to-svg-frontend-padding-display` set the padding of inline and
+  display previews separately, with the values `latex-to-svg-frontend-padding`
+  takes. They are safe as file-local values and update the previews when set.
+
+### Deprecated
+
+- `latex-to-svg-frontend-padding`, which padded both kinds alike. It still
+  works: a kind whose own option is nil (the default) takes its value.
+
 ## [0.18.0] - 2026-09-27
 
 ### Added
