@@ -7,9 +7,6 @@
 [![CI](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/github/license/alberti42/latex-to-svg)](LICENSE)
 
-The two MELPA badges are the core, `latex-to-svg-frontend`; the adaptors'
-badges are on their lines under [One adaptor per markup](#one-adaptor-per-markup).
-
 Render LaTeX math in Emacs Org, Markdown and LaTeX buffers. Inline and display math,
 numbered environments included, is compiled with
 [LaTeX](https://www.latex-project.org/) (`latex` → `dvisvgm`), or with
