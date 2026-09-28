@@ -134,6 +134,32 @@ which finds the label in any file of the document. The etags backends
 (`etags`, and `tex-etags` in Emacs 31, which AUCTeX enables) are not asked:
 without a `TAGS` file they prompt for one.
 
+## Compared with AUCTeX's preview-latex
+
+AUCTeX's preview-latex also previews math in place, and since AUCTeX 14.1.1
+(January 2026) can make SVG images too, through `dvisvgm`, as an option next to
+its default PNG. This adaptor does not depend on AUCTeX: AUCTeX is optional,
+and its functions are called only when they are defined. What it offers in
+addition:
+
+- **Previews appear on their own**, when the buffer opens and as the cursor
+  leaves an equation, with no command to run.
+- **`\ref` and `\eqref` show the numbers from the `.aux` file**, as text over
+  the source, and a click jumps to the label, in another file through `xref`.
+- **Padding, background and colour are display options**: changing them
+  redraws the previews from the cache, with no LaTeX run, as a theme switch and
+  a text zoom do.
+- **The previews come from the backend's cache**, where each equation is named
+  after its content: shared by all buffers and by `agent-shell-math-renderer`,
+  kept across sessions, and cleaned of what has not been used for a while.
+- **It is a thin layer**, about 500 lines. If you already use the Org or
+  Markdown adaptor, it brings the same previews, cache and settings to your
+  LaTeX buffers, with nothing else to install.
+
+preview-latex compiles the whole document, so its equation numbers follow
+`\numberwithin`, which this adaptor's do not (see
+[Limitations](#limitations)).
+
 ## Limitations
 
 - **Numbers inside the previews** come from the front-end's count, which
