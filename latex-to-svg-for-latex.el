@@ -98,7 +98,7 @@ unescaped.")
   "Non-nil when POS is inside a comment (see `--comment-re')."
   (save-excursion
     (save-match-data
-      (goto-char (line-beginning-position))
+      (beginning-of-line)
       (and (re-search-forward latex-to-svg-for-latex--comment-re
                               (line-end-position) t)
            (< (match-beginning 1) pos)))))
@@ -396,7 +396,7 @@ ignores:
 
 (defun latex-to-svg-for-latex--xref-backend ()
   "Return the buffer's xref backend if it can find a label, else nil.
-The two etags backends are excluded: without a `TAGS' file they prompt
+The two etags backends are excluded: without a TAGS file they prompt
 for one.  `tex-etags' is Emacs 31's TeX backend, which AUCTeX enables."
   (when (require 'xref nil t)
     (let ((backend (xref-find-backend)))
