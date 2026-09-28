@@ -1,0 +1,51 @@
+#!/bin/sh
+# Git pre-push hook: refuse to push a release tag that fails the release check.
+#
+# Install once per clone, from the repository root:
+#
+#   ln -s ../../scripts/pre-push .git/hooks/pre-push
+#
+# For each tag vX.Y.Z being pushed, it checks that the tag names the version
+# in the Version: headers, that it points at the checked-out commit (the
+# check reads the working tree), and that scripts/release-check.el passes:
+# the frontend requires the newest latex-to-svg-backend on MELPA Stable, and
+# CHANGELOG.md has the version's dated section.  Any failure cancels the push.
+# MELPA Stable builds from tags, so a tag that never reaches GitHub never
+# reaches users.  Other pushes (branches, other tags) pass through untouched.
+# `git push --no-verify' skips the hook.
+
+root=$(git rev-parse --show-toplevel) || exit 1
+cd "$root" || exit 1
+
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/tags/v[0-9]*) ;;
+    *) continue ;;
+  esac
+  # A deleted tag has an all-zero local sha: nothing to check.
+  case "$local_sha" in
+    *[!0]*) ;;
+    *) continue ;;
+  esac
+  tag=${remote_ref#refs/tags/}
+  version=$(sed -n 's/^;; Version: //p' latex-to-svg-frontend.el)
+  if [ "$tag" != "v$version" ]; then
+    echo "pre-push: $tag does not match the Version: header ($version)." >&2
+    status=1
+    continue
+  fi
+  tagged=$(git rev-parse "$local_sha^{commit}")
+  if [ "$tagged" != "$(git rev-parse HEAD)" ]; then
+    echo "pre-push: $tag points at $tagged, not the checked-out commit;" >&2
+    echo "pre-push: check it out first, so the release check reads its files." >&2
+    status=1
+    continue
+  fi
+  echo "pre-push: checking $tag before it is pushed." >&2
+  if ! emacs -Q -batch -l scripts/release-check.el; then
+    echo "pre-push: $tag not pushed: the release check failed." >&2
+    status=1
+  fi
+done
+exit $status
