@@ -127,3 +127,29 @@ jobs:
             --eval '(progn (require (quote package)) (package-initialize))' \
             -L . -l ert -l tests/latex-to-svg-frontend-tests.el \
             -f ert-run-tests-batch-and-exit
+
+  # Before a release: when the version in the headers has no tag yet, this
+  # commit is (or leads up to) a release, so run the checks that need
+  # MELPA Stable (scripts/release-check.el): the frontend must require the
+  # newest backend there, and CHANGELOG.md must have the version's dated
+  # section.  After the tag exists, ordinary pushes skip it.  One Emacs is
+  # enough; the result does not depend on the Emacs version.
+  release-check:
+    runs-on: ubuntu-latest
+    name: Release check
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: purcell/setup-emacs@master
+        with:
+          version: '30.2'
+
+      - name: Check a version not yet tagged
+        run: |
+          version=$(sed -n 's/^;; Version: //p' latex-to-svg-frontend.el)
+          if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null; then
+            echo "v$version is already tagged; nothing to check before a release."
+          else
+            echo "v$version is not tagged yet; checking it as a release."
+            emacs -Q -batch -l scripts/release-check.el
+          fi
