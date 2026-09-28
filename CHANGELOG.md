@@ -11,6 +11,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.1] - 2026-09-28
+
+### Fixed
+
+- The Org and Markdown adaptors required `latex-to-svg-frontend` 0.11.0, the
+  oldest frontend their code runs on, so upgrading one of them left the
+  frontend where it was, without the fixes of the releases since; a user who
+  installed only an adaptor does not upgrade the frontend by hand. Each
+  adaptor now requires the frontend of its own release, here 0.18.1, so
+  upgrading an adaptor upgrades the frontend too, and the frontend the backend
+  it was tested with.
+
 ## [0.18.0] - 2026-09-28
 
 ### Added
@@ -619,7 +631,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.18.1...HEAD
+[0.18.1]: https://github.com/alberti42/latex-to-svg/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/alberti42/latex-to-svg/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/alberti42/latex-to-svg/compare/v0.16.2...v0.17.0
 [0.16.2]: https://github.com/alberti42/latex-to-svg/compare/v0.16.1...v0.16.2

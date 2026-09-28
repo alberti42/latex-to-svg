@@ -2772,6 +2772,23 @@ other buffer BODY opened."
     (should (seq-every-p #'stringp versions))
     (should (equal (seq-uniq versions) (list (car versions))))))
 
+(ert-deftest l2sf-adaptors-require-the-frontend-of-their-release ()
+  ;; Drift guard: each adaptor requires the frontend at the version of its
+  ;; own release, so upgrading an adaptor alone also upgrades the frontend.
+  ;; A user who installed only an adaptor never upgrades the frontend by
+  ;; hand, and every fix is in the frontend.
+  (let ((version (l2sf-tests--header-version "latex-to-svg-frontend.el")))
+    (dolist (file '("latex-to-svg-for-org.el"
+                    "latex-to-svg-for-markdown.el"
+                    "latex-to-svg-for-latex.el"))
+      (let ((requires (with-temp-buffer
+                        (insert-file-contents
+                         (expand-file-name file l2sf-tests--repo-root))
+                        (car (read-from-string
+                              (lm-header "package-requires"))))))
+        (should (equal (cadr (assq 'latex-to-svg-frontend requires))
+                       version))))))
+
 (ert-deftest l2sf-changelog-not-behind-package-version ()
   ;; Drift guard: a released section never claims a version the sources have
   ;; not reached.  Between releases the headers may run ahead of the newest
