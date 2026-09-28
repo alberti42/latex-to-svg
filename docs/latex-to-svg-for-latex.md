@@ -142,8 +142,11 @@ its default PNG. This adaptor does not depend on AUCTeX: AUCTeX is optional,
 and its functions are called only when they are defined. What it offers in
 addition:
 
-- **Previews appear on their own**, when the buffer opens and as the cursor
-  leaves an equation, with no command to run.
+- **Previews are made and remade without a command.** preview-latex also shows
+  an equation's source when the cursor enters its preview, but typesets only on
+  command, and an edited equation keeps its old image or an icon until the next
+  one. Here, the math renders when the buffer opens, and an edited equation
+  renders again as the cursor leaves it.
 - **`\ref` and `\eqref` show the numbers from the `.aux` file**, as text over
   the source, and a click jumps to the label, in another file through `xref`.
 - **Padding, background and colour are display options**: changing them
@@ -159,6 +162,11 @@ addition:
 preview-latex compiles the whole document, so its equation numbers follow
 `\numberwithin`, which this adaptor's do not (see
 [Limitations](#limitations)).
+
+Both speed up LaTeX with a format file (`.fmt`): the document's preamble is
+dumped once with TeX's `\dump`, and every later run loads it instead of
+reading the preamble again. The technique is David Carlisle's `mylatex.ltx`,
+from 1994, and preview-latex has used it since its release 0.7.4, in 2002.
 
 ## Limitations
 
