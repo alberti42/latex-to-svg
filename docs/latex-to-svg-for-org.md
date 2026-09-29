@@ -29,7 +29,13 @@ The adaptor is on MELPA; installing it pulls in the frontend and the backend
 ```elisp
 (use-package latex-to-svg-for-org
   :ensure t                  ; with straight: :straight t
-  :hook (org-mode . latex-to-svg-for-org-mode))
+  :hook (org-mode . latex-to-svg-for-org-mode)
+  :init
+  ;; Ignore `#+startup: latexpreview': it would run Org's own preview
+  ;; before this mode turns on (see Troubleshooting).
+  (with-eval-after-load 'org
+    (setq org-startup-options
+          (assoc-delete-all "latexpreview" org-startup-options))))
 ```
 
 ## Usage
@@ -62,3 +68,38 @@ Math inside these is left as text:
 - comment lines,
 - inline `~code~` / `=verbatim=` spans (via Org's own `org-verbatim-re`), so
   `=\(=` stays literal text.
+
+## Troubleshooting
+
+### Opening a file with `#+startup: latexpreview` fails
+
+`#+startup: latexpreview` (or `org-startup-with-latex-preview`) makes
+`org-mode` run Org's own preview, `org-latex-preview`, while it sets up the
+buffer, before `org-mode-hook` turns `latex-to-svg-for-org-mode` on. If Org's
+own preview is not properly configured on your system, it fails with an error
+such as
+
+```
+File "/tmp/orgtexeQT6GZ.dvi" wasn't produced  Please adjust 'dvisvgm' part of 'org-preview-latex-process-alist'.
+```
+
+and the error stops `org-mode`'s setup, so the mode is never turned on. When
+Org's pipeline works, the overlays produced by Org and by this mode cover the
+same math.
+
+The mode renders all math when the buffer opens, so the option `latexpreview`
+is not needed. Delete it from the file, or have Org ignore it in every file,
+without editing them, with the `:init` lines in [Installation](#installation):
+
+```elisp
+(with-eval-after-load 'org
+  (setq org-startup-options
+        (assoc-delete-all "latexpreview" org-startup-options)))
+```
+
+`org-startup-options` lists the words Org accepts after `#+STARTUP:`. The
+snippet removes `latexpreview` from that list, and Org ignores a word that is
+not in it, so a file that still has `#+startup: latexpreview` no longer runs
+Org's preview. `org-startup-options` is a `defconst`: loading Org sets it
+again, which would undo a `setq` made before, hence `with-eval-after-load`.
+Remove these lines to use Org's own preview again.

@@ -192,7 +192,14 @@ are on MELPA, with `melpa` in `package-archives`:
 ```elisp
 (use-package latex-to-svg-for-org
   :ensure t
-  :hook (org-mode . latex-to-svg-for-org-mode))
+  :hook (org-mode . latex-to-svg-for-org-mode)
+  :init
+  ;; Ignore `#+startup: latexpreview': it would run Org's own preview
+  ;; before this mode turns on (see Troubleshooting in
+  ;; docs/latex-to-svg-for-org.md).
+  (with-eval-after-load 'org
+    (setq org-startup-options
+          (assoc-delete-all "latexpreview" org-startup-options))))
 ```
 
 With `straight`, which resolves MELPA recipes on its own, write `:straight t`
