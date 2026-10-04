@@ -123,7 +123,8 @@ images over these. See [its page](docs/latex-to-svg-for-org.md).
 
 ### `latex-to-svg-for-latex`
 
-Not on MELPA yet.
+[![MELPA](https://melpa.org/packages/latex-to-svg-for-latex-badge.svg)](https://melpa.org/#/latex-to-svg-for-latex)
+[![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-latex-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-latex)
 
 For AUCTeX's `LaTeX-mode` or the built-in `latex-mode`. Skips comments,
 `comment` environments, `\iffalse` … `\fi`, verbatim environments and `\verb`,
@@ -186,8 +187,8 @@ The stack has three layers:
   use.
 
 Install the adaptor for each markup you use; it pulls in the frontend and the
-backend through its `Package-Requires` header. The Markdown and Org adaptors
-are on MELPA, with `melpa` in `package-archives`:
+backend through its `Package-Requires` header. The adaptors are on MELPA,
+with `melpa` in `package-archives`:
 
 ```elisp
 (use-package latex-to-svg-for-org
@@ -206,9 +207,8 @@ With `straight`, which resolves MELPA recipes on its own, write `:straight t`
 instead of `:ensure t` (run `M-x straight-pull-recipe-repositories` if your
 recipes predate the packages). Each adaptor's page gives its lines
 ([Markdown](docs/latex-to-svg-for-markdown.md#installation),
-[Org](docs/latex-to-svg-for-org.md#installation)). The LaTeX adaptor is not on
-MELPA yet: its page gives a git recipe
-([LaTeX](docs/latex-to-svg-for-latex.md#installation)).
+[Org](docs/latex-to-svg-for-org.md#installation),
+[LaTeX](docs/latex-to-svg-for-latex.md#installation)).
 
 Optionally, re-tint previews the instant you switch themes, and rescale them
 when the frame font changes (see

@@ -1,6 +1,8 @@
 # latex-to-svg-for-latex
 
 ![Made for GNU Emacs](https://img.shields.io/badge/Made%20for-GNU%20Emacs-7F5AB6?logo=gnuemacs&logoColor=white)
+[![MELPA](https://melpa.org/packages/latex-to-svg-for-latex-badge.svg)](https://melpa.org/#/latex-to-svg-for-latex)
+[![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-latex-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-latex)
 [![melpazoid](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/melpazoid.yml)
 [![CI](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml/badge.svg)](https://github.com/alberti42/latex-to-svg/actions/workflows/ci.yml)
 [![License: GPL-3.0](https://img.shields.io/github/license/alberti42/latex-to-svg)](../LICENSE)
@@ -23,18 +25,12 @@ skips the verbatim environments AUCTeX's style files add.
 
 ## Installation
 
-The adaptor is not on MELPA yet. Install the frontend from MELPA (see the
-README's [Installation](../README.md#installation)), then the adaptor from
-git, here with `straight`:
+The adaptor is on MELPA; installing it pulls in the frontend and the backend
+(see the README's [Installation](../README.md#installation)):
 
 ```elisp
-(use-package latex-to-svg-frontend :straight t)
-
-;; LaTeX adaptor
 (use-package latex-to-svg-for-latex
-  :straight (latex-to-svg-for-latex :type git :host github
-                                    :repo "alberti42/latex-to-svg"
-                                    :files ("latex-to-svg-for-latex.el"))
+  :ensure t                  ; with straight: :straight t
   :hook ((LaTeX-mode latex-mode) . latex-to-svg-for-latex-mode))
 ```
 
