@@ -1,9 +1,9 @@
 # Byte-compilation, checkdoc and the ERT suite, on every push to main and
 # every pull request.
 #
-# The four packages in this repository (`latex-to-svg-frontend' and its
+# The five packages in this repository (`latex-to-svg-frontend' and its
 # `latex-to-svg-for-org' / `latex-to-svg-for-markdown' /
-# `latex-to-svg-for-latex' adaptors) all load
+# `latex-to-svg-for-latex' / `latex-to-svg-for-gnus' adaptors) all load
 # the backend, `latex-to-svg-backend'.  package.el installs it from MELPA,
 # which is where a user gets it too, so a backend change that breaks this
 # front-end shows up here rather than in a user's report.  Every later step
@@ -100,7 +100,8 @@ jobs:
             latex-to-svg-frontend.el \
             latex-to-svg-for-org.el \
             latex-to-svg-for-markdown.el \
-            latex-to-svg-for-latex.el
+            latex-to-svg-for-latex.el \
+            latex-to-svg-for-gnus.el
 
       # Docstring conventions, exiting non-zero on any finding.  Both flags
       # are set rather than left at their defaults, so the step reports the
@@ -115,7 +116,8 @@ jobs:
             (dolist (file (list "latex-to-svg-frontend.el"
                                 "latex-to-svg-for-org.el"
                                 "latex-to-svg-for-markdown.el"
-                                "latex-to-svg-for-latex.el"))
+                                "latex-to-svg-for-latex.el"
+                                "latex-to-svg-for-gnus.el"))
               (checkdoc-file file))
             (if (get-buffer "*Warnings*")
                 (kill-emacs 1)

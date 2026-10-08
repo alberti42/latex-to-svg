@@ -62,6 +62,10 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (require 'latex-to-svg-for-markdown)
 (require 'latex-to-svg-for-org)
 (require 'latex-to-svg-for-latex)
+(require 'latex-to-svg-for-gnus)
+;; Built-in; defines `gnus-article-mode' and `article-emphasize' for the Gnus
+;; adaptor's tests.
+(require 'gnus-art)
 ;; Built-in; defines `latex-mode' and `latex-mode-hook' for the LaTeX adaptor's tests.
 (require 'tex-mode)
 ;; Built-in on Emacs 31+; only needed for the minor-mode enable/disable test,
@@ -1447,6 +1451,96 @@ other buffer BODY opened."
     (should-error (latex-to-svg-for-markdown-mode 1))
     (should-not latex-to-svg-for-markdown-mode)))
 
+;;;; Gnus adaptor
+
+(defmacro l2sf-tests--gnus (&rest body)
+  "Run BODY in an empty `gnus-article-mode' buffer, read-only as Gnus has it."
+  (declare (indent 0) (debug t))
+  `(with-temp-buffer
+     (let ((gnus-article-mode-hook nil))
+       (gnus-article-mode))
+     (setq buffer-read-only t)
+     ,@body))
+
+(defun l2sf-tests--gnus-prepared ()
+  "Run `gnus-article-prepare-hook' as Gnus does, for the current buffer.
+Gnus runs it with the summary buffer current, where `gnus-article-buffer'
+names the article buffer."
+  (let ((gnus-article-buffer (current-buffer)))
+    (with-temp-buffer
+      (run-hooks 'gnus-article-prepare-hook))))
+
+(defun l2sf-tests--gnus-show (text)
+  "Replace the article buffer's text with TEXT, as Gnus does for an article.
+Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
+  (let ((inhibit-read-only t))
+    (erase-buffer)
+    (insert text))
+  (article-goto-body)
+  (l2sf-tests--gnus-prepared))
+
+(ert-deftest l2sf-gnus-mode-refuses-non-article ()
+  ;; The adaptor gates on the major mode (the core itself does not).
+  (with-temp-buffer
+    (fundamental-mode)
+    (should-error (latex-to-svg-for-gnus-mode 1) :type 'user-error)
+    (should-not latex-to-svg-for-gnus-mode)))
+
+(ert-deftest l2sf-gnus-mode-draws-each-article ()
+  ;; The mode turns on in the empty article buffer, from
+  ;; `gnus-article-mode-hook'.  Each article Gnus shows in the buffer is
+  ;; drawn from `gnus-article-prepare-hook', including the equation point is
+  ;; in; the previous article's previews are gone.  Numbering is off in the
+  ;; buffer unless set there; turning the mode off restores both.
+  (l2sf-tests--with-stub
+    (l2sf-tests--gnus
+      (latex-to-svg-for-gnus-mode 1)
+      (should latex-to-svg-frontend-mode)
+      (should-not latex-to-svg-frontend-number-equations)
+      (l2sf-tests--gnus-show "Subject: on $x$\n\n$a$ and \\(b\\)\n")
+      (should (equal (l2sf-tests--values) '("$x$" "$a$" "\\(b\\)")))
+      (l2sf-tests--gnus-show "Subject: none\n\n$c$\n")
+      (should (equal (l2sf-tests--values) '("$c$")))
+      (latex-to-svg-for-gnus-mode -1)
+      (should-not latex-to-svg-frontend-mode)
+      (should-not (local-variable-p 'latex-to-svg-frontend-number-equations))
+      (should-not (memq #'latex-to-svg-for-gnus--article-prepared
+                        gnus-article-prepare-hook))
+      (should (null (l2sf-tests--overlays)))))
+  ;; A buffer-local value set before the mode is kept.
+  (l2sf-tests--with-stub
+    (l2sf-tests--gnus
+      (setq-local latex-to-svg-frontend-number-equations t)
+      (latex-to-svg-for-gnus-mode 1)
+      (should latex-to-svg-frontend-number-equations)
+      (latex-to-svg-for-gnus-mode -1)
+      (should latex-to-svg-frontend-number-equations))))
+
+(ert-deftest l2sf-gnus-removes-emphasis-inside-math ()
+  ;; `article-emphasize' reads `/b/' as italic inside math too: it hides the
+  ;; slashes and puts the face on an overlay.  Inside math the adaptor shows
+  ;; the slashes again and deletes the overlay; in prose it keeps both.
+  (l2sf-tests--with-stub
+    (l2sf-tests--gnus
+      (latex-to-svg-for-gnus-mode 1)
+      (let ((inhibit-read-only t))
+        (insert "Subject: x\n\nsee $a /b/ c$ and /word/ here.\n"))
+      (article-emphasize)
+      (l2sf-tests--gnus-prepared)
+      (let ((math (save-excursion (goto-char (point-min))
+                                  (search-forward "/b/")))
+            (prose (save-excursion (goto-char (point-min))
+                                   (search-forward "/word/"))))
+        (should-not (get-text-property (- math 3) 'invisible))
+        (should-not (get-text-property (- math 1) 'invisible))
+        (should-not (seq-find (lambda (ov) (eq (overlay-get ov 'face)
+                                               'gnus-emphasis-italic))
+                              (overlays-in (- math 3) math)))
+        (should (get-text-property (- prose 6) 'invisible))
+        (should (seq-find (lambda (ov) (eq (overlay-get ov 'face)
+                                           'gnus-emphasis-italic))
+                          (overlays-in (- prose 6) prose)))))))
+
 ;;;; Refresh
 
 (ert-deftest l2sf-refresh-updates-image ()
@@ -2812,13 +2906,14 @@ other buffer BODY opened."
          (match-string 1))))
 
 (ert-deftest l2sf-package-versions-agree ()
-  ;; Drift guard: the repository ships four packages on one version stream,
+  ;; Drift guard: the repository ships five packages on one version stream,
   ;; so their `Version:' headers are bumped together.
   (let ((versions (mapcar #'l2sf-tests--header-version
                           '("latex-to-svg-frontend.el"
                             "latex-to-svg-for-org.el"
                             "latex-to-svg-for-markdown.el"
-                            "latex-to-svg-for-latex.el"))))
+                            "latex-to-svg-for-latex.el"
+                            "latex-to-svg-for-gnus.el"))))
     (should (seq-every-p #'stringp versions))
     (should (equal (seq-uniq versions) (list (car versions))))))
 
@@ -2830,7 +2925,8 @@ other buffer BODY opened."
   (let ((version (l2sf-tests--header-version "latex-to-svg-frontend.el")))
     (dolist (file '("latex-to-svg-for-org.el"
                     "latex-to-svg-for-markdown.el"
-                    "latex-to-svg-for-latex.el"))
+                    "latex-to-svg-for-latex.el"
+                    "latex-to-svg-for-gnus.el"))
       (let ((requires (with-temp-buffer
                         (insert-file-contents
                          (expand-file-name file l2sf-tests--repo-root))

@@ -2,14 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
-This repository ships three packages that share one version/tag stream:
-`latex-to-svg-frontend` (the core) and its `latex-to-svg-for-markdown` and
-`latex-to-svg-for-org` adaptors.
+This repository ships five packages that share one version/tag stream:
+`latex-to-svg-frontend` (the core) and its `latex-to-svg-for-markdown`,
+`latex-to-svg-for-org`, `latex-to-svg-for-latex` and `latex-to-svg-for-gnus`
+adaptors.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Added
+
+- `latex-to-svg-for-gnus`, an adaptor for Gnus's `gnus-article-mode` (see
+  `docs/latex-to-svg-for-gnus.md`), for articles such as the abstracts of the
+  arXiv feeds on gwene.org (issue #3). It draws the previews again for each
+  article Gnus shows, turns equation numbering off in the article buffer, and
+  removes Gnus's emphasis (`gnus-emphasis-alist`) from inside math.
 
 ## [0.19.0] - 2026-10-08
 

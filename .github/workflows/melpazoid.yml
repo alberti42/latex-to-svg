@@ -10,7 +10,7 @@
 # checkout of package-lint, which is where a symbol newer than the
 # declared Emacs floor shows up.
 #
-# This repository ships three packages, each with its own MELPA recipe, so
+# This repository ships five packages, each with its own MELPA recipe, so
 # the job runs once per recipe: what is checked is one package and the
 # single file that recipe ships, not the checkout as a whole.
 #
@@ -43,6 +43,8 @@ jobs:
             recipe: '(latex-to-svg-for-markdown :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-markdown.el"))'
           - package: latex-to-svg-for-latex
             recipe: '(latex-to-svg-for-latex :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-latex.el"))'
+          - package: latex-to-svg-for-gnus
+            recipe: '(latex-to-svg-for-gnus :fetcher github :repo "alberti42/latex-to-svg" :files ("latex-to-svg-for-gnus.el"))'
     name: MELPA checks (${{ matrix.package }})
     # A passing job takes about 2 minutes.  Without a limit, a stalled
     # apt-get keeps the job running for GitHub's default of 6 hours.

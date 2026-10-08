@@ -25,13 +25,15 @@ This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 - **`latex-to-svg-for-markdown`** — [Markdown adaptor](docs/latex-to-svg-for-markdown.md).
 - **`latex-to-svg-for-org`** — [Org adaptor](docs/latex-to-svg-for-org.md).
 - **`latex-to-svg-for-latex`** — [LaTeX adaptor](docs/latex-to-svg-for-latex.md).
+- **`latex-to-svg-for-gnus`** — [Gnus adaptor](docs/latex-to-svg-for-gnus.md).
 
 An overview of the adaptors is presented under [One adaptor per markup](#one-adaptor-per-markup).
 
 ```
   latex-to-svg-for-markdown ─┐
-  latex-to-svg-for-org ──────┼─▶ latex-to-svg-frontend ─▶ latex-to-svg-backend
-  latex-to-svg-for-latex ────┘        (this repo)             (backend)
+  latex-to-svg-for-org ──────┤
+  latex-to-svg-for-latex ────┼─▶ latex-to-svg-frontend ─▶ latex-to-svg-backend
+  latex-to-svg-for-gnus ─────┘        (this repo)             (backend)
 ```
 
 You install an **adaptor**; it pulls in the frontend core and the backend
@@ -133,6 +135,15 @@ the document's `.aux` file, so references to sections, figures and other files
 resolve too. While it is on, AUCTeX's preview-latex commands only say that they
 are off. See [its page](docs/latex-to-svg-for-latex.md).
 
+### `latex-to-svg-for-gnus`
+
+Not on MELPA yet.
+
+For Gnus's `gnus-article-mode`, such as the abstracts of the arXiv feeds on
+gwene.org. Skips nothing. Draws the previews again for each article Gnus
+shows, turns equation numbering off in the article buffer, and removes Gnus's
+emphasis from inside math. See [its page](docs/latex-to-svg-for-gnus.md).
+
 To add an adaptor for another markup, see
 [Writing an adaptor for another markup](#writing-an-adaptor-for-another-markup).
 
@@ -183,12 +194,13 @@ The stack has three layers:
   shared preview core (detection, overlays, numbering, refresh),
   markup-agnostic.
 - **`latex-to-svg-for-markdown`** / **`latex-to-svg-for-org`** /
-  **`latex-to-svg-for-latex`** — the per-mode adaptors. Install whichever you
+  **`latex-to-svg-for-latex`** / **`latex-to-svg-for-gnus`** — the per-mode
+  adaptors. Install whichever you
   use.
 
 Install the adaptor for each markup you use; it pulls in the frontend and the
-backend through its `Package-Requires` header. The adaptors are on MELPA,
-with `melpa` in `package-archives`:
+backend through its `Package-Requires` header. The Markdown, Org and LaTeX
+adaptors are on MELPA, with `melpa` in `package-archives`:
 
 ```elisp
 (use-package latex-to-svg-for-org
@@ -208,7 +220,9 @@ instead of `:ensure t` (run `M-x straight-pull-recipe-repositories` if your
 recipes predate the packages). Each adaptor's page gives its lines
 ([Markdown](docs/latex-to-svg-for-markdown.md#installation),
 [Org](docs/latex-to-svg-for-org.md#installation),
-[LaTeX](docs/latex-to-svg-for-latex.md#installation)).
+[LaTeX](docs/latex-to-svg-for-latex.md#installation)). The Gnus adaptor is
+not on MELPA yet: its page gives a git recipe
+([Gnus](docs/latex-to-svg-for-gnus.md#installation)).
 
 Optionally, re-tint previews the instant you switch themes, and rescale them
 when the frame font changes (see
@@ -660,7 +674,7 @@ buffer-local protocol and toggles the core:
   records, replacing the scanner entirely. Escape hatch; rarely needed.
 
 See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` /
-`latex-to-svg-for-latex.el` as templates.
+`latex-to-svg-for-latex.el` / `latex-to-svg-for-gnus.el` as templates.
 
 Pull requests adding adaptors for other major modes are welcome.
 
