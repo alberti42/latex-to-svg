@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-10-08
+
 ### Added
 
 - `latex-to-svg-frontend-reveal` sets when the preview point is on is shown
@@ -644,7 +646,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.18.1...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/alberti42/latex-to-svg/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/alberti42/latex-to-svg/compare/v0.18.0...v0.18.1
 [0.18.0]: https://github.com/alberti42/latex-to-svg/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/alberti42/latex-to-svg/compare/v0.16.2...v0.17.0
