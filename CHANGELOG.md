@@ -11,6 +11,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `latex-to-svg-frontend-reveal` sets when the preview point is on is shown
+  as its LaTeX source: `always`, `writable` (in a buffer that is not
+  read-only) or `nil` (never). During an Isearch it is shown whatever the
+  value.
+
+### Changed
+
+- In a read-only buffer the preview point is on stays drawn, except during
+  an Isearch. Set `latex-to-svg-frontend-reveal` to `always` for the former
+  behavior.
+
 ## [0.18.1] - 2026-09-28
 
 ### Fixed

@@ -631,6 +631,56 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend--handle-cursor)
         (should (eq (overlay-get ov 'display) 'fake-image))))))
 
+(ert-deftest l2sf-reveal-follows-option-and-read-only ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$ after\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((ov (car (l2sf-tests--overlays))))
+        (dolist (case '((writable nil t) (writable t nil)
+                        (always t t) (nil nil nil)))
+          (pcase-let ((`(,reveal ,read-only ,shown) case))
+            (setq-local latex-to-svg-frontend-reveal reveal)
+            (setq buffer-read-only read-only)
+            (goto-char (point-max))
+            (latex-to-svg-frontend--handle-cursor)
+            (goto-char (+ (point-min) 1))
+            (latex-to-svg-frontend--handle-cursor)
+            (should (eq (null (overlay-get ov 'display)) shown))))))))
+
+(ert-deftest l2sf-isearch-reveals-in-read-only-buffer ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$ after\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (setq-local latex-to-svg-frontend-reveal nil)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (setq buffer-read-only t)
+      (let ((ov (car (l2sf-tests--overlays))))
+        (goto-char (point-max))
+        (latex-to-svg-frontend--handle-cursor)
+        (let ((isearch-mode " Isearch"))
+          (goto-char (+ (point-min) 1))
+          (latex-to-svg-frontend--handle-cursor)
+          (should (null (overlay-get ov 'display))))
+        ;; The Isearch ends with point on the preview: it is drawn again.
+        (latex-to-svg-frontend--handle-cursor)
+        (should (eq (overlay-get ov 'display) 'fake-image))))))
+
+(ert-deftest l2sf-edited-preview-stays-revealed-when-reveal-is-off ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$ after\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (setq-local latex-to-svg-frontend-reveal nil)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((ov (car (l2sf-tests--overlays))))
+        (goto-char (+ (point-min) 1))
+        (latex-to-svg-frontend--handle-cursor)
+        (should (eq (overlay-get ov 'display) 'fake-image))
+        (insert "b")
+        (latex-to-svg-frontend--handle-cursor)
+        (should (null (overlay-get ov 'display)))
+        (should (overlay-get ov 'latex-to-svg-frontend-modified))))))
+
 (ert-deftest l2sf-cursor-jump-between-previews ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ $b$\n"

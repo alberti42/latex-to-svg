@@ -75,7 +75,9 @@
 ;; never while still inside — so half-typed equations are not compiled.  That
 ;; same discrete leave event reconciles numbers and references synchronously;
 ;; the debounced `after-change' pass is only the backstop for edits with no
-;; clean leave (delete, paste, undo).
+;; clean leave (delete, paste, undo).  `latex-to-svg-frontend-reveal' sets
+;; in which buffers point reveals the source: by default not in a read-only
+;; one, except during an Isearch.
 
 ;;; Code:
 
@@ -441,6 +443,18 @@ very start of a reference, where the preview's keymap is already active.
 \\<latex-to-svg-frontend--reference-keymap>\\[latex-to-svg-frontend-goto-reference] follows a reference regardless."
   :type 'boolean
   :safe #'booleanp
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-reveal 'writable
+  "When the preview point is on is shown as its LaTeX source.
+`always' means in every buffer, `writable' in a buffer that is not
+read-only, and nil never.  During an Isearch the preview point is on is
+shown as its LaTeX source whatever the value, so a match in it can be
+seen.  Editing a preview shows its source whatever the value."
+  :type '(choice (const :tag "In every buffer" always)
+                 (const :tag "In a buffer that is not read-only" writable)
+                 (const :tag "Never" nil))
+  :safe (lambda (value) (memq value '(always writable nil)))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-suppress-emphasis t
@@ -1065,6 +1079,15 @@ Image previews, `\\eqref' / `\\ref' text previews and unrendered math
                             (overlay-get o 'latex-to-svg-frontend-unrendered)))
             (overlays-at pos)))
 
+(defun latex-to-svg-frontend--reveal-p ()
+  "Non-nil if the preview point is on is shown as its LaTeX source.
+That is when `latex-to-svg-frontend-reveal' says so, or during an
+Isearch."
+  (or isearch-mode
+      (pcase latex-to-svg-frontend-reveal
+        ('always t)
+        ('writable (not buffer-read-only)))))
+
 (defun latex-to-svg-frontend--open-overlay (ov)
   "Reveal OV's LaTeX source by hiding its image / reference text."
   (latex-to-svg-frontend--hide-image ov))
@@ -1144,8 +1167,16 @@ On `post-command-hook' while the mode is on."
       (when (and last (/= last (point)))
         (latex-to-svg-frontend--render-on-leave last (point)))
       (let* ((prev (and last (latex-to-svg-frontend--revealable-overlay-at last)))
-             (cur (latex-to-svg-frontend--revealable-overlay-at (point))))
-      (when (and prev (not (eq prev cur)))
+             (cur (latex-to-svg-frontend--revealable-overlay-at (point)))
+             (reveal (latex-to-svg-frontend--reveal-p)))
+      ;; Close the preview point left.  Also close the one point stays on
+      ;; once revealing stops, as when an Isearch ends in a read-only
+      ;; buffer; never an edited one, which re-renders only on leave.
+      (when (and prev
+                 (or (not (eq prev cur))
+                     (and (not reveal)
+                          (null (overlay-get prev 'display))
+                          (not (overlay-get prev 'latex-to-svg-frontend-modified)))))
         (latex-to-svg-frontend--close-overlay prev))
       ;; A reference reached by *mouse* is never revealed: a click there is a
       ;; jump, not an edit.  This is not just taste -- it is required for
@@ -1157,7 +1188,7 @@ On `post-command-hook' while the mode is on."
       ;; different position and the release is reported as `drag-mouse-1' --
       ;; which never follows a link.  Point-motion reveal stays for the
       ;; keyboard, which is where editing intent actually comes from.
-      (when (and cur (not (eq cur prev))
+      (when (and cur reveal (not (eq cur prev))
                  (not (and (overlay-get cur 'latex-to-svg-frontend-ref)
                            (mouse-event-p last-command-event))))
         (latex-to-svg-frontend--open-overlay cur))

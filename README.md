@@ -255,6 +255,10 @@ half-typed equations aren't compiled. Math you paste, yank or restore with an
 undo renders a moment later (`latex-to-svg-frontend-reconcile-idle`, 0.4 s),
 except an equation the cursor is in.
 
+`latex-to-svg-frontend-reveal` sets when the preview point is on is shown as
+its LaTeX source: `always`, `writable` (default; in a buffer that is not
+read-only) or `nil` (never). During an Isearch it is shown whatever the value.
+
 ### Per-mode configuration
 
 The size multipliers, colors, numbering, and detection toggles are ordinary
