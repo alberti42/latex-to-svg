@@ -2372,6 +2372,84 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                                          (- center (0.5 . ,l2sf-tests--image))))))
               (should-not (overlay-get ov 'before-string)))))))))
 
+(defun l2sf-tests--line-breaks (ov)
+  "Return the text under OV's line-break overlays, with their positions.
+Each element is (BEG END TEXT); every overlay must display a newline."
+  (mapcar (lambda (o)
+            (should (equal (overlay-get o 'display) "\n"))
+            (list (overlay-start o) (overlay-end o)
+                  (buffer-substring-no-properties
+                   (overlay-start o) (overlay-end o))))
+          (overlay-get ov 'latex-to-svg-frontend-line-breaks)))
+
+(ert-deftest l2sf-inline-math-across-lines-breaks-at-next-space ()
+  ;; A `display' property replaces the newline it covers, which would join
+  ;; the two lines of a hard-wrapped paragraph.  The break goes where a
+  ;; fill puts it: at the first spaces after the equation, shown as a
+  ;; newline, so punctuation attached to the equation stays on its line.
+  ;; Inline math on one line gets no break.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--md "a $x=\\mathrm\n{Tr}$ predicts $y$ c \\(C_\n{qa}\\), the end\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((ovs (l2sf-tests--overlays)))
+          (should (= (length ovs) 3))
+          (dolist (ov ovs)
+            (should (eq (overlay-get ov 'display) l2sf-tests--image)))
+          (should (equal (mapcar #'caddr (l2sf-tests--line-breaks (nth 0 ovs)))
+                         '(" ")))
+          (should (= (car (car (l2sf-tests--line-breaks (nth 0 ovs))))
+                     (overlay-end (nth 0 ovs))))
+          (should-not (l2sf-tests--line-breaks (nth 1 ovs)))
+          ;; `,' stays with the equation; the space after it breaks.
+          (should (= (car (car (l2sf-tests--line-breaks (nth 2 ovs))))
+                     (1+ (overlay-end (nth 2 ovs)))))
+          ;; Revealed, the break overlays are deleted; shown again, they
+          ;; come back.
+          (latex-to-svg-frontend--open-overlay (nth 0 ovs))
+          (should-not (overlay-get (nth 0 ovs) 'latex-to-svg-frontend-line-breaks))
+          (should-not (seq-some (lambda (o) (overlay-get o 'display))
+                                (overlays-in (overlay-end (nth 0 ovs))
+                                             (1+ (overlay-end (nth 0 ovs))))))
+          (latex-to-svg-frontend--close-overlay (nth 0 ovs))
+          (should (l2sf-tests--line-breaks (nth 0 ovs)))
+          ;; Clearing the previews deletes the break overlays too.
+          (latex-to-svg-frontend--clear-region (point-min) (point-max))
+          (should-not (seq-some (lambda (o) (overlay-get o 'display))
+                                (overlays-in (point-min) (point-max)))))))))
+
+(ert-deftest l2sf-inline-math-across-lines-at-end-of-line-no-break ()
+  ;; With no space before the end of the line, nothing follows to break
+  ;; from: the line's own newline ends it.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--md "a \\(C_\n{qa}\\).\nnext\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should-not (l2sf-tests--line-breaks (car (l2sf-tests--overlays))))))))
+
+(ert-deftest l2sf-display-math-with-text-around-breaks-at-spaces ()
+  ;; Display math with text before or after it on its delimiters' lines
+  ;; starts and ends a line: the spaces before it and the first spaces
+  ;; after it show as newlines.  Punctuation after it stays on the image's
+  ;; line.  Alone on its line, indented or with trailing spaces, it gets
+  ;; no break.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-number-equations nil)
+          (latex-to-svg-frontend-center-display-math t))
+      (l2sf-tests--md "we have  $$a=\nb$$; where a\n\n  \\[c\\]  \nd\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((ovs (l2sf-tests--overlays)))
+          (should (= (length ovs) 2))
+          (should (equal (mapcar #'caddr (l2sf-tests--line-breaks (nth 0 ovs)))
+                         '("  " " ")))
+          (should (= (cadr (car (l2sf-tests--line-breaks (nth 0 ovs))))
+                     (overlay-start (nth 0 ovs))))
+          (should (= (car (cadr (l2sf-tests--line-breaks (nth 0 ovs))))
+                     (1+ (overlay-end (nth 0 ovs)))))
+          ;; The centering prefix is unchanged: the break is not in it.
+          (should (equal (overlay-get (nth 0 ovs) 'before-string) " "))
+          (should-not (l2sf-tests--line-breaks (nth 1 ovs))))))))
+
 (ert-deftest l2sf-centering-off-by-default ()
   ;; Off, nothing is indented -- previews start at the left margin as before.
   (l2sf-tests--with-stub

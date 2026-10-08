@@ -20,6 +20,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   article Gnus shows, turns equation numbering off in the article buffer, and
   removes Gnus's emphasis (`gnus-emphasis-alist`) from inside math.
 
+### Fixed
+
+- Inline math whose source spans lines, as in a paragraph filled with hard
+  line breaks, no longer joins the line holding the equation and the line
+  after it. The line breaks where a fill would break it, at the first spaces
+  after the equation, so punctuation attached to the equation stays on its
+  line.
+- Display math with text before or after it on the lines of its delimiters,
+  such as `we have $$a$$, where`, starts and ends a line, as in the typeset
+  document: the spaces before it and the first spaces after it are shown as
+  line breaks. With `latex-to-svg-frontend-center-display-math` on, the image
+  is centered on its own line.
+
 ## [0.19.0] - 2026-10-08
 
 ### Added

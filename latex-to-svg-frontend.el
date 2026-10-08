@@ -925,21 +925,95 @@ reliable)."
              (overlay-get ov 'latex-to-svg-frontend-display-math))
     (propertize " " 'display `(space :align-to (- center (0.5 . ,image))))))
 
+(defun latex-to-svg-frontend--space-before (ov)
+  "Return (BEG . END) of the spaces and tabs just before OV, or nil.
+Nil also when nothing but spaces and tabs precedes OV on its line."
+  (save-excursion
+    (goto-char (overlay-start ov))
+    (let ((end (point)))
+      (skip-chars-backward " \t" (line-beginning-position))
+      (and (< (point) end)
+           (not (bolp))
+           (cons (point) end)))))
+
+(defun latex-to-svg-frontend--space-after (ov)
+  "Return (BEG . END) of the first spaces and tabs after OV, or nil.
+They are searched for on the line OV ends on.  Nil when no text follows
+them on that line: the newline ending the line breaks it already."
+  (save-excursion
+    (goto-char (overlay-end ov))
+    (skip-chars-forward "^ \t\n")
+    (let ((beg (point)))
+      (skip-chars-forward " \t")
+      (and (< beg (point))
+           (not (eolp))
+           (cons beg (point))))))
+
+(defun latex-to-svg-frontend--line-breaks (ov)
+  "Return the spans to show as line breaks around OV's image.
+A list of (BEG . END), each a run of spaces and tabs.  A `display'
+property replaces the newlines of the text it covers, so:
+- inline math whose source spans lines, as in a paragraph filled with
+  hard line breaks, would join the line holding the equation and the
+  line after it;
+- display math with text before or after it on the lines of its
+  delimiters would have that text beside the image.
+The break goes where a fill would put it: at the first spaces after
+the equation, so that punctuation attached to it stays on the image's
+line, and, for display math, at the spaces before it."
+  (let ((display (overlay-get ov 'latex-to-svg-frontend-display-math)))
+    (delq nil
+          (list (and display (latex-to-svg-frontend--space-before ov))
+                (and (or display
+                         (save-excursion
+                           (goto-char (overlay-start ov))
+                           (search-forward "\n" (overlay-end ov) t)))
+                     (latex-to-svg-frontend--space-after ov))))))
+
+(defun latex-to-svg-frontend--delete-line-breaks (ov)
+  "Delete the line-break overlays of OV."
+  (mapc #'delete-overlay (overlay-get ov 'latex-to-svg-frontend-line-breaks))
+  (overlay-put ov 'latex-to-svg-frontend-line-breaks nil))
+
+(defun latex-to-svg-frontend--show-line-breaks (ov)
+  "Show the spans `latex-to-svg-frontend--line-breaks' finds as newlines.
+Each span gets an overlay with `display' \"\\n\", recorded on OV, which
+owns it: it is deleted with OV's image.  These overlays do not carry
+the `latex-to-svg-frontend' property, so code looking for previews
+does not see them."
+  (latex-to-svg-frontend--delete-line-breaks ov)
+  (overlay-put ov 'latex-to-svg-frontend-line-breaks
+               (mapcar (lambda (span)
+                         (let ((o (make-overlay (car span) (cdr span))))
+                           (overlay-put o 'display "\n")
+                           (overlay-put o 'evaporate t)
+                           o))
+                       (latex-to-svg-frontend--line-breaks ov))))
+
 (defun latex-to-svg-frontend--show-image (ov image)
   "Show IMAGE on OV, centered if it is display math and centering is on.
 The centering prefix embeds IMAGE, so it is rebuilt here rather than
 kept across a re-render: every path that shows an image goes through
-this function, and `latex-to-svg-frontend--hide-image' undoes it."
+this function, and `latex-to-svg-frontend--hide-image' undoes it.  So
+are the line breaks around the image (see
+`latex-to-svg-frontend--line-breaks')."
   (overlay-put ov 'display image)
   (overlay-put ov 'before-string
-               (latex-to-svg-frontend--center-prefix ov image)))
+               (latex-to-svg-frontend--center-prefix ov image))
+  (latex-to-svg-frontend--show-line-breaks ov))
 
 (defun latex-to-svg-frontend--hide-image (ov)
   "Hide OV's image, revealing its LaTeX source.
-Drops the centering prefix with it, so revealed source is not indented
-by a leftover stretch."
+Drops the centering prefix and the line breaks with it, so revealed
+source is not indented by a leftover stretch."
   (overlay-put ov 'display nil)
-  (overlay-put ov 'before-string nil))
+  (overlay-put ov 'before-string nil)
+  (latex-to-svg-frontend--delete-line-breaks ov))
+
+(defun latex-to-svg-frontend--delete-overlay (ov)
+  "Delete the preview overlay OV and its line-break overlays."
+  (latex-to-svg-frontend--delete-line-breaks ov)
+  (delete-overlay ov))
 
 (defun latex-to-svg-frontend--overlays-in (beg end)
   "Return this package's overlays intersecting BEG..END."
@@ -948,7 +1022,8 @@ by a leftover stretch."
 
 (defun latex-to-svg-frontend--clear-region (beg end)
   "Delete this package's preview overlays intersecting BEG..END."
-  (mapc #'delete-overlay (latex-to-svg-frontend--overlays-in beg end)))
+  (mapc #'latex-to-svg-frontend--delete-overlay
+        (latex-to-svg-frontend--overlays-in beg end)))
 
 (defun latex-to-svg-frontend--help-echo-text (latex)
   "Return LATEX quoted so that `help-echo' shows it as written.
@@ -1135,7 +1210,7 @@ below it are re-threaded (`--reconcile-from'); otherwise a full scan."
       (if (and el (memq (latex-to-svg-frontend--math-type el)
                         latex-to-svg-frontend--element-types))
           (latex-to-svg-frontend--render-on-leave-element el)
-        (delete-overlay ov)))))
+        (latex-to-svg-frontend--delete-overlay ov)))))
 
 (defun latex-to-svg-frontend--render-on-leave (from to)
   "Render the math element FROM was inside, once TO has left its span.
