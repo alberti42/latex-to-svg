@@ -2485,7 +2485,34 @@ not colour -- matters.)"
 
 (defconst latex-to-svg-frontend--font-lock-keywords
   '((latex-to-svg-frontend--suppress-emphasis))
-  "Font-lock keywords added while the mode is on (appended, so they run last).")
+  "Font-lock keywords added while the mode is on (appended, so they run last).
+They are added only in a buffer whose major mode sets `font-lock-defaults'
+\(see `latex-to-svg-frontend--add-font-lock-keywords').")
+
+(defvar-local latex-to-svg-frontend--font-lock-added nil
+  "Non-nil when the mode added `latex-to-svg-frontend--font-lock-keywords'.")
+
+(defun latex-to-svg-frontend--add-font-lock-keywords ()
+  "Add `latex-to-svg-frontend--font-lock-keywords', if the buffer needs them.
+They undo the faces a markup's font-lock puts on math, so they are added
+only when the major mode sets `font-lock-defaults'.  In a buffer without
+font-lock keywords, such as a Gnus article, `font-lock-mode' does
+nothing; a keyword would make it fontify, and fontifying first removes
+every `face' property, including the faces the major mode put on the
+text itself."
+  (when font-lock-defaults
+    (font-lock-add-keywords
+     nil latex-to-svg-frontend--font-lock-keywords 'append)
+    (setq latex-to-svg-frontend--font-lock-added t)
+    (when font-lock-mode (font-lock-flush))))
+
+(defun latex-to-svg-frontend--remove-font-lock-keywords ()
+  "Remove the keywords `--add-font-lock-keywords' added, if it added them."
+  (when latex-to-svg-frontend--font-lock-added
+    (font-lock-remove-keywords
+     nil latex-to-svg-frontend--font-lock-keywords)
+    (setq latex-to-svg-frontend--font-lock-added nil)
+    (when font-lock-mode (font-lock-flush))))
 
 (defun latex-to-svg-frontend--render-when-on (buffer)
   "Render all math in BUFFER, if `latex-to-svg-frontend-mode' is still on.
@@ -2536,9 +2563,7 @@ an option of this package updates the previews on its own (see
                   #'latex-to-svg-frontend--handle-cursor nil t)
         (add-hook 'change-major-mode-hook
                   #'latex-to-svg-frontend--before-major-mode-change nil t)
-        (font-lock-add-keywords
-         nil latex-to-svg-frontend--font-lock-keywords 'append)
-        (when font-lock-mode (font-lock-flush))
+        (latex-to-svg-frontend--add-font-lock-keywords)
         (if buffer-file-name
             (unless (timerp latex-to-svg-frontend--initial-render-timer)
               (setq latex-to-svg-frontend--initial-render-timer
@@ -2554,9 +2579,7 @@ an option of this package updates the previews on its own (see
     (remove-hook 'post-command-hook #'latex-to-svg-frontend--handle-cursor t)
     (remove-hook 'change-major-mode-hook
                  #'latex-to-svg-frontend--before-major-mode-change t)
-    (font-lock-remove-keywords
-     nil latex-to-svg-frontend--font-lock-keywords)
-    (when font-lock-mode (font-lock-flush))
+    (latex-to-svg-frontend--remove-font-lock-keywords)
     (when (markerp latex-to-svg-frontend--last-point)
       (set-marker latex-to-svg-frontend--last-point nil))
     (setq latex-to-svg-frontend--last-point nil)

@@ -36,6 +36,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cookie and for `latex-to-svg-frontend-engine` alike. Before, only a cookie
   warned, and an engine set by the option drew the backend's placeholder.
 
+### Fixed
+
+- In a Gnus article, `latex-to-svg-for-gnus-mode` removed Gnus's faces: the
+  colours of the headers, the larger Subject, and the proportional font of an
+  HTML body (issue #3). The mode added its font-lock keyword
+  (`latex-to-svg-frontend-suppress-emphasis`) in every buffer, so font-lock
+  fontified a buffer it had nothing to do in, and fontifying first removes
+  every `face` property. The keyword is now added only when the major mode
+  sets `font-lock-defaults`, as Org, Markdown and LaTeX modes do; it undoes
+  their font-lock, and a buffer without one needs nothing undone.
+
 ## [0.19.1] - 2026-10-08
 
 ### Added

@@ -541,6 +541,39 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
           (should (plist-member face :strike-through))
           (should (overlay-get ov 'priority)))))))
 
+(defun l2sf-tests--suppress-keyword-p ()
+  "Non-nil if the buffer's font-lock keywords run `--suppress-emphasis'.
+`font-lock-keywords' may be compiled, as (t ORIGINAL . COMPILED)."
+  (seq-some (lambda (k) (eq (car-safe k) 'latex-to-svg-frontend--suppress-emphasis))
+            (if (eq (car-safe font-lock-keywords) t)
+                (cadr font-lock-keywords)
+              font-lock-keywords)))
+
+(ert-deftest l2sf-font-lock-keywords-only-with-font-lock-defaults ()
+  ;; The keywords undo a markup's font-lock, so the mode adds them only when
+  ;; the major mode sets `font-lock-defaults', and removes them when off.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n"
+      (setq-local font-lock-defaults '(nil))
+      (latex-to-svg-frontend-mode 1)
+      (should (l2sf-tests--suppress-keyword-p))
+      (latex-to-svg-frontend-mode -1)
+      (should-not (l2sf-tests--suppress-keyword-p)))))
+
+(ert-deftest l2sf-font-lock-keeps-faces-without-font-lock-defaults ()
+  ;; Without `font-lock-defaults', the mode adds no keyword, so fontifying
+  ;; keeps the faces the major mode put on the text itself (Gnus's header
+  ;; faces, shr's `shr-text').  With a keyword, fontifying would first
+  ;; remove every `face' property.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text $a$\n"
+      (put-text-property (point-min) (+ (point-min) 4) 'face 'bold)
+      (latex-to-svg-frontend-mode 1)
+      (should-not font-lock-keywords)
+      (font-lock-ensure)
+      (should (eq (get-text-property (point-min) 'face) 'bold))
+      (latex-to-svg-frontend-mode -1))))
+
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
 (no overlay), colour and all."
@@ -1518,6 +1551,24 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
       (should latex-to-svg-frontend-number-equations)
       (latex-to-svg-for-gnus-mode -1)
       (should latex-to-svg-frontend-number-equations))))
+
+(ert-deftest l2sf-gnus-keeps-article-faces ()
+  ;; Gnus puts its header faces on the text as `face' properties, and
+  ;; `gnus-article-mode' sets no `font-lock-defaults'.  The faces survive
+  ;; the mode and a fontification.
+  (l2sf-tests--with-stub
+    (l2sf-tests--gnus
+      (latex-to-svg-for-gnus-mode 1)
+      (let ((inhibit-read-only t))
+        (insert (propertize "Subject:" 'face 'gnus-header-name) " "
+                (propertize "On $x$" 'face 'gnus-header-subject)
+                "\n\nbody\n"))
+      (l2sf-tests--gnus-prepared)
+      (font-lock-ensure)
+      (should (eq (get-text-property (point-min) 'face) 'gnus-header-name))
+      (should (eq (get-text-property (+ (point-min) 9) 'face)
+                  'gnus-header-subject))
+      (should (equal (l2sf-tests--values) '("$x$"))))))
 
 (ert-deftest l2sf-gnus-removes-emphasis-inside-math ()
   ;; `article-emphasize' reads `/b/' as italic inside math too: it hides the
