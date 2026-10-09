@@ -338,16 +338,23 @@ A plain buffer suffices — detection is a regexp scanner."
                    '("$b$")))))
 
 (ert-deftest l2sf-inline-dollar-currency-guards ()
-  ;; pandoc-style guards on inline `$…$': an opener must be followed by a
-  ;; non-space, a closer preceded by one, and `\$' is escaped.  So spaced
-  ;; currency is not math, while real math (and adjacent no-space ranges,
-  ;; which is the residual the toggle is for) behave as documented.
-  (dolist (case '(("I have $30 and you have $50" . ())      ; rule 2: closer after space
-                  ("cost 30$ and 50$ each"       . ())      ; rule 1: opener before space
+  ;; pandoc's guards on inline `$…$': an opener must be followed by a
+  ;; non-space, a closer preceded by one and not followed by a digit, and
+  ;; `\$' is escaped.  As in TeX, the first `$' after an opener ends the
+  ;; span, so a rejected closer leaves no span and a currency `$' never pairs
+  ;; with an equation's `$' further on.  Shell variables are the residual the
+  ;; toggle is for.
+  (dolist (case '(("I have $30 and you have $50" . ())      ; closer after space
+                  ("cost 30$ and 50$ each"       . ())      ; opener before space
                   ("escaped \\$5 and \\$9 here"   . ())      ; escaped \$
                   ("some $\\alpha$ inline"        . ("$\\alpha$"))
                   ("real $x+y$ math"             . ("$x+y$"))
-                  ("a range $100-$200 wide"      . ("$100-$")))) ; residual misfire
+                  ("a range $100-$200 wide"      . ())      ; closer before a digit
+                  ("math $x$2 then"              . ())      ; the price of that rule
+                  ("it costs $5 and $x$ here"    . ("$x$")) ; no pairing past " $"
+                  ("$100-$200 and $x$ here"      . ("$x$")) ; no pairing past "$2"
+                  ("two $a$ and $b$"             . ("$a$" "$b$"))
+                  ("vars $HOME/$USER here"       . ("$HOME/$")))) ; residual misfire
     (l2sf-tests--md (concat (car case) "\n")
       (should (equal (mapcar #'latex-to-svg-frontend--math-value
                              (latex-to-svg-frontend--elements (point-min) (point-max)))

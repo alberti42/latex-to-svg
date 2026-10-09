@@ -19,6 +19,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `$1`, `$2`, …, and a fixed-width line (`: …`, a literal example) such as
   `: echo ${VARNAME}`, whose `$` could pair with a `$` later in the paragraph
   and hide a real equation. Both are now excluded, like comment lines.
+- A `$` that cannot close an inline `$…$` (it follows whitespace) no longer
+  lets the span run on to a later `$`: in `it costs $5 and $x$`, the scanner
+  read `$5 and $x$` as one equation and lost `$x$`. As in TeX, the first `$`
+  after an opening one ends the span, and when it cannot close it there is no
+  span. This holds in every adaptor.
+- A no-space price range such as `$100-$200` is no longer read as the equation
+  `100-`: a closing `$` must not be followed by a digit, as in pandoc.
+
+### Changed
+
+- Inline math directly followed by a digit, such as `$x$2`, is no longer
+  detected; this is the price of the digit rule above, which pandoc also
+  applies. What still reads as math is shell variables such as `$HOME/$USER`
+  (see `latex-to-svg-frontend-detect-dollar-inline`).
 
 ## [0.20.0] - 2026-10-09
 

@@ -589,19 +589,19 @@ precedes it on its line, so prose that mentions `\begin{equation}`
 mid-sentence stays prose. The closing `\end{env}` has no such rule.
 
 **Why inline dollar is split out.** A lone `$` is the one delimiter that also
-occurs in ordinary prose — prices, shell variables. The scanner already guards
-the common cases (pandoc-style: an opening `$` must be followed by a non-space
-character, a closing `$` preceded by one, and an escaped `\$` is ignored), so
-spaced currency like `$30 and $50` is **not** mistaken for math. What still
-slips through is a no-space range like `$100-$200`: the hyphen touches both
-dollars, so it reads as the equation `100-` and the rest of the line is
-mangled. This case is *irreducible* — `$100-$200` is syntactically identical to
-legitimate math such as `$x$2`, so no local rule can reject one without the
-other.
+occurs in ordinary prose — prices, shell variables. The scanner guards the
+common cases with pandoc's rules: an opening `$` must be followed by a
+non-space character, a closing `$` preceded by one and not followed by a
+digit, and an escaped `\$` is ignored. As in TeX, the first `$` after an
+opening one ends the span. So currency like `$30 and $50` or `$100-$200` is
+**not** mistaken for math, and does not pair with the `$` of an equation later
+in the paragraph. The price of the digit rule: math directly followed by a
+digit, such as `$x$2`, is not detected either. What still slips through is
+shell variables such as `$HOME/$USER`, which read as the equation `HOME/`.
 
 Two ways to deal with it:
 
-- **One-off:** escape the dollars — `\$100-\$200` — which the scanner ignores.
+- **One-off:** escape the dollars — `\$HOME/\$USER` — which the scanner ignores.
 - **Document-wide:** if a buffer is full of prices, turn
   **`latex-to-svg-frontend-detect-dollar-inline` off** and write your math with
   the unambiguous LaTeX parentheses form `\(…\)` instead. The other three

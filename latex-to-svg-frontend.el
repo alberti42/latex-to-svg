@@ -365,14 +365,16 @@ line, simply stays where it is: the space cannot pull it left."
 (defcustom latex-to-svg-frontend-detect-dollar-inline t
   "Whether to detect inline TeX dollar math `$…$'.
 `$' is the least reliable delimiter, since it also occurs in prose (prices,
-shell variables).  The scanner already applies pandoc-style guards — an
-opening `$' must be followed by a non-space, a closing `$' preceded by a
-non-space, and an escaped `\$' is ignored — so spaced currency like
-\"$30 and $50\" is not mistaken for math.  What still slips through is a
-no-space range such as \"$100-$200\" (the hyphen touches both dollars, so it
-reads as the equation `100-'); escape it as \"\$100-\$200\" for a one-off, or
-turn this off (leaving the other three families on) and use `\(…\)' in
-buffers where `$' is mostly currency."
+shell variables).  The scanner applies pandoc's guards — an opening `$'
+must be followed by a non-space, a closing `$' preceded by a non-space
+and not followed by a digit, and an escaped `\$' is ignored — and, as in
+TeX, the first `$' after an opening one ends the span.  So currency like
+\"$30 and $50\" or \"$100-$200\" is not mistaken for math, and does not
+pair with the `$' of an equation later in the paragraph.  Math directly
+followed by a digit, such as `$x$2', is not detected either.  What still
+slips through is shell variables such as \"$HOME/$USER\"; escape them as
+\"\$HOME/\$USER\" for a one-off, or turn this off (leaving the other three
+families on) and use `\(…\)' in buffers where `$' is mostly prose."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
@@ -744,20 +746,24 @@ unbalanced opener can never run away past the paragraph it lives in."
 (defun latex-to-svg-frontend--find-dollar-close (from limit)
   "Return the position just after the closing `$' of an inline span, or nil.
 FROM is the position right after the opening `$'; the search is bounded by
-LIMIT (the block end).  Skips escaped `\\$', treats a `$$' as not-a-close,
-and requires the closing `$' to not follow whitespace (a pandoc-style
-guard against stray currency dollars)."
+LIMIT (the block end).  The first `$' after FROM ends the span, as in TeX,
+skipping an escaped `\\$' and a `$$'.  It closes the span only if no
+whitespace precedes it and no digit follows it (pandoc's guards against
+currency dollars); otherwise there is no span, so a currency `$' never
+pairs with a `$' further on, such as the opening `$' of an equation."
   (save-excursion
     (goto-char from)
     (catch 'done
       (while (re-search-forward "\\$" limit t)
-        (let ((p (match-beginning 0)))
+        (let ((p (match-beginning 0))
+              (after (char-after (match-end 0))))
           (cond
            ((latex-to-svg-frontend--escaped-p p) nil) ; \$, keep looking
-           ((eq (char-after (match-end 0)) ?$)            ; part of a $$
+           ((eq after ?$)                                 ; part of a $$
             (goto-char (1+ (match-end 0))))
-           ((memq (char-before p) '(?\s ?\t ?\n)) nil)    ; " $" not a close
-           ((<= p from) nil)                              ; empty span
+           ((or (memq (char-before p) '(?\s ?\t ?\n))    ; " $" not a close
+                (and after (<= ?0 after ?9)))             ; "$2" not a close
+            (throw 'done nil))
            (t (throw 'done (match-end 0))))))
       nil)))
 
