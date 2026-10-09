@@ -1623,32 +1623,15 @@ without one.  See `latex-to-svg-frontend--cookie-bounds'."
               (substring source (nth 3 bounds)))
     source))
 
-(defun latex-to-svg-frontend--missing-tools-message (engine)
-  "Return the warning for a cookie requesting ENGINE, whose programs are missing."
-  (pcase engine
-    ('ratex (format "engine=ratex: `%s' not found (see `%s')"
-                    latex-to-svg-backend-ratex-program
-                    'latex-to-svg-backend-ratex-program))
-    ('texres (format "engine=texres: `%s' or `%s' not found (see `%s' and `%s')"
-                     latex-to-svg-backend-texres-program
-                     latex-to-svg-backend-pdftocairo-program
-                     'latex-to-svg-backend-texres-program
-                     'latex-to-svg-backend-pdftocairo-program))
-    (_ (format "engine=latex: `%s' or `%s' not found (see `%s' and `%s')"
-               latex-to-svg-backend-latex-program
-               latex-to-svg-backend-dvisvgm-program
-               'latex-to-svg-backend-latex-program
-               'latex-to-svg-backend-dvisvgm-program))))
-
 (defun latex-to-svg-frontend--engine-for (source)
   "Return the engine for the equation whose LaTeX is SOURCE.
 Display math can choose its engine with a cookie (see
 `latex-to-svg-frontend--cookie'); without one, the engine is
 `latex-to-svg-frontend-engine'.  The result is `latex', `ratex' or
-`texres';
-`skip' for `engine=skip' or `engine=none'; or a string, the warning
-for an unknown key or value, or for a requested engine whose programs
-are not found.  For `skip' and a string, nothing is sent to the backend."
+`texres'; `skip' for `engine=skip' or `engine=none'; or a string, the
+warning for an unknown key or value.  For `skip' and a string, nothing
+is sent to the backend.  A program of the engine that is not found is
+the backend's to report."
   (let ((cookie (and (latex-to-svg-frontend--display-p source)
                      (latex-to-svg-frontend--cookie source))))
     (if (null cookie)
@@ -1664,9 +1647,7 @@ are not found.  For `skip' and a string, nothing is sent to the backend."
                   (cdr cookie) (cdr cookie)
                   (mapconcat #'car latex-to-svg-frontend--engine-cookie-values
                              ", ")))
-         ((eq engine 'skip) 'skip)
-         ((latex-to-svg-backend-tools-available-p engine) engine)
-         (t (latex-to-svg-frontend--missing-tools-message engine)))))))
+         (t engine))))))
 
 (defun latex-to-svg-frontend--backend-value (k source engine)
   "Return the string handed to the backend for SOURCE, numbered from K.

@@ -88,7 +88,6 @@ them again: `latex main.tex' twice in that directory, keeping only the
          (l2sf-tests--last-rescale nil)
          (l2sf-tests--last-args nil)
          (l2sf-tests--calls nil)
-         (l2sf-tests--missing-engines nil)
          (l2sf-tests--engine-used nil)
          (latex-to-svg-backend-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
@@ -100,9 +99,6 @@ them again: `latex main.tex' twice in that directory, keeping only the
                ((symbol-function 'latex-to-svg-backend-engine-used)
                 (lambda (_latex &optional engine _fallback)
                   (or l2sf-tests--engine-used engine)))
-               ((symbol-function 'latex-to-svg-backend-tools-available-p)
-                (lambda (&optional engine)
-                  (not (memq engine l2sf-tests--missing-engines))))
                ((symbol-function 'latex-to-svg-backend-appearance)
                 (lambda (&optional _font-height) l2sf-tests--appearance))
                ((symbol-function 'latex-to-svg-backend-metadata)
@@ -2076,27 +2072,6 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
         (should-not l2sf-tests--calls)
         (should (= (length warnings) 1))
         (should (string-match-p "katex" (car warnings)))))))
-
-(ert-deftest l2sf-cookie-missing-engine-warns ()
-  ;; A cookie naming an engine whose programs are missing warns instead of
-  ;; letting the backend draw its placeholder.
-  (l2sf-tests--with-stub
-    (setq l2sf-tests--missing-engines '(ratex))
-    (l2sf-tests--md "\\[% engine=ratex\nx\\]\n"
-      (let ((warnings nil))
-        (cl-letf (((symbol-function 'display-warning)
-                   (lambda (_type message &rest _) (push message warnings))))
-          (latex-to-svg-frontend--render-region (point-min) (point-max)))
-        (should-not l2sf-tests--calls)
-        (should (string-match-p "not found" (car warnings)))))))
-
-(ert-deftest l2sf-cookie-missing-texres-warns ()
-  ;; The warning for texres names its two programs.
-  (l2sf-tests--with-stub
-    (setq l2sf-tests--missing-engines '(texres))
-    (should (string-match-p
-             "engine=texres: .*latex-to-svg-backend-pdftocairo-program"
-             (latex-to-svg-frontend--engine-for "\\[% engine=texres\nx\\]")))))
 
 (ert-deftest l2sf-cookie-skipped-equation-keeps-its-numbers ()
   ;; A skipped `align' is still numbered in the exported document: the

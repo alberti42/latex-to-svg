@@ -490,7 +490,9 @@ a &= b
 - **Display math only.** A `%` inside `$…$` comments out the closing `$`, so an
   inline equation cannot carry a cookie.
 - **An unknown key or value** (`engine=katex`) warns and leaves the source
-  visible. So does a cookie naming an engine whose programs are not found.
+  visible. A cookie naming an engine whose program is not found leaves the
+  source visible too, and the backend warns, naming the engine and the
+  program.
 - **A skipped equation still takes its numbers**, as in the exported document,
   so the equations after it keep theirs, and a `\label` in it still resolves.
 - **Mixing engines mixes styles.** An equation a cookie sends to the other

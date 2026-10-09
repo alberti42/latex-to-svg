@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of `texres`, since texres reads the preamble. It still replaces a global
   `ratex` with `latex`.
 
+- A `% engine=` cookie naming an engine whose program is not found no longer
+  warns from the front-end: the equation is sent to the backend like any
+  other, and the backend warns, naming the engine and the program, for the
+  cookie and for `latex-to-svg-frontend-engine` alike. Before, only a cookie
+  warned, and an engine set by the option drew the backend's placeholder.
+
 ## [0.19.1] - 2026-10-08
 
 ### Added
