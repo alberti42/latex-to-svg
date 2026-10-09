@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.20.0] - 2026-10-09
+
 ### Added
 
 - A third engine, `texres`: `latex-to-svg-frontend-engine` and the
@@ -21,8 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `pdftocairo`. Numbering works as with `latex`: a `\setcounter` prefix and
   the compile metadata. `C-u M-x latex-to-svg-frontend-refresh` deletes
   texres's `.fmt` file too. An equation texres rejects has a LaTeX error, so it
-  gets no fallback. Needs the `latex-to-svg-backend` release that adds the
-  texres engine.
+  gets no fallback. Requires `latex-to-svg-backend` 0.12.1.
 
 ### Changed
 
@@ -705,7 +706,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.19.1...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/alberti42/latex-to-svg/compare/v0.19.1...v0.20.0
 [0.19.1]: https://github.com/alberti42/latex-to-svg/compare/v0.19.0...v0.19.1
 [0.19.0]: https://github.com/alberti42/latex-to-svg/compare/v0.18.1...v0.19.0
 [0.18.1]: https://github.com/alberti42/latex-to-svg/compare/v0.18.0...v0.18.1

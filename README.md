@@ -170,7 +170,10 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 - Emacs 29.1+ with SVG image support. Each adaptor's page lists the major
   modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.11.1+ (the backend) — the floor is set by the per-project preambles: the
+  0.12.1+ (the backend) — the floor is set by the `texres` engine, which came
+  with 0.12.0 together with the backend's warning for a program that is not
+  found; 0.12.1 fixed the texres engine on Emacs 29 to 31. The per-project
+  preambles came with 0.11.1: the
   backend reads `latex-to-svg-backend-preamble`, `-appended-preamble` and
   `-preamble-not-precompiled` in the buffer that asks for an equation, and the
   front-end watches all three, so that setting one updates the previews. The engine
