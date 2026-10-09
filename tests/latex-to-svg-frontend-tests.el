@@ -985,7 +985,7 @@ merely *contains* inline math) is left untouched."
 (ert-deftest l2sf-latex-mode-setup ()
   ;; The adaptor refuses outside LaTeX buffers.  In `latex-mode' it turns
   ;; the core on, sets the engine to `latex' unless the buffer already has
-  ;; a local value, and remaps the preview-latex commands; turning it off
+  ;; a local value or the global value is `texres', and remaps the preview-latex commands; turning it off
   ;; undoes what it set.
   (l2sf-tests--with-stub
     (with-temp-buffer
@@ -1013,7 +1013,14 @@ merely *contains* inline math) is left untouched."
       (latex-to-svg-for-latex-mode 1)
       (should (eq latex-to-svg-frontend-engine 'ratex))
       (latex-to-svg-for-latex-mode -1)
-      (should (eq latex-to-svg-frontend-engine 'ratex)))))
+      (should (eq latex-to-svg-frontend-engine 'ratex)))
+    ;; A global `texres' stays: texres reads the preamble.
+    (with-temp-buffer
+      (let ((latex-mode-hook nil)) (latex-mode))
+      (let ((latex-to-svg-frontend-engine 'texres))
+        (latex-to-svg-for-latex-mode 1)
+        (should (eq latex-to-svg-frontend-engine 'texres))
+        (latex-to-svg-for-latex-mode -1)))))
 
 (ert-deftest l2sf-latex-aux-file-template ()
   ;; Without AUCTeX the `.aux' is next to the file; a template fills `%b'
@@ -2004,7 +2011,8 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                     ("\\[\n% engine=none\nx=1\n\\]" . skip)
                     ("\\begin{align}% latex-to-svg: engine = tex\na\n\\end{align}" . latex)
                     ("\\begin{alignat}{2}  %latex-to-svg:engine=latex\na\n\\end{alignat}" . latex)
-                    ("$$ % engine=ratex\nx$$" . ratex)))
+                    ("$$ % engine=ratex\nx$$" . ratex)
+                    ("\\[% engine=texres\nx\\]" . texres)))
       (should (eq (latex-to-svg-frontend--engine-for (car case)) (cdr case))))))
 
 (ert-deftest l2sf-cookie-position-rule ()
@@ -2081,6 +2089,14 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
           (latex-to-svg-frontend--render-region (point-min) (point-max)))
         (should-not l2sf-tests--calls)
         (should (string-match-p "not found" (car warnings)))))))
+
+(ert-deftest l2sf-cookie-missing-texres-warns ()
+  ;; The warning for texres names its two programs.
+  (l2sf-tests--with-stub
+    (setq l2sf-tests--missing-engines '(texres))
+    (should (string-match-p
+             "engine=texres: .*latex-to-svg-backend-pdftocairo-program"
+             (latex-to-svg-frontend--engine-for "\\[% engine=texres\nx\\]")))))
 
 (ert-deftest l2sf-cookie-skipped-equation-keeps-its-numbers ()
   ;; A skipped `align' is still numbered in the exported document: the
@@ -2213,6 +2229,46 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
         (latex-to-svg-frontend--render-region (point-min) (point-max))
         (should-not (plist-get l2sf-tests--last-args :fallback))))))
 
+;;;; The texres engine
+
+(ert-deftest l2sf-texres-numbers-like-latex ()
+  ;; texres typesets with LaTeX: a numbered equation gets the `\setcounter'
+  ;; prefix and keeps its `\label', as with `latex', and the overlay takes
+  ;; its numbers from the compile metadata.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{equation}\\label{a}\nx\n\\end{equation}\n"
+      (let ((latex-to-svg-frontend-engine 'texres))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (should (equal (l2sf-tests--values)
+                     '("\\setcounter{equation}{0}%\n\\begin{equation}\\label{a}\nx\n\\end{equation}\\typeout{L2S=\\arabic{equation}}%\n")))
+      (should (eq (plist-get l2sf-tests--last-args :engine) 'texres))
+      (should (equal l2sf-tests--metadata-engines '(texres)))
+      (should (eq (overlay-get (car (l2sf-tests--overlays))
+                               'latex-to-svg-frontend-engine)
+                  'texres)))))
+
+(ert-deftest l2sf-texres-has-no-fallback ()
+  ;; An equation texres rejects has a LaTeX error, so it is sent with no
+  ;; `:fallback', and a recompile invalidates the texres entry only.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[x\\]\n"
+      (let ((latex-to-svg-frontend-engine 'texres))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (memq :fallback l2sf-tests--last-args))
+        (should-not (plist-get l2sf-tests--last-args :fallback))
+        (latex-to-svg-frontend-refresh nil '(4)))
+      (should (equal l2sf-tests--invalidated-engines '(texres))))))
+
+(ert-deftest l2sf-texres-help-echo ()
+  ;; The tooltip names texres.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[x\\]\n"
+      (let ((latex-to-svg-frontend-engine 'texres))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (should (equal (substitute-command-keys
+                      (overlay-get (car (l2sf-tests--overlays)) 'help-echo))
+                     "Typeset with texres: \\[x\\]")))))
+
 (ert-deftest l2sf-quiet-passed ()
   ;; `:quiet' follows the option: nil by default, t when set, including in
   ;; a refresh.
@@ -2285,7 +2341,11 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
       (let ((latex-to-svg-frontend-engine 'ratex)
             (latex-to-svg-frontend-fallback nil))
         (latex-to-svg-frontend-refresh nil '(4)))
-      (should (= l2sf-tests--formats-invalidated 2)))))
+      (should (= l2sf-tests--formats-invalidated 2))
+      ;; texres dumps a `.fmt' file of its own.
+      (let ((latex-to-svg-frontend-engine 'texres))
+        (latex-to-svg-frontend-refresh nil '(4)))
+      (should (= l2sf-tests--formats-invalidated 3)))))
 
 ;;;; Inline / display rescale
 

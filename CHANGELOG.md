@@ -12,6 +12,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A third engine, `texres`: `latex-to-svg-frontend-engine` and the
+  `% engine=texres` cookie send an equation to the backend with
+  `:engine 'texres`, which compiles it with the `pdflatex` of
+  [texres](https://github.com/leoliu0/texres) and converts the PDF with
+  `pdftocairo`. Numbering works as with `latex`: a `\setcounter` prefix and
+  the compile metadata. `C-u M-x latex-to-svg-frontend-refresh` deletes
+  texres's `.fmt` file too. An equation texres rejects has a LaTeX error, so it
+  gets no fallback. Needs the `latex-to-svg-backend` release that adds the
+  texres engine.
+
+### Changed
+
+- `latex-to-svg-for-latex-mode` keeps a global `latex-to-svg-frontend-engine`
+  of `texres`, since texres reads the preamble. It still replaces a global
+  `ratex` with `latex`.
+
 ## [0.19.1] - 2026-10-08
 
 ### Added

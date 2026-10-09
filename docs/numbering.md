@@ -189,7 +189,7 @@ the exported document, and the misplaced tag can make RaTeX fail. With the
 the counter for the blocks after it.
 
 **The engine is chosen per equation.** A cookie at the top of a display
-equation (`% engine=latex`, `ratex` or `skip`; see the README) overrides
+equation (`% engine=latex`, `ratex`, `texres` or `skip`; see the README) overrides
 `latex-to-svg-frontend-engine` for that equation. `--engine-for` reads it
 from the source, so every caller of `--backend-value` makes the
 `\setcounter`-or-`\tag` choice per equation, and the numbers still agree,

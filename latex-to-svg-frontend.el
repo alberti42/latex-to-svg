@@ -91,16 +91,19 @@
   :prefix "latex-to-svg-frontend-")
 
 (defcustom latex-to-svg-frontend-engine 'latex
-  "Engine that typesets the previews: the symbol `latex' or `ratex'.
+  "Engine that typesets the previews: the symbol `latex', `ratex' or `texres'.
 
 `latex' runs `latex' and `dvisvgm': full LaTeX, with any package the
 backend's preamble loads.  `ratex' runs RaTeX's `render-svg': no TeX
 installation, for the math KaTeX supports and no packages.  An
 equation RaTeX cannot parse is typeset with LaTeX instead, or keeps its
-source as text when `latex-to-svg-frontend-fallback' is nil.  Where the
-programs are is set in the backend (see
-`latex-to-svg-backend-latex-program' and
-`latex-to-svg-backend-ratex-program').
+source as text when `latex-to-svg-frontend-fallback' is nil.  `texres'
+runs the `pdflatex' of texres, then `pdftocairo': full LaTeX with the
+LaTeX engine's preamble, from one program instead of a TeX
+installation.  Where the programs are is set in the backend (see
+`latex-to-svg-backend-latex-program',
+`latex-to-svg-backend-ratex-program' and
+`latex-to-svg-backend-texres-program').
 
 Passed to `latex-to-svg-backend' as `:engine'.  Each engine has its
 own cache entries, so switching back and forth does not recompile an
@@ -113,18 +116,20 @@ each numbered row instead of a `\\setcounter' prefix, and every `\\label'
 is removed from what RaTeX receives (see docs/numbering.md).
 
 A display equation can choose its own engine, or stay unrendered, with
-a comment at its top: `% engine=latex', `% engine=ratex' or
-`% engine=skip' (see `latex-to-svg-frontend--cookie')."
+a comment at its top: `% engine=latex', `% engine=ratex',
+`% engine=texres' or `% engine=skip' (see
+`latex-to-svg-frontend--cookie')."
   :type '(choice (const :tag "LaTeX (latex + dvisvgm)" latex)
-                 (const :tag "RaTeX (render-svg)" ratex))
-  :safe (lambda (v) (memq v '(latex ratex)))
+                 (const :tag "RaTeX (render-svg)" ratex)
+                 (const :tag "texres (pdflatex + pdftocairo)" texres))
+  :safe (lambda (v) (memq v '(latex ratex texres)))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-fallback t
   "Whether LaTeX typesets an equation the chosen engine cannot.
 
-When non-nil and an equation's engine is not `latex' (the option
-`latex-to-svg-frontend-engine' or its cookie chose `ratex'), a formula
+When non-nil and an equation's engine is `ratex' (the option
+`latex-to-svg-frontend-engine' or its cookie chose it), a formula
 that engine rejects, such as one using siunitx's `\\SI',
 `\\DeclareMathOperator' or an environment RaTeX lacks (`multline',
 `eqnarray', ...), is typeset with LaTeX instead: passed to
@@ -1036,8 +1041,11 @@ before each backslash, backquote and apostrophe makes
   (replace-regexp-in-string "[\\`']" "\\\\=\\&" latex))
 
 (defun latex-to-svg-frontend--engine-name (engine)
-  "Return the name of ENGINE for display: \"LaTeX\" or \"RaTeX\"."
-  (if (eq engine 'ratex) "RaTeX" "LaTeX"))
+  "Return the name of ENGINE for display: \"LaTeX\", \"RaTeX\" or \"texres\"."
+  (pcase engine
+    ('ratex "RaTeX")
+    ('texres "texres")
+    (_ "LaTeX")))
 
 (defun latex-to-svg-frontend--help-echo (value source engine fallback)
   "Return the `help-echo' of a preview of SOURCE, sent as VALUE.
@@ -1563,6 +1571,7 @@ checked by `latex-to-svg-frontend--cookie'.")
 (defconst latex-to-svg-frontend--engine-cookie-values
   '(("latex" . latex) ("tex" . latex)
     ("ratex" . ratex)
+    ("texres" . texres)
     ("skip" . skip) ("none" . skip))
   "The values of a `engine=' cookie, and what each one selects.")
 
@@ -1620,6 +1629,11 @@ without one.  See `latex-to-svg-frontend--cookie-bounds'."
     ('ratex (format "engine=ratex: `%s' not found (see `%s')"
                     latex-to-svg-backend-ratex-program
                     'latex-to-svg-backend-ratex-program))
+    ('texres (format "engine=texres: `%s' or `%s' not found (see `%s' and `%s')"
+                     latex-to-svg-backend-texres-program
+                     latex-to-svg-backend-pdftocairo-program
+                     'latex-to-svg-backend-texres-program
+                     'latex-to-svg-backend-pdftocairo-program))
     (_ (format "engine=latex: `%s' or `%s' not found (see `%s' and `%s')"
                latex-to-svg-backend-latex-program
                latex-to-svg-backend-dvisvgm-program
@@ -1630,7 +1644,8 @@ without one.  See `latex-to-svg-frontend--cookie-bounds'."
   "Return the engine for the equation whose LaTeX is SOURCE.
 Display math can choose its engine with a cookie (see
 `latex-to-svg-frontend--cookie'); without one, the engine is
-`latex-to-svg-frontend-engine'.  The result is `latex' or `ratex';
+`latex-to-svg-frontend-engine'.  The result is `latex', `ratex' or
+`texres';
 `skip' for `engine=skip' or `engine=none'; or a string, the warning
 for an unknown key or value, or for a requested engine whose programs
 are not found.  For `skip' and a string, nothing is sent to the backend."
@@ -1657,8 +1672,8 @@ are not found.  For `skip' and a string, nothing is sent to the backend."
   "Return the string handed to the backend for SOURCE, numbered from K.
 ENGINE is the engine that typesets it.  K is the counter before SOURCE;
 nil means SOURCE is not numbered.  The cookie, if any, is removed first
-\(see `--remove-cookie').  For `latex', a numbered SOURCE then gets
-`--setcounter-value' and any other SOURCE is passed as it is.  For
+\(see `--remove-cookie').  For `latex' and `texres', a numbered SOURCE
+then gets `--setcounter-value' and any other SOURCE is passed as it is.  For
 `ratex', a numbered SOURCE gets `--tagged-value', and every `\\label' is
 removed, because RaTeX has no `\\label'.  The overlay keeps SOURCE, so
 the label map, built from the source, still sees the labels."
@@ -1683,8 +1698,10 @@ TABLE is a (OFFSETS . LABELS) scan."
 (defun latex-to-svg-frontend--fallback-for (engine)
   "Return the fallback engine for an equation typeset by ENGINE, or nil.
 That is `latex' when `latex-to-svg-frontend-fallback' is on and ENGINE is
-an engine other than `latex', today `ratex'.  For `skip' or a warning
-string (see `--engine-for') nothing is compiled, so there is none."
+`ratex'.  `texres' has none: it typesets with LaTeX, so an equation it
+rejects has a LaTeX error that `latex' rejects too.  For `skip' or a
+warning string (see `--engine-for') nothing is compiled, so there is
+none."
   (and latex-to-svg-frontend-fallback
        (eq engine 'ratex)
        'latex))
@@ -1699,7 +1716,7 @@ Any other ENGINE (`skip', or a warning string: see `--engine-for') sends
 nothing to the backend and installs `--set-unrendered-overlay' instead."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
-      (if (not (memq engine '(nil latex ratex)))
+      (if (not (memq engine '(nil latex ratex texres)))
           (latex-to-svg-frontend--set-unrendered-overlay
            beg end source enums-fallback engine)
       (let* ((fallback (latex-to-svg-frontend--fallback-for engine))
@@ -2390,22 +2407,23 @@ Deletes each equation's cached SVG (via `latex-to-svg-backend-invalidate')
 and clears its overlay, then re-renders.  With a fallback engine (see
 `latex-to-svg-frontend-fallback'), the fallback's SVG is deleted too, and
 so is the record of the engine's failure, so the engine is tried again.
-When an equation is typeset with LaTeX, as the engine or the fallback,
-the buffer's `.fmt' file is deleted too
-\(`latex-to-svg-backend-invalidate-format'): it holds the files the
-preamble loads as they were when it was dumped, so an edit to one, such
-as the `macros.tex' of an `\\input{macros.tex}', would not reach the
-recompiled equations.  The next compile dumps it again.
+When an equation is typeset with LaTeX or texres, as the engine or the
+fallback, the buffer's `.fmt' files are deleted too
+\(`latex-to-svg-backend-invalidate-format', one per TeX program): each
+holds the files the preamble loads as they were when it was dumped, so
+an edit to one, such as the `macros.tex' of an `\\input{macros.tex}',
+would not reach the recompiled equations.  The next compile dumps them
+again.
 Run by `latex-to-svg-frontend-refresh' with a prefix argument."
   (let ((table (latex-to-svg-frontend--maybe-table))
         (latex nil))
     (dolist (el (latex-to-svg-frontend--elements beg end))
       (let* ((source (latex-to-svg-frontend--math-value el))
              (engine (latex-to-svg-frontend--engine-for source)))
-        (when (memq engine '(latex ratex))
+        (when (memq engine '(latex ratex texres))
           (let ((value (latex-to-svg-frontend--numbered-value el source table))
                 (fallback (latex-to-svg-frontend--fallback-for engine)))
-            (when (or (eq engine 'latex) (eq fallback 'latex))
+            (when (or (memq engine '(latex texres)) (eq fallback 'latex))
               (setq latex t))
             (latex-to-svg-backend-invalidate value engine)
             (when fallback

@@ -468,9 +468,11 @@ Installs the LaTeX comment and verbatim exclusions (see
 from the document's `.aux' file (see `latex-to-svg-for-latex-aux-file';
 \"??\" for a label it lacks), and turns on `latex-to-svg-frontend-mode',
 which does the rendering.  In LaTeX buffers the engine is `latex' by
-default, overriding the global value of `latex-to-svg-frontend-engine':
-RaTeX ignores every preamble and most packages, so equations that use
-the project's macros fail with it.  To use RaTeX anyway, set
+default, overriding a global value `ratex' of
+`latex-to-svg-frontend-engine': RaTeX ignores every preamble and most
+packages, so equations that use the project's macros fail with it.  A
+global value `texres' stays, since texres reads the preamble.  To use
+RaTeX anyway, set
 `latex-to-svg-frontend-engine' buffer-locally, for example in the
 project's `.dir-locals.el'.  Enable the mode from
 `LaTeX-mode-hook' (AUCTeX) or `latex-mode-hook'.  While it is on,
@@ -490,7 +492,11 @@ AUCTeX's preview-latex commands only say that they are off (see
             (setq-local latex-to-svg-frontend-find-label-function
                         #'latex-to-svg-for-latex--find-label)
             (unless (local-variable-p 'latex-to-svg-frontend-engine)
-              (setq-local latex-to-svg-frontend-engine 'latex)
+              (setq-local latex-to-svg-frontend-engine
+                          (if (eq (default-value 'latex-to-svg-frontend-engine)
+                                  'texres)
+                              'texres
+                            'latex))
               (setq latex-to-svg-for-latex--set-engine t))
             (latex-to-svg-frontend-mode 1))
         (setq latex-to-svg-for-latex-mode nil)

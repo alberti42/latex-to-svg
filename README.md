@@ -182,7 +182,8 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
   `:font-height`, which lets the front-end measure the buffer font against the
   frame that actually displays it, came earlier.
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution), or RaTeX's
-  `render-svg` for the `ratex` engine (see [Engine](#engine)).
+  `render-svg` for the `ratex` engine, or texres and `pdftocairo` for the
+  `texres` engine (see [Engine](#engine)).
 
 ## Installation
 
@@ -382,12 +383,14 @@ previews:
 |-------|---------|----------|
 | `latex` (default) | `latex` + `dvisvgm` | Full LaTeX, with any package the backend's preamble loads. |
 | `ratex` | RaTeX's `render-svg` | The math KaTeX supports, with no packages and no TeX installation. |
+| `texres` | the `pdflatex` of [texres](https://github.com/leoliu0/texres) + `pdftocairo` | Full LaTeX, with the LaTeX engine's preamble options, and no TeX Live installation. |
 
 The choice is passed to the backend with each equation. Where the programs
 are is a backend setting (`latex-to-svg-backend-latex-program`,
-`latex-to-svg-backend-ratex-program`); the backend README's
+`latex-to-svg-backend-ratex-program`, `latex-to-svg-backend-texres-program`);
+the backend README's
 [Engines](https://github.com/alberti42/latex-to-svg-backend#engines)
-section covers installing RaTeX and what changes with it. The option is safe
+section covers installing RaTeX and texres and what changes with each. The option is safe
 as a file- or directory-local variable, so a project can choose RaTeX in its
 `.dir-locals.el`:
 
@@ -414,6 +417,13 @@ What works with `ratex`:
 
 Hovering over a preview shows which engine typeset it, then its source:
 "Typeset with RaTeX: \[ E=mc^2 \]".
+
+What works with `texres`: the same as with `latex`. Numbering uses LaTeX's own
+counter, `C-u M-x latex-to-svg-frontend-refresh` deletes texres's `.fmt` file
+too, and in LaTeX buffers a global `texres` stays (see the
+[LaTeX adaptor](docs/latex-to-svg-for-latex.md)). An equation texres rejects
+has a LaTeX error, so `latex-to-svg-frontend-fallback` does not apply: its
+source stays as text.
 
 #### When RaTeX cannot typeset an equation
 
@@ -469,6 +479,7 @@ a &= b
 |--------|--------|
 | `engine=latex`, alias `engine=tex` | this equation uses the LaTeX engine |
 | `engine=ratex` | this equation uses the RaTeX engine |
+| `engine=texres` | this equation uses the texres engine |
 | `engine=skip`, alias `engine=none` | no preview: the source stays as text |
 
 - **Where:** a `%` comment before any math, either on the opener line
