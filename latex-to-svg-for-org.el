@@ -32,7 +32,8 @@
 ;; `latex-to-svg-frontend'.
 ;;
 ;; Detection uses the core's universal scanner (not `org-element'); the Org
-;; block/comment regions below are excluded from it, as are inline `~code~' /
+;; block, comment, table formula and fixed-width regions below are excluded
+;; from it, as are inline `~code~' /
 ;; `=verbatim=' spans, so `=\(=' stays literal text.  Disable a delimiter
 ;; family with the core toggles if a markup character still causes false
 ;; positives.
@@ -79,7 +80,8 @@ what Org fontifies as verbatim; group 2 is the span including its markers."
 (defun latex-to-svg-for-org--exclusions (beg end)
   "Return Org code / verbatim / comment regions in BEG..END to skip.
 Covers `#+begin_src' / `example' / `export' / `comment' blocks, whole
-comment lines (`# …'), and inline `~code~' / `=verbatim=' spans.  This is
+comment lines (`# …'), table formula lines (`#+TBLFM:'), fixed-width
+lines (`: …'), and inline `~code~' / `=verbatim=' spans.  This is
 the buffer's `latex-to-svg-frontend-exclude-function'."
   (let ((regions '())
         (case-fold-search t))
@@ -104,6 +106,14 @@ the buffer's `latex-to-svg-frontend-exclude-function'."
         ;; Whole comment lines: `# …' or a bare `#'.
         (goto-char (point-min))
         (while (re-search-forward "^[ \t]*#\\(?: .*\\)?$" end t)
+          (push (cons (match-beginning 0) (match-end 0)) regions))
+        ;; Table formulas, which refer to columns as `$1', `$2' ...
+        (goto-char (point-min))
+        (while (re-search-forward "^[ \t]*#\\+tblfm:.*$" end t)
+          (push (cons (match-beginning 0) (match-end 0)) regions))
+        ;; Fixed-width lines (literal examples): `: …' or a bare `:'.
+        (goto-char (point-min))
+        (while (re-search-forward "^[ \t]*:\\(?: .*\\)?$" end t)
           (push (cons (match-beginning 0) (match-end 0)) regions))
         ;; Inline `~code~' / `=verbatim='.
         (setq regions

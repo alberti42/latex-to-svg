@@ -119,7 +119,8 @@ exact; without it a regexp fallback handles fenced and indented blocks. See
 [![MELPA Stable](https://stable.melpa.org/packages/latex-to-svg-for-org-badge.svg)](https://stable.melpa.org/#/latex-to-svg-for-org)
 
 For `org-mode`. Skips `#+begin_src` / `example` / `export` / `comment` blocks,
-comment lines and inline `~code~` / `=verbatim=` spans. While it is on,
+comment lines, table formulas (`#+TBLFM:`), fixed-width lines (`: …`) and
+inline `~code~` / `=verbatim=` spans. While it is on,
 `org-latex-preview` only says that it is off: Org's preview would draw its own
 images over these. See [its page](docs/latex-to-svg-for-org.md).
 

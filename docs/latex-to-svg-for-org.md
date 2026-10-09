@@ -66,6 +66,9 @@ Math inside these is left as text:
 
 - `#+begin_src` / `example` / `export` / `comment` blocks,
 - comment lines,
+- table formulas (`#+TBLFM:` lines), which refer to columns as `$1`, `$2`, …,
+- fixed-width lines (`: …`, a literal example), such as a shell command
+  `: echo ${VARNAME}`,
 - inline `~code~` / `=verbatim=` spans (via Org's own `org-verbatim-re`), so
   `=\(=` stays literal text.
 

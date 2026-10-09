@@ -277,6 +277,20 @@ A plain buffer suffices — detection is a regexp scanner."
                            (latex-to-svg-frontend--elements (point-min) (point-max)))
                    '("$a$" "$b$")))))
 
+(ert-deftest l2sf-org-adaptor-skips-table-formulas-and-fixed-width ()
+  ;; `#+TBLFM:' lines refer to columns as `$1', `$2' ..., and fixed-width
+  ;; lines (`: …') are literal examples, such as shell commands with `${VAR}'
+  ;; (issue #4).  A property drawer (`:PROPERTIES:') is not fixed-width.
+  (l2sf-tests--md
+      (concat "| 1 | 2 |\n#+TBLFM: $2=$1*2\n#+tblfm: $3=$1+$2\n\n"
+              ": echo ${VARNAME}\n  : x=$HOME$PATH\n:\ntext $a$\n\n"
+              ":PROPERTIES:\n:END:\nmore $b$\n")
+    (setq-local latex-to-svg-frontend-exclude-function
+                #'latex-to-svg-for-org--exclusions)
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("$a$" "$b$")))))
+
 (ert-deftest l2sf-org-adaptor-skips-inline-verbatim ()
   ;; `=verbatim=' / `~code~' spans are literal text: a math delimiter typed
   ;; inside them (e.g. writing about `=\(=') must not be previewed, while real

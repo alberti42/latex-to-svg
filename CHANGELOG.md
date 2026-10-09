@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `latex-to-svg-for-org-mode` read Org syntax with `$` in it as math (issue
+  #4): a table formula such as `#+TBLFM: $2=$1*2`, which refers to columns as
+  `$1`, `$2`, …, and a fixed-width line (`: …`, a literal example) such as
+  `: echo ${VARNAME}`, whose `$` could pair with a `$` later in the paragraph
+  and hide a real equation. Both are now excluded, like comment lines.
+
 ## [0.20.0] - 2026-10-09
 
 ### Added
