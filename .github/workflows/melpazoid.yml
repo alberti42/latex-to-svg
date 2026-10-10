@@ -74,6 +74,20 @@ jobs:
           git clone https://github.com/riscy/melpazoid.git ~/melpazoid
           pip install ~/melpazoid
 
+      # melpazoid's image builds Emacs from the release tarball on
+      # ftp.gnu.org, which did not answer emacs-ltex-plus's CI on
+      # 2026-10-06; on 2026-10-10 a pretty-tables job printed nothing for
+      # 15 minutes and passed once it used the mirror.  The same tarball is
+      # fetched from the kernel.org mirror of the GNU archive instead.  If
+      # melpazoid changes that line, the grep fails this step, so the job
+      # never falls back on ftp.gnu.org without saying so.
+      - name: Fetch Emacs from a GNU mirror
+        run: |
+          dockerfile=~/melpazoid/docker/Dockerfile
+          grep -q 'https://ftp.gnu.org/gnu/emacs/' "$dockerfile"
+          sed -i 's|https://ftp.gnu.org/gnu/emacs/|https://mirrors.kernel.org/gnu/emacs/|' "$dockerfile"
+          grep 'mirrors.kernel.org' "$dockerfile"
+
       - name: Run melpazoid
         env:
           LOCAL_REPO: ${{ github.workspace }}
