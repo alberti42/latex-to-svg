@@ -1,13 +1,16 @@
-# Byte-compilation, checkdoc and the ERT suite, on every push to main and
-# every pull request.
+# Byte-compilation, checkdoc and the ERT suite, on every push to main or
+# develop and every pull request.
 #
 # The five packages in this repository (`latex-to-svg-frontend' and its
 # `latex-to-svg-for-org' / `latex-to-svg-for-markdown' /
 # `latex-to-svg-for-latex' / `latex-to-svg-for-gnus' adaptors) all load
 # the backend, `latex-to-svg-backend'.  package.el installs it from MELPA,
 # which is where a user gets it too, so a backend change that breaks this
-# front-end shows up here rather than in a user's report.  Every later step
-# calls `package-initialize' to put it on the load-path.
+# front-end shows up here rather than in a user's report.  On develop, and
+# on a pull request from it, package.el installs it from the backend's own
+# develop branch instead, which holds the backend that develop here needs
+# before MELPA has it.  Every later step calls `package-initialize' to put
+# it on the load-path.
 #
 # The suite stubs the backend and detects math with a regexp scanner, so it
 # needs no TeX toolchain, no graphical display and no tree-sitter grammar;
@@ -21,7 +24,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, develop]
   pull_request:
 
 concurrency:
@@ -55,6 +58,7 @@ jobs:
       # with no MELPA package registered, so the install below fails on an
       # otherwise healthy runner.  Fetch again rather than trust one request.
       - name: Install the backend from MELPA
+        if: github.ref_name != 'develop' && github.head_ref != 'develop'
         run: |
           for attempt in 1 2 3; do
             if emacs -Q -batch --eval '(progn
@@ -70,6 +74,22 @@ jobs:
             sleep 15
           done
           exit 1
+
+      # `package-install-file' on the checkout installs it as MELPA's
+      # package would be, under the version in its header.
+      - name: Install the backend from its develop branch
+        if: github.ref_name == 'develop' || github.head_ref == 'develop'
+        run: |
+          git clone --depth 1 -b develop \
+            https://github.com/alberti42/latex-to-svg-backend.git \
+            "$RUNNER_TEMP/latex-to-svg-backend"
+          emacs -Q -batch --eval '(progn
+            (require (quote package))
+            (package-initialize)
+            (package-install-file
+             (file-name-as-directory
+              (expand-file-name "latex-to-svg-backend"
+                                (getenv "RUNNER_TEMP")))))'
 
       # AUCTeX, from GNU ELPA, for the one LaTeX adaptor test that runs the
       # real AUCTeX (the others fake what they need from it).  Retried like
@@ -134,12 +154,6 @@ jobs:
             -L . -l ert -l tests/latex-to-svg-frontend-tests.el \
             -f ert-run-tests-batch-and-exit
 
-  # Before a release: when the version in the headers has no tag yet, this
-  # commit is (or leads up to) a release, so run the checks that need
-  # MELPA Stable (scripts/release-check.el): the frontend must require the
-  # newest backend there, and CHANGELOG.md must have the version's dated
-  # section.  After the tag exists, ordinary pushes skip it.  One Emacs is
-  # enough; the result does not depend on the Emacs version.
   # `latex-to-svg-frontend--text-foreground' follows two functions of
   # Emacs's faces.el; tests/fixtures/emacs-faces-attribute-at-point.el holds
   # a copy of them.  On Emacs snapshot, where they would change first, this
@@ -159,7 +173,16 @@ jobs:
       - name: Compare faces--attribute-at-point and foreground-color-at-point
         run: emacs -Q -batch -l scripts/emacs-faces-check.el
 
+  # Before a release: when the version in the headers has no tag yet, this
+  # commit is (or leads up to) a release, so run the checks that need
+  # MELPA Stable (scripts/release-check.el): the frontend must require the
+  # newest backend there, and CHANGELOG.md must have the version's dated
+  # section.  After the tag exists, ordinary pushes skip it.  One Emacs is
+  # enough; the result does not depend on the Emacs version.  Skipped on
+  # develop and on a pull request from it, whose frontend may require a
+  # backend MELPA Stable does not have yet.
   release-check:
+    if: github.ref_name != 'develop' && github.head_ref != 'develop'
     runs-on: ubuntu-latest
     name: Release check
     steps:
