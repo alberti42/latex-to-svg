@@ -1177,10 +1177,14 @@ does not see them."
 pretty-tables draws a table row from what its cells display when
 jit-lock reaches it, so an image shown after that is not in the
 drawing.  Its row overlays have the property `pretty-tables', and
-`jit-lock-refontify' has the table drawn again at the next redisplay."
-  (when (seq-some (lambda (o) (overlay-get o 'pretty-tables))
-                  (overlays-at (overlay-start ov)))
-    (jit-lock-refontify (overlay-start ov) (overlay-end ov))))
+`jit-lock-refontify' has the table drawn again at the next redisplay.
+The text is marked from the start of the row overlay, not of OV:
+redisplay does not reach the text under a drawn row, whose overlay
+displays the row in its place, but it does stop at the overlay's
+start and runs jit-lock there."
+  (when-let* ((row (seq-find (lambda (o) (overlay-get o 'pretty-tables))
+                             (overlays-at (overlay-start ov)))))
+    (jit-lock-refontify (overlay-start row) (overlay-end ov))))
 
 (defun latex-to-svg-frontend--show-image (ov image)
   "Show IMAGE on OV, centered if it is display math and centering is on.

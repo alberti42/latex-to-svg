@@ -2854,8 +2854,9 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
 (ert-deftest l2sf-image-in-a-table-redraws-it ()
   ;; pretty-tables draws a row from what its cells display when jit-lock
   ;; reaches it, so an image shown in a drawn row (an overlay with the
-  ;; property `pretty-tables') marks its text for jit-lock again.  Text
-  ;; outside a drawn row is left alone.
+  ;; property `pretty-tables') marks its text for jit-lock again, from the
+  ;; start of the row: redisplay does not reach the text under a drawn
+  ;; row.  Text outside a drawn row is left alone.
   (l2sf-tests--with-stub
     (let ((latex-to-svg-frontend-number-equations nil))
       (l2sf-tests--md "| a | $x$ |\n\nb $y$ c\n"
@@ -2865,6 +2866,7 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
           (latex-to-svg-frontend--render-region (point-min) (point-max))
           (let ((ovs (l2sf-tests--overlays)))
             (should (= (length ovs) 2))
+            (should-not (get-text-property (overlay-start row) 'fontified))
             (should-not (get-text-property (overlay-start (nth 0 ovs)) 'fontified))
             (should (get-text-property (overlay-start (nth 1 ovs)) 'fontified))))))))
 
