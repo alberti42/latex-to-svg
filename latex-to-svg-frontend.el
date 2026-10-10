@@ -594,13 +594,13 @@ obsolete `latex-to-svg-frontend-padding'."
   "Non-nil once an unmeasurable buffer font has been reported in this buffer.")
 
 (defun latex-to-svg-frontend--x-height-ratio (name frame)
-  "Return the x-height of the font NAME on FRAME as a share of its size.
-That is the ascent of its glyph for `x' divided by the pixel size,
+  "Return the x-height of the font NAME on FRAME as a fraction of its size.
+That is the ascent of its glyph for `x' divided by its pixel size,
 read with the font opened at 1000 pixels: `font-get-glyphs' gives
 whole pixels, which at a text size of 18 pixels is off by up to 5%.
-Emacs keeps the opened font, so a second call costs little.  Nil when
-FRAME finds no font NAME, or the font has no glyph for `x', as a symbol
-font has none."
+Emacs keeps a font it has opened, so a repeat costs about a
+microsecond.  Nil when FRAME finds no font NAME, or the font has no
+glyph for `x', as a symbol font has none."
   (when-let* ((entity (find-font (font-spec :name name) frame))
               (font (open-font entity 1000 frame))
               (glyph (aref (font-get-glyphs font 0 1 "x") 0)))
@@ -610,17 +610,18 @@ font has none."
   "Return the x-height of BUFFER's default font in a graphical frame, or nil.
 That is the height of the lowercase `x' of the font of the `default'
 face, in pixels: its pixel size, slot 2 of `font-info' of `face-font',
-times `latex-to-svg-frontend--x-height-ratio'.  `face-font' follows the
-buffer's face remapping, so `text-scale-mode' applies.
+times its ratio (`latex-to-svg-frontend--x-height-ratio').
+`face-font' follows the buffer's face remapping, so `text-scale-mode'
+applies.
 
-Measured against the frame that actually displays BUFFER, so previews
-size correctly even when the selected frame is a TTY/daemon frame (an
-async compile callback firing while a terminal frame is current).
-Uses `with-selected-frame' — a temporary, non-raising, non-focus-stealing
-selection — so it never makes a parked child frame appear.  Returns nil
-when BUFFER is shown in no graphical window, in which case the backend
-compiles the equation but sizes nothing, and the refresh hook draws it
-once a graphical window shows BUFFER.
+Measured against the frame that actually displays BUFFER, so the size
+is right even when the selected frame is a TTY/daemon frame (an async
+compile callback firing while a terminal frame is current).  Uses
+`with-selected-frame' (a temporary, non-raising, non-focus-stealing
+selection), so it never makes a parked child frame appear.  Returns
+nil when BUFFER is shown in no graphical window, in which case the
+backend compiles the equation but sizes nothing, and the refresh hook
+draws it once a graphical window shows BUFFER.
 
 A font the frame cannot open, or one with no glyph for `x', yields nil
 as well, but is reported once per buffer rather than passed over."
@@ -680,11 +681,12 @@ See `latex-to-svg-frontend--display-window'."
 That is the height of the lowercase `x' of the font Emacs uses at POS,
 the opening delimiter of an equation, in a window showing BUFFER (see
 `latex-to-svg-frontend--display-window'), in pixels: its pixel size,
-slot 2 of `query-font', times `latex-to-svg-frontend--x-height-ratio'.
-The faces at POS and their `:height' apply, and so does
-`text-scale-mode'.  When no font is found at POS, or it has no glyph
-for `x', it is `latex-to-svg-frontend--x-height', which is nil when
-BUFFER is shown in no graphical window."
+slot 2 of `query-font', times its ratio
+\(`latex-to-svg-frontend--x-height-ratio').  The faces at POS and their
+`:height' apply, and so does `text-scale-mode'.  When no font is found
+at POS, or it has no glyph for `x', it is
+`latex-to-svg-frontend--x-height', which is nil when BUFFER is shown
+in no graphical window."
   (let ((buffer (or buffer (current-buffer))))
     (or (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
           (with-selected-frame (window-frame win)
