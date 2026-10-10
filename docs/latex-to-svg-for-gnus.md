@@ -29,14 +29,21 @@ and the backend from MELPA (see the README's
   :hook (gnus-article-mode . latex-to-svg-for-gnus-mode))
 ```
 
-With `package.el`: download
-[`latex-to-svg-for-gnus.el`](https://raw.githubusercontent.com/alberti42/latex-to-svg/main/latex-to-svg-for-gnus.el)
-and run `M-x package-install-file` on it. This installs only the Gnus
-adaptor and pulls the frontend and the backend from MELPA. It does not
-update itself: repeat this step to upgrade.
+With `package.el`, the `:preface` below downloads
+`latex-to-svg-for-gnus.el` and installs it with `package-install-file`,
+once: only the Gnus adaptor, with the frontend and the backend from
+MELPA. It does not update itself: to upgrade, run `M-x package-delete
+RET latex-to-svg-for-gnus` and restart Emacs.
 
 ```elisp
 (use-package latex-to-svg-for-gnus
+  :preface
+  (unless (package-installed-p 'latex-to-svg-for-gnus)
+    (let ((file (expand-file-name "latex-to-svg-for-gnus.el"
+                                  (make-temp-file "l2s" t))))
+      (url-copy-file "https://raw.githubusercontent.com/alberti42/latex-to-svg/main/latex-to-svg-for-gnus.el"
+                     file)
+      (package-install-file file)))
   :hook (gnus-article-mode . latex-to-svg-for-gnus-mode))
 ```
 
