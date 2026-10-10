@@ -96,8 +96,22 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar l2sf-tests--calls)
 (defvar l2sf-tests--engine-used)
 
+(defun l2sf-tests--check-colors (args)
+  "Signal an error unless ARGS meet `latex-to-svg-backend' 0.14.0.
+That is: `:color' and `:background' are nil or `#rrggbb' strings, and
+`:color' is non-nil whenever `:font-height' is."
+  (let ((hex "\\`#[[:xdigit:]]\\{6\\}\\'"))
+    (dolist (key '(:color :background))
+      (let ((value (plist-get args key)))
+        (when (and value (not (and (stringp value) (string-match-p hex value))))
+          (error "%s is not a #rrggbb string: %S" key value))))
+    (when (and (plist-get args :font-height) (not (plist-get args :color)))
+      (error ":color is nil with :font-height %S" (plist-get args :font-height)))))
+
 (defmacro l2sf-tests--with-stub (&rest body)
-  "Run BODY with the backend stubbed to return `l2sf-tests--image'."
+  "Run BODY with the backend stubbed to return `l2sf-tests--image'.
+The stub signals as the backend does when the colors break its contract
+\(`l2sf-tests--check-colors')."
   (declare (indent 0) (debug t))
   `(let ((l2sf-tests--appearance '("#000" "#fff" 20))
          (l2sf-tests--invalidated nil)
@@ -112,6 +126,7 @@ them again: `latex main.tex' twice in that directory, keeping only the
          (latex-to-svg-backend-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
                 (lambda (latex &rest args)
+                  (l2sf-tests--check-colors args)
                   (setq l2sf-tests--last-rescale (plist-get args :rescale-by)
                         l2sf-tests--last-args args)
                   (push (cons latex (plist-get args :engine)) l2sf-tests--calls)
@@ -819,34 +834,34 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
 (ert-deftest l2sf-equation-sized-like-its-text ()
   ;; Each equation is sized by the font at its opening delimiter: its
   ;; ascent plus descent, when drawn and on refresh.  Batch has no
-  ;; graphical window, so the window and the fonts are stubbed: text with
-  ;; a face gets a font 36 pixels high, other text one 23 pixels high.
+  ;; graphical window, so the window (`l2sf-tests--with-frame') and the
+  ;; fonts are stubbed: text with a face gets a font 36 pixels high, other
+  ;; text one 23 pixels high.
   (l2sf-tests--with-stub
-    (let ((heights nil)
-          (stub (symbol-function 'latex-to-svg-backend)))
-      (cl-letf (((symbol-function 'latex-to-svg-backend)
-                 (lambda (latex &rest args)
-                   (push (cons latex (plist-get args :font-height)) heights)
-                   (apply stub latex args)))
-                ((symbol-function 'latex-to-svg-frontend--display-window)
-                 (lambda (_buffer) (selected-window)))
-                ((symbol-function 'font-at)
-                 (lambda (pos &rest _)
-                   (if (get-text-property pos 'face) 'big 'plain)))
-                ((symbol-function 'query-font)
-                 (lambda (font)
-                   (if (eq font 'big)
-                       [nil nil 27 nil 28 8 nil nil nil]
-                     [nil nil 18 nil 18 5 nil nil nil]))))
-        (l2sf-tests--md "$a$ $b$\n"
-          (put-text-property 5 6 'face '(:height 1.5))
-          (latex-to-svg-frontend--render-region (point-min) (point-max))
-          (should (equal (reverse heights) '(("$a$" . 23) ("$b$" . 36))))
-          (setq heights nil)
-          (put-text-property 5 6 'face nil)
-          (latex-to-svg-frontend--refresh-buffer (current-buffer))
-          (should (equal (sort heights (lambda (x y) (string< (car x) (car y))))
-                         '(("$a$" . 23) ("$b$" . 23)))))))))
+    (l2sf-tests--with-frame
+      (let ((heights nil)
+            (stub (symbol-function 'latex-to-svg-backend)))
+        (cl-letf (((symbol-function 'latex-to-svg-backend)
+                   (lambda (latex &rest args)
+                     (push (cons latex (plist-get args :font-height)) heights)
+                     (apply stub latex args)))
+                  ((symbol-function 'font-at)
+                   (lambda (pos &rest _)
+                     (if (get-text-property pos 'face) 'big 'plain)))
+                  ((symbol-function 'query-font)
+                   (lambda (font)
+                     (if (eq font 'big)
+                         [nil nil 27 nil 28 8 nil nil nil]
+                       [nil nil 18 nil 18 5 nil nil nil]))))
+          (l2sf-tests--md "$a$ $b$\n"
+            (put-text-property 5 6 'face '(:height 1.5))
+            (latex-to-svg-frontend--render-region (point-min) (point-max))
+            (should (equal (reverse heights) '(("$a$" . 23) ("$b$" . 36))))
+            (setq heights nil)
+            (put-text-property 5 6 'face nil)
+            (latex-to-svg-frontend--refresh-buffer (current-buffer))
+            (should (equal (sort heights (lambda (x y) (string< (car x) (car y))))
+                           '(("$a$" . 23) ("$b$" . 23))))))))))
 
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
@@ -1895,6 +1910,7 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
             (metadata nil))
         (cl-letf (((symbol-function 'latex-to-svg-backend)
                    (lambda (_latex &rest args)
+                     (l2sf-tests--check-colors args)
                      (push (plist-get args :callback) callbacks)
                      (push (plist-get args :metadata) metadata)
                      nil)))
@@ -2051,7 +2067,8 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                    (current-buffer)))
           (with-temp-file file (insert "$a$\n"))
           (cl-letf (((symbol-function 'latex-to-svg-backend)
-                     (lambda (_latex &rest _args)
+                     (lambda (_latex &rest args)
+                       (l2sf-tests--check-colors args)
                        (setq seen latex-to-svg-backend-preamble-not-precompiled)
                        l2sf-tests--image)))
             (let ((enable-local-variables :all)
@@ -2999,6 +3016,7 @@ Each element is (BEG END TEXT); every overlay must display a newline."
     (let ((paddings nil))
       (cl-letf (((symbol-function 'latex-to-svg-backend)
                  (lambda (latex &rest args)
+                   (l2sf-tests--check-colors args)
                    (push (cons latex (plist-get args :padding)) paddings)
                    l2sf-tests--image)))
         (l2sf-tests--md "$a$\n\n\\[b\\]\n"
