@@ -595,6 +595,80 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
       (should (eq (get-text-property (point-min) 'face) 'bold))
       (latex-to-svg-frontend-mode -1))))
 
+;;;; The colour of the text an equation is in
+
+(defface l2sf-tests--gold '((t :foreground "gold"))
+  "A test face with a foreground."
+  :group 'latex-to-svg-frontend)
+
+(defface l2sf-tests--inherits-gold '((t :inherit l2sf-tests--gold))
+  "A test face whose foreground comes through `:inherit'."
+  :group 'latex-to-svg-frontend)
+
+(defconst l2sf-tests--face-values
+  '(nil
+    bold                                  ; a face without a foreground
+    l2sf-tests--gold
+    l2sf-tests--inherits-gold
+    (bold l2sf-tests--gold)               ; the first with a foreground wins
+    (l2sf-tests--inherits-gold bold)
+    (:foreground "red")
+    (:weight bold :foreground "red")
+    (foreground-color . "blue"))
+  "Values of the `face' property our reader and Emacs's must agree on.")
+
+(ert-deftest l2sf-text-foreground-matches-emacs ()
+  ;; Drift guard: on text with no overlay, `--text-foreground' gives what
+  ;; Emacs's `foreground-color-at-point' gives, for the forms a `face'
+  ;; property takes, from the `face' and the `font-lock-face' property.
+  ;; Where ours is nil, Emacs gives the foreground of the `default' face.
+  (dolist (prop '(face font-lock-face))
+    (dolist (value l2sf-tests--face-values)
+      (with-temp-buffer
+        (insert "$x$")
+        (put-text-property 1 2 prop value)
+        (let ((font-lock-mode (eq prop 'font-lock-face)))
+          (goto-char 1)
+          (should (equal (list prop value
+                               (or (latex-to-svg-frontend--text-foreground 1)
+                                   (face-attribute 'default :foreground)))
+                         (list prop value (foreground-color-at-point)))))))))
+
+(ert-deftest l2sf-text-foreground-ignores-overlays ()
+  ;; The preview overlay covers the opening delimiter, with a face of its
+  ;; own; the reader reads the text's face under it, where Emacs's function
+  ;; reads the overlay's.
+  (with-temp-buffer
+    (insert "$x$")
+    (put-text-property 1 2 'face 'l2sf-tests--gold)
+    (overlay-put (make-overlay 1 4) 'face '(:foreground "red"))
+    (goto-char 1)
+    (should (equal (foreground-color-at-point) "red"))
+    (should (equal (latex-to-svg-frontend--text-foreground 1) "gold"))))
+
+(ert-deftest l2sf-foreground-for-rule ()
+  ;; An equation in coloured text takes the text's colour.  In text with no
+  ;; foreground of its own, or the `default' face's, it takes
+  ;; `latex-to-svg-frontend-foreground-color' (nil: the backend's default).
+  (let ((old (face-attribute 'default :foreground)))
+    (unwind-protect
+        (progn
+          (set-face-attribute 'default nil :foreground "white")
+          (with-temp-buffer
+            (insert "$a$ $b$ $c$")
+            (put-text-property 5 6 'face 'l2sf-tests--gold)
+            (put-text-property 9 10 'face '(:foreground "#ffffff"))
+            (let ((latex-to-svg-frontend-foreground-color nil))
+              (should-not (latex-to-svg-frontend--foreground-for 1))
+              (should (equal (latex-to-svg-frontend--foreground-for 5) "gold"))
+              (should-not (latex-to-svg-frontend--foreground-for 9)))
+            (let ((latex-to-svg-frontend-foreground-color "#123456"))
+              (should (equal (latex-to-svg-frontend--foreground-for 1) "#123456"))
+              (should (equal (latex-to-svg-frontend--foreground-for 5) "gold"))
+              (should (equal (latex-to-svg-frontend--foreground-for 9)
+                             "#123456")))))
+      (set-face-attribute 'default nil :foreground old))))
+
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
 (no overlay), colour and all."

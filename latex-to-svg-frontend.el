@@ -598,9 +598,7 @@ per buffer rather than passed over: `default-font-height' reads
 `font-info', which returns nil for a font it cannot open, and then signals
 `wrong-type-argument'."
   (let ((buffer (or buffer (current-buffer))))
-    (when-let* ((win (get-buffer-window buffer t))
-                (frame (window-frame win))
-                ((display-graphic-p frame)))
+    (when-let* ((frame (latex-to-svg-frontend--display-frame buffer)))
       (with-selected-frame frame
         (with-current-buffer buffer
           (condition-case err
@@ -614,6 +612,69 @@ per buffer rather than passed over: `default-font-height' reads
                         (error-message-string err))
                 :warning))
              nil)))))))
+
+(defun latex-to-svg-frontend--display-frame (buffer)
+  "Return the graphical frame of a window showing BUFFER, or nil.
+The frame previews are measured and tinted against (see
+`latex-to-svg-frontend--font-height')."
+  (when-let* ((win (get-buffer-window buffer t))
+              (frame (window-frame win))
+              ((display-graphic-p frame)))
+    frame))
+
+(defun latex-to-svg-frontend--text-foreground (pos &optional frame)
+  "Return the foreground the faces of the text at POS give it, or nil.
+Follows `foreground-color-at-point' (see `faces--attribute-at-point'),
+with three differences.  It reads text properties only, not overlays,
+so the preview overlay of this package at POS does not hide the face
+of the text.  It reads the faces on FRAME (nil: the selected frame).
+When no face at POS specifies a foreground, it returns nil, not the
+foreground of the `default' face.
+
+The faces are the `font-lock-face' property when `font-lock-mode' is
+on and the text has one, else the `face' property: a face, a list of
+faces (the first that specifies a foreground wins), or an anonymous
+face such as (:foreground \"gold\") or (foreground-color . \"gold\")."
+  (let ((faces (or (and font-lock-mode
+                        (get-text-property pos 'font-lock-face))
+                   (get-text-property pos 'face)))
+        (found nil))
+    (dolist (face (if (face-list-p faces) faces (list faces)))
+      (cond (found)
+            ((and face (symbolp face))
+             (let ((value (face-attribute-specified-or
+                           (face-attribute face :foreground frame t)
+                           nil)))
+               (unless (member value '(nil "unspecified-fg" "unspecified-bg"))
+                 (setq found value))))
+            ((consp face)
+             (setq found (cond ((memq 'foreground-color face)
+                                (cdr (memq 'foreground-color face)))
+                               ((memq :foreground face)
+                                (cadr (memq :foreground face))))))))
+    found))
+
+(defun latex-to-svg-frontend--default-foreground-p (color &optional frame)
+  "Return non-nil if COLOR is the foreground of the `default' face on FRAME.
+Colors compare by value, so \"white\" and \"#ffffff\" are the same.  A
+color without values, such as \"unspecified-fg\" on a terminal, is
+never the default."
+  (let ((rgb (color-values color frame)))
+    (and rgb
+         (equal rgb (color-values (face-foreground 'default frame t) frame)))))
+
+(defun latex-to-svg-frontend--foreground-for (pos &optional frame)
+  "Return the color to tint the equation that opens at POS with, or nil.
+That is the foreground of the text at POS, the opening delimiter of the
+equation (see `latex-to-svg-frontend--text-foreground'), read on FRAME.
+When the text has no foreground of its own, or the foreground of the
+`default' face, it is `latex-to-svg-frontend-foreground-color'.  Nil
+lets the backend tint with the foreground of the `default' face."
+  (let ((text (latex-to-svg-frontend--text-foreground pos frame)))
+    (if (or (null text)
+            (latex-to-svg-frontend--default-foreground-p text frame))
+        latex-to-svg-frontend-foreground-color
+      text)))
 
 (defconst latex-to-svg-frontend--numbered-environments-single
   '("equation" "math" "displaymath" "multline" "dmath" "empheq")
