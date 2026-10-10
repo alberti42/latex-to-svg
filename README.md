@@ -309,6 +309,7 @@ These options update the previews on their own when you set them, with `setq`,
 |--------|----------------|
 | `latex-to-svg-frontend-engine` | the equations are typeset again with the new engine |
 | `latex-to-svg-frontend-fallback` | the equations RaTeX rejected are typeset again, or left as text |
+| `latex-to-svg-frontend-render-on-non-graphic` | the equations not yet compiled are compiled |
 | `latex-to-svg-frontend-foreground-color`, `-background-color`, `-padding-inline`, `-padding-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-rescale-inline`, `-rescale-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
@@ -558,6 +559,18 @@ individually, so buffers on an untouched frame cost nothing.
 
 Without it, previews re-tint / rescale on their next redisplay. You can always force a
 refresh with `M-x latex-to-svg-frontend-refresh` (current buffer).
+
+### Terminal frames and the Emacs daemon
+
+An equation is compiled only while some frame is graphical, whether or not a
+window shows its buffer: a buffer buried in a graphical session has its images
+in the cache when it is shown. While every frame is a terminal frame, as in an
+Emacs daemon with only terminal clients, nothing is compiled, and the equations
+are compiled when a graphical window first shows the buffer.
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `latex-to-svg-frontend-render-on-non-graphic` | `nil` | Compile equations even when no frame is graphical. The raw LaTeX shows on a terminal, and the images are drawn from the cache as soon as a graphical window shows the buffer. A purely terminal session then runs LaTeX compiles whose images it never displays. |
 
 ### Delimiter toggles
 

@@ -161,6 +161,28 @@ in a mode hook or in `.dir-locals.el', to silence one kind of document."
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-render-on-non-graphic nil
+  "When non-nil, render equations even when no graphical frame exists.
+
+By default an equation is compiled only while some frame is graphical
+\(see `latex-to-svg-frontend--graphical-p'), whether or not a window
+shows its buffer: a buffer buried in a graphical session has its images
+in the cache when it is shown.  While every frame is a terminal frame,
+as in an Emacs daemon with only terminal clients, nothing is compiled,
+and the equations are compiled when a graphical window first shows the
+buffer, appearing when each compile ends.
+
+Set non-nil, typically in an Emacs daemon whose buffers are later
+viewed in a graphical frame, to compile them ahead: the raw LaTeX shows
+on a terminal, and the images are drawn from the cache as soon as a
+graphical window shows the buffer.  The trade-off is that a purely
+terminal session then runs LaTeX compiles whose images it never
+displays.  Setting it with `setq', `setq-local' or Customize updates
+the previews on its own."
+  :type 'boolean
+  :safe #'booleanp
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-number-equations t
   "Whether to compute and bake equation numbers into display-math previews.
 
@@ -627,6 +649,30 @@ Previews are measured and tinted against its frame (see
   (when-let* ((win (get-buffer-window buffer t))
               ((display-graphic-p (window-frame win))))
     win))
+
+(defun latex-to-svg-frontend--graphical-p ()
+  "Return non-nil when some live frame is graphical.
+An image can then be displayed in this session, whether or not a window
+shows the buffer.  This decides whether to render at all (see
+`latex-to-svg-frontend-render-on-non-graphic'); the frame an equation
+is measured and tinted against is `--display-frame'.  A frame found
+here is neither measured nor selected, so a parked child frame, which
+exists only in a graphical session, gives the right answer too."
+  (seq-some #'display-graphic-p (frame-list)))
+
+(defun latex-to-svg-frontend--render-p ()
+  "Return non-nil when equations are to be sent to the backend now.
+That is while `latex-to-svg-frontend--graphical-p', or always with
+`latex-to-svg-frontend-render-on-non-graphic' non-nil."
+  (or latex-to-svg-frontend-render-on-non-graphic
+      (latex-to-svg-frontend--graphical-p)))
+
+(defvar-local latex-to-svg-frontend--undrawn nil
+  "Non-nil when math may lack a preview until a graphical window shows it.
+`--place' sets it when it sends no request (see `--render-p') or sends
+one with no display frame, for which the backend compiles and returns
+no image.  `--refresh-if-changed' renders that math once a graphical
+window shows the buffer.")
 
 (defun latex-to-svg-frontend--display-frame (buffer)
   "Return the graphical frame of a window showing BUFFER, or nil.
@@ -1868,34 +1914,43 @@ ENGINE is passed to the backend as `:engine' (nil means `latex'), with
 `:fallback' from `--fallback-for' and `:quiet' from
 `latex-to-svg-frontend-quiet'.
 Any other ENGINE (`skip', or a warning string: see `--engine-for') sends
-nothing to the backend and installs `--set-unrendered-overlay' instead."
+nothing to the backend and installs `--set-unrendered-overlay' instead.
+Nothing is sent either while `latex-to-svg-frontend--render-p' is nil.
+That, or no graphical window showing BUFFER, sets
+`latex-to-svg-frontend--undrawn'."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
-      (if (not (memq engine '(nil latex ratex texres)))
-          (latex-to-svg-frontend--set-unrendered-overlay
-           beg end source enums-fallback engine)
-      (let* ((fallback (latex-to-svg-frontend--fallback-for engine))
-             (frame (latex-to-svg-frontend--display-frame buffer))
-             (image (latex-to-svg-backend
-                    value
-                    :rescale-by (latex-to-svg-frontend--rescale-for display-p)
-                    :color (latex-to-svg-frontend--foreground-for beg frame)
-                    :background (latex-to-svg-frontend--background-for frame)
-                    :padding (latex-to-svg-frontend--padding-for display-p)
-                    :font-height (latex-to-svg-frontend--font-height-at
-                                  beg buffer)
-                    :metadata (car enums-fallback)
-                    :engine engine
-                    :fallback fallback
-                    :quiet latex-to-svg-frontend-quiet
-                    :callback (lambda ()
-                                (latex-to-svg-frontend--place
-                                 buffer beg end value source enums-fallback display-p
-                                 engine)))))
-        (when image
-          (latex-to-svg-frontend--set-overlay
-           beg end value image source enums-fallback display-p engine
-           fallback)))))))
+      (cond
+       ((not (memq engine '(nil latex ratex texres)))
+        (latex-to-svg-frontend--set-unrendered-overlay
+         beg end source enums-fallback engine))
+       ((not (latex-to-svg-frontend--render-p))
+        (setq latex-to-svg-frontend--undrawn t))
+       (t
+        (let* ((fallback (latex-to-svg-frontend--fallback-for engine))
+               (frame (latex-to-svg-frontend--display-frame buffer))
+               (image (latex-to-svg-backend
+                       value
+                       :rescale-by (latex-to-svg-frontend--rescale-for display-p)
+                       :color (latex-to-svg-frontend--foreground-for beg frame)
+                       :background (latex-to-svg-frontend--background-for frame)
+                       :padding (latex-to-svg-frontend--padding-for display-p)
+                       :font-height (latex-to-svg-frontend--font-height-at
+                                     beg buffer)
+                       :metadata (car enums-fallback)
+                       :engine engine
+                       :fallback fallback
+                       :quiet latex-to-svg-frontend-quiet
+                       :callback (lambda ()
+                                   (latex-to-svg-frontend--place
+                                    buffer beg end value source enums-fallback display-p
+                                    engine)))))
+          (unless frame
+            (setq latex-to-svg-frontend--undrawn t))
+          (when image
+            (latex-to-svg-frontend--set-overlay
+             beg end value image source enums-fallback display-p engine
+             fallback))))))))
 
 (defun latex-to-svg-frontend--render-numbered (el k)
   "Render numbered environment EL starting at counter K."
@@ -2253,36 +2308,38 @@ cache key changed \(`latex-to-svg-backend-preamble',
 `latex-to-svg-backend-preamble-not-precompiled') or the entry was
 collected, the backend compiles it and this runs again when the compile
 is done.  OV keeps its old image until then; an OV
-deleted in the meantime (edited, renumbered) is left alone."
+deleted in the meantime (edited, renumbered) is left alone.  Nothing is
+fetched while `latex-to-svg-frontend--render-p' is nil."
   (when-let* ((buffer (overlay-buffer ov))
               (value (overlay-get ov 'latex-to-svg-frontend-value)))
     (with-current-buffer buffer
-      (let ((frame (latex-to-svg-frontend--display-frame buffer)))
-        (when-let* ((image (latex-to-svg-backend
-                            value
-                            :rescale-by (latex-to-svg-frontend--rescale-for
-                                         (overlay-get ov 'latex-to-svg-frontend-display-math))
-                            :color (latex-to-svg-frontend--foreground-for
-                                    (overlay-start ov) frame)
-                            :background (latex-to-svg-frontend--background-for frame)
-                            :padding (latex-to-svg-frontend--padding-for
-                                      (overlay-get ov 'latex-to-svg-frontend-display-math))
-                            :font-height (latex-to-svg-frontend--font-height-at
-                                          (overlay-start ov) buffer)
-                            :metadata (car (overlay-get
-                                            ov 'latex-to-svg-frontend-enums))
-                            :engine (overlay-get
-                                     ov 'latex-to-svg-frontend-engine)
-                            :fallback (overlay-get
-                                       ov 'latex-to-svg-frontend-fallback)
-                            :quiet latex-to-svg-frontend-quiet
-                            :callback
-                            (lambda ()
-                              (when (overlay-buffer ov)
-                                (latex-to-svg-frontend--refresh-overlay ov))))))
-          (overlay-put ov 'latex-to-svg-frontend-image image)
-          (when (overlay-get ov 'display)
-            (latex-to-svg-frontend--show-image ov image)))))))
+      (when (latex-to-svg-frontend--render-p)
+        (let ((frame (latex-to-svg-frontend--display-frame buffer)))
+          (when-let* ((image (latex-to-svg-backend
+                              value
+                              :rescale-by (latex-to-svg-frontend--rescale-for
+                                           (overlay-get ov 'latex-to-svg-frontend-display-math))
+                              :color (latex-to-svg-frontend--foreground-for
+                                      (overlay-start ov) frame)
+                              :background (latex-to-svg-frontend--background-for frame)
+                              :padding (latex-to-svg-frontend--padding-for
+                                        (overlay-get ov 'latex-to-svg-frontend-display-math))
+                              :font-height (latex-to-svg-frontend--font-height-at
+                                            (overlay-start ov) buffer)
+                              :metadata (car (overlay-get
+                                              ov 'latex-to-svg-frontend-enums))
+                              :engine (overlay-get
+                                       ov 'latex-to-svg-frontend-engine)
+                              :fallback (overlay-get
+                                         ov 'latex-to-svg-frontend-fallback)
+                              :quiet latex-to-svg-frontend-quiet
+                              :callback
+                              (lambda ()
+                                (when (overlay-buffer ov)
+                                  (latex-to-svg-frontend--refresh-overlay ov))))))
+            (overlay-put ov 'latex-to-svg-frontend-image image)
+            (when (overlay-get ov 'display)
+              (latex-to-svg-frontend--show-image ov image))))))))
 
 (defun latex-to-svg-frontend--refresh-buffer (buffer)
   "Fetch BUFFER's previews again for the current appearance.
@@ -2367,6 +2424,7 @@ fallback than the options now give it (see `--engine-for' and
 (defconst latex-to-svg-frontend--watched-options
   '(latex-to-svg-frontend-engine
     latex-to-svg-frontend-fallback
+    latex-to-svg-frontend-render-on-non-graphic
     latex-to-svg-frontend-foreground-color
     latex-to-svg-frontend-background-color
     latex-to-svg-frontend-padding
@@ -2442,11 +2500,21 @@ changed, or that has no local value of an option whose default changed."
        (latex-to-svg-frontend--overlays-in (point-min) (point-max))))
 
 (defun latex-to-svg-frontend--refresh-if-changed ()
-  "Refresh the current buffer's previews if its appearance changed."
-  (when (and (latex-to-svg-frontend--present-p)
-             (not (equal (latex-to-svg-frontend--appearance)
-                         latex-to-svg-frontend--rendered-appearance)))
-    (latex-to-svg-frontend--refresh-buffer (current-buffer))))
+  "Bring the current buffer's previews up to date with how it is shown.
+When `latex-to-svg-frontend--undrawn' is set and a graphical window
+shows the buffer, render the math with no preview (see
+`--update-buffer'): math skipped while no frame was graphical, or
+requested while no window showed the buffer.  Otherwise refresh the
+previews if the appearance changed."
+  (cond ((and latex-to-svg-frontend-mode
+              latex-to-svg-frontend--undrawn
+              (latex-to-svg-frontend--display-window (current-buffer)))
+         (setq latex-to-svg-frontend--undrawn nil)
+         (latex-to-svg-frontend--update-buffer (current-buffer)))
+        ((and (latex-to-svg-frontend--present-p)
+              (not (equal (latex-to-svg-frontend--appearance)
+                          latex-to-svg-frontend--rendered-appearance)))
+         (latex-to-svg-frontend--refresh-buffer (current-buffer)))))
 
 (defun latex-to-svg-frontend--maybe-refresh (&rest _)
   "Schedule a lazy appearance-changed refresh of the current buffer."
@@ -2768,7 +2836,8 @@ an option of this package updates the previews on its own (see
       (cancel-timer latex-to-svg-frontend--initial-render-timer)
       (setq latex-to-svg-frontend--initial-render-timer nil))
     (latex-to-svg-frontend--clear-region (point-min) (point-max))
-    (setq latex-to-svg-frontend--rendered-appearance nil)))
+    (setq latex-to-svg-frontend--rendered-appearance nil
+          latex-to-svg-frontend--undrawn nil)))
 
 (provide 'latex-to-svg-frontend)
 

@@ -117,6 +117,9 @@ them again: `latex main.tex' twice in that directory, keeping only the
                   (or l2sf-tests--engine-used engine)))
                ((symbol-function 'latex-to-svg-frontend--appearance)
                 (lambda (&optional _buffer) l2sf-tests--appearance))
+               ;; Batch has no graphical frame, which would close the gate.
+               ((symbol-function 'latex-to-svg-frontend--graphical-p)
+                (lambda () t))
                ((symbol-function 'latex-to-svg-backend-metadata)
                 (lambda (value &optional engine)
                   (push engine l2sf-tests--metadata-engines)
@@ -1914,6 +1917,85 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
       (let ((l2sf-tests--image 'applied))
         (latex-to-svg-frontend--refresh-if-changed)
         (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display) 'applied))))))
+
+(ert-deftest l2sf-graphical-p-any-frame ()
+  ;; Some live frame is graphical, whichever frame is selected.
+  (let ((graphical nil))
+    (cl-letf (((symbol-function 'frame-list) (lambda () '(tty gui)))
+              ((symbol-function 'display-graphic-p)
+               (lambda (&optional frame) (memq frame graphical))))
+      (should-not (latex-to-svg-frontend--graphical-p))
+      (setq graphical '(gui))
+      (should (latex-to-svg-frontend--graphical-p))
+      (setq graphical '(tty))
+      (should (latex-to-svg-frontend--graphical-p)))))
+
+(ert-deftest l2sf-no-request-without-graphical-frame ()
+  ;; While no frame is graphical, nothing is sent to the backend, on a
+  ;; render or a refresh, unless `-render-on-non-graphic' is non-nil.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$ \\[b\\]\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (setq l2sf-tests--calls nil)
+      (cl-letf (((symbol-function 'latex-to-svg-frontend--graphical-p)
+                 (lambda () nil)))
+        (latex-to-svg-frontend--refresh-buffer (current-buffer))
+        (latex-to-svg-frontend--clear-region (point-min) (point-max))
+        (setq latex-to-svg-frontend--undrawn nil)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should-not l2sf-tests--calls)
+        (should-not (l2sf-tests--overlays))
+        (should latex-to-svg-frontend--undrawn)
+        (let ((latex-to-svg-frontend-render-on-non-graphic t))
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (should (= (length l2sf-tests--calls) 2)))))))
+
+(ert-deftest l2sf-request-for-a-buried-buffer ()
+  ;; With a graphical frame and no window showing the buffer, the request
+  ;; is sent with no color and no font height: the backend compiles.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (should (equal l2sf-tests--calls '(("$a$" . latex))))
+      (should (plist-member l2sf-tests--last-args :font-height))
+      (should-not (plist-get l2sf-tests--last-args :font-height))
+      (should (plist-member l2sf-tests--last-args :color))
+      (should-not (plist-get l2sf-tests--last-args :color))
+      (should latex-to-svg-frontend--undrawn))))
+
+(ert-deftest l2sf-undrawn-math-drawn-when-shown ()
+  ;; Math with no preview, because no window showed the buffer or because
+  ;; no frame was graphical, is drawn when a graphical window shows it.
+  ;; Like the backend, the stub returns no image without a font height.
+  (dolist (graphical '(t nil))
+    (l2sf-tests--with-stub
+      (let ((stub (symbol-function 'latex-to-svg-backend)))
+        (cl-letf (((symbol-function 'latex-to-svg-backend)
+                   (lambda (latex &rest args)
+                     (let ((image (apply stub latex args)))
+                       (and (plist-get args :font-height) image)))))
+          (l2sf-tests--md "$a$ \\[b\\]\n"
+            (goto-char (point-max))
+            (setq-local latex-to-svg-frontend-mode t)
+            (cl-letf (((symbol-function 'latex-to-svg-frontend--graphical-p)
+                       (lambda () graphical)))
+              (latex-to-svg-frontend--render-region (point-min) (point-max)))
+            (should-not (l2sf-tests--overlays))
+            (should latex-to-svg-frontend--undrawn)
+            ;; No window shows it yet: nothing to do.
+            (latex-to-svg-frontend--refresh-if-changed)
+            (should-not (l2sf-tests--overlays))
+            (l2sf-tests--with-frame
+              (latex-to-svg-frontend--refresh-if-changed))
+            (should (equal (l2sf-tests--values) '("$a$" "\\[b\\]")))
+            (should-not latex-to-svg-frontend--undrawn)))))))
+
+(ert-deftest l2sf-render-on-non-graphic-is-watched ()
+  (should (memq 'latex-to-svg-frontend-render-on-non-graphic
+                latex-to-svg-frontend--watched-options))
+  (should (eq (get 'latex-to-svg-frontend-render-on-non-graphic 'safe-local-variable)
+              #'booleanp)))
 
 (ert-deftest l2sf-on-appearance-change-refreshes-changed-buffers ()
   ;; A frame font change is global: the handler sweeps every mode buffer,

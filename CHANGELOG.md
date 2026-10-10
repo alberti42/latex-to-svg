@@ -12,7 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `latex-to-svg-frontend-render-on-non-graphic`, default nil: when
+  non-nil, equations are compiled even when no frame is graphical, as in
+  an Emacs daemon with only terminal clients, so their images are in the
+  cache when a graphical window shows the buffer. It replaces
+  `latex-to-svg-backend-render-on-non-graphic`, which is obsolete and has
+  no effect in `latex-to-svg-backend` 0.14.0.
+
 ### Changed
+
+- An equation is compiled only while some frame is graphical, whether or
+  not a window shows its buffer: a buffer buried in a graphical session
+  is compiled ahead. Up to `latex-to-svg-backend` 0.13.0 the backend
+  compiled only while the selected frame was graphical.
 
 - Requires `latex-to-svg-backend` 0.14.0, which reads no faces and no
   frames. The front-end reads the colors on the frame that shows the
@@ -26,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The check for a theme or font change compares the colors of the
   `default` face on the frame that shows the buffer, where it compared
   those of the selected frame.
+
+### Fixed
+
+- An equation that has no preview because no graphical window showed its
+  buffer, or because no frame was graphical, is drawn when a graphical
+  window shows the buffer. Before, it stayed text until
+  `latex-to-svg-frontend-refresh` or until the mode was turned off and on.
 
 ### Added
 
