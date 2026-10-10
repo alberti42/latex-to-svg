@@ -7,7 +7,7 @@
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.20.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.12.1"))
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.13.0"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify

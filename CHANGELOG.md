@@ -19,8 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   preview overlay gives its image's width in pixels, from
   `latex-to-svg-backend-image-width`, in the property
   `pretty-tables-image-width`, and an image shown in a row pretty-tables
-  has drawn has that table drawn again. Needs a `latex-to-svg-backend`
-  with `latex-to-svg-backend-image-width`.
+  has drawn has that table drawn again. Requires `latex-to-svg-backend`
+  0.13.0.
 
 ## [0.20.0] - 2026-10-10
 
