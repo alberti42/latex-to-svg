@@ -598,8 +598,8 @@ per buffer rather than passed over: `default-font-height' reads
 `font-info', which returns nil for a font it cannot open, and then signals
 `wrong-type-argument'."
   (let ((buffer (or buffer (current-buffer))))
-    (when-let* ((frame (latex-to-svg-frontend--display-frame buffer)))
-      (with-selected-frame frame
+    (when-let* ((window (latex-to-svg-frontend--display-window buffer)))
+      (with-selected-frame (window-frame window)
         (with-current-buffer buffer
           (condition-case err
               (default-font-height)
@@ -613,14 +613,37 @@ per buffer rather than passed over: `default-font-height' reads
                 :warning))
              nil)))))))
 
-(defun latex-to-svg-frontend--display-frame (buffer)
-  "Return the graphical frame of a window showing BUFFER, or nil.
-The frame previews are measured and tinted against (see
+(defun latex-to-svg-frontend--display-window (buffer)
+  "Return a window showing BUFFER on a graphical frame, or nil.
+Previews are measured and tinted against its frame (see
 `latex-to-svg-frontend--font-height')."
   (when-let* ((win (get-buffer-window buffer t))
-              (frame (window-frame win))
-              ((display-graphic-p frame)))
-    frame))
+              ((display-graphic-p (window-frame win))))
+    win))
+
+(defun latex-to-svg-frontend--display-frame (buffer)
+  "Return the graphical frame of a window showing BUFFER, or nil.
+See `latex-to-svg-frontend--display-window'."
+  (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
+    (window-frame win)))
+
+(defun latex-to-svg-frontend--font-height-at (pos &optional buffer)
+  "Return the pixel height of the font of the text at POS in BUFFER, or nil.
+That is the ascent plus the descent of the font Emacs uses at POS, the
+opening delimiter of an equation, in a window showing BUFFER (see
+`latex-to-svg-frontend--display-window').  The faces at POS and their
+`:height' apply, and so does `text-scale-mode'; text in the default
+font measures what `default-font-height' does.  When no font is found
+at POS, it is `latex-to-svg-frontend--font-height', which is nil when
+BUFFER is shown in no graphical window."
+  (let ((buffer (or buffer (current-buffer))))
+    (or (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
+          (with-selected-frame (window-frame win)
+            (with-current-buffer buffer
+              (when-let* ((font (ignore-errors (font-at pos win)))
+                          (info (query-font font)))
+                (+ (aref info 4) (aref info 5))))))
+        (latex-to-svg-frontend--font-height buffer))))
 
 (defun latex-to-svg-frontend--text-foreground (pos &optional frame)
   "Return the foreground the faces of the text at POS give it, or nil.
@@ -1758,7 +1781,9 @@ none."
   "Ensure BEG..END in BUFFER shows the current image for render VALUE.
 Overlays immediately on a cache hit, else schedules an async compile and
 overlays when it finishes.  BEG / END should be markers.  The image is
-tinted like the text at BEG (see `latex-to-svg-frontend--foreground-for').
+tinted and sized like the text at BEG (see
+`latex-to-svg-frontend--foreground-for' and
+`latex-to-svg-frontend--font-height-at').
 ENGINE is passed to the backend as `:engine' (nil means `latex'), with
 `:fallback' from `--fallback-for' and `:quiet' from
 `latex-to-svg-frontend-quiet'.
@@ -1777,7 +1802,8 @@ nothing to the backend and installs `--set-unrendered-overlay' instead."
                             beg (latex-to-svg-frontend--display-frame buffer))
                     :background latex-to-svg-frontend-background-color
                     :padding (latex-to-svg-frontend--padding-for display-p)
-                    :font-height (latex-to-svg-frontend--font-height buffer)
+                    :font-height (latex-to-svg-frontend--font-height-at
+                                  beg buffer)
                     :metadata (car enums-fallback)
                     :engine engine
                     :fallback fallback
@@ -2136,10 +2162,12 @@ so math still being typed is never compiled."
 
 ;;;; Refresh (theme / font tracking)
 
-(defun latex-to-svg-frontend--refresh-overlay (ov font-height)
-  "Fetch preview overlay OV's image again, measured at FONT-HEIGHT.
-Uses the value, engine and fallback recorded on OV, and tints it like
-the text at its start now (see `latex-to-svg-frontend--foreground-for').
+(defun latex-to-svg-frontend--refresh-overlay (ov)
+  "Fetch preview overlay OV's image again.
+Uses the value, engine and fallback recorded on OV, and tints and sizes
+it like the text at its start now (see
+`latex-to-svg-frontend--foreground-for' and
+`latex-to-svg-frontend--font-height-at').
 When the cache has no picture for them, because a backend option in the
 cache key changed \(`latex-to-svg-backend-preamble',
 `latex-to-svg-backend-preamble-not-precompiled') or the entry was
@@ -2159,7 +2187,8 @@ deleted in the meantime (edited, renumbered) is left alone."
                           :background latex-to-svg-frontend-background-color
                           :padding (latex-to-svg-frontend--padding-for
                                     (overlay-get ov 'latex-to-svg-frontend-display-math))
-                          :font-height font-height
+                          :font-height (latex-to-svg-frontend--font-height-at
+                                        (overlay-start ov) buffer)
                           :metadata (car (overlay-get
                                           ov 'latex-to-svg-frontend-enums))
                           :engine (overlay-get
@@ -2170,9 +2199,7 @@ deleted in the meantime (edited, renumbered) is left alone."
                           :callback
                           (lambda ()
                             (when (overlay-buffer ov)
-                              (latex-to-svg-frontend--refresh-overlay
-                               ov (latex-to-svg-frontend--font-height
-                                   (overlay-buffer ov))))))))
+                              (latex-to-svg-frontend--refresh-overlay ov))))))
         (overlay-put ov 'latex-to-svg-frontend-image image)
         (when (overlay-get ov 'display)
           (latex-to-svg-frontend--show-image ov image))))))
@@ -2185,7 +2212,7 @@ and re-scaled, or compiled when the cache has no picture for it."
     (with-current-buffer buffer
       (let ((font-height (latex-to-svg-frontend--font-height (current-buffer))))
         (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
-          (latex-to-svg-frontend--refresh-overlay ov font-height))
+          (latex-to-svg-frontend--refresh-overlay ov))
         (setq latex-to-svg-frontend--rendered-appearance
               (latex-to-svg-backend-appearance font-height))))))
 

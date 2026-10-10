@@ -697,6 +697,38 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
         (should (equal (sort colors (lambda (x y) (string< (car x) (car y))))
                        '(("$a$") ("$b$" . "red"))))))))
 
+(ert-deftest l2sf-equation-sized-like-its-text ()
+  ;; Each equation is sized by the font at its opening delimiter: its
+  ;; ascent plus descent, when drawn and on refresh.  Batch has no
+  ;; graphical window, so the window and the fonts are stubbed: text with
+  ;; a face gets a font 36 pixels high, other text one 23 pixels high.
+  (l2sf-tests--with-stub
+    (let ((heights nil)
+          (stub (symbol-function 'latex-to-svg-backend)))
+      (cl-letf (((symbol-function 'latex-to-svg-backend)
+                 (lambda (latex &rest args)
+                   (push (cons latex (plist-get args :font-height)) heights)
+                   (apply stub latex args)))
+                ((symbol-function 'latex-to-svg-frontend--display-window)
+                 (lambda (_buffer) (selected-window)))
+                ((symbol-function 'font-at)
+                 (lambda (pos &rest _)
+                   (if (get-text-property pos 'face) 'big 'plain)))
+                ((symbol-function 'query-font)
+                 (lambda (font)
+                   (if (eq font 'big)
+                       [nil nil 27 nil 28 8 nil nil nil]
+                     [nil nil 18 nil 18 5 nil nil nil]))))
+        (l2sf-tests--md "$a$ $b$\n"
+          (put-text-property 5 6 'face '(:height 1.5))
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (should (equal (reverse heights) '(("$a$" . 23) ("$b$" . 36))))
+          (setq heights nil)
+          (put-text-property 5 6 'face nil)
+          (latex-to-svg-frontend--refresh-buffer (current-buffer))
+          (should (equal (sort heights (lambda (x y) (string< (car x) (car y))))
+                         '(("$a$" . 23) ("$b$" . 23)))))))))
+
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
 (no overlay), colour and all."
