@@ -71,6 +71,8 @@ them again: `latex main.tex' twice in that directory, keeping only the
 ;; Built-in on Emacs 31+; only needed for the minor-mode enable/disable test,
 ;; which skips itself when it (or the `markdown' grammar) is unavailable.
 (require 'markdown-ts-mode nil t)
+;; Declared so that test binds it dynamically on an Emacs without it.
+(defvar markdown-ts-mode-hook)
 
 ;; --- Stub the backend: synchronous, deterministic, no TeX / no display -------
 
@@ -1501,6 +1503,8 @@ other buffer BODY opened."
     (let ((latex-to-svg-for-latex-aux-file "../main.aux"))
       (l2sf-tests--visit-book "chapters/ch2.tex"
         (should (equal (l2sf-tests--ref-displays) '("(1.1)")))))))
+
+(require 'xref)
 
 ;; A stand-in for eglot's xref backend: it answers `xref-find-definitions'
 ;; with a location in another file, as texlab does.  The backend is only
