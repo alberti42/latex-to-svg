@@ -71,8 +71,10 @@ them again: `latex main.tex' twice in that directory, keeping only the
 ;; Built-in on Emacs 31+; only needed for the minor-mode enable/disable test,
 ;; which skips itself when it (or the `markdown' grammar) is unavailable.
 (require 'markdown-ts-mode nil t)
-;; Declared so that test binds it dynamically on an Emacs without it.
+;; Declared for an Emacs without it, on which that test skips itself: the
+;; test binds the hook dynamically and calls the mode.
 (defvar markdown-ts-mode-hook)
+(declare-function markdown-ts-mode "markdown-ts-mode")
 
 ;; --- Stub the backend: synchronous, deterministic, no TeX / no display -------
 
