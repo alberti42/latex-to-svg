@@ -12,38 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed
-
-- `latex-to-svg-for-org-mode` read Org syntax with `$` in it as math (issue
-  #4): a table formula such as `#+TBLFM: $2=$1*2`, which refers to columns as
-  `$1`, `$2`, …, and a fixed-width line (`: …`, a literal example) such as
-  `: echo ${VARNAME}`, whose `$` could pair with a `$` later in the paragraph
-  and hide a real equation. Both are now excluded, like comment lines.
-- A `$` that cannot close an inline `$…$` (it follows whitespace) no longer
-  lets the span run on to a later `$`: in `it costs $5 and $x$`, the scanner
-  read `$5 and $x$` as one equation and lost `$x$`. As in TeX, the first `$`
-  after an opening one ends the span, and when it cannot close it there is no
-  span. This holds in every adaptor.
-- A no-space price range such as `$100-$200` is no longer read as the equation
-  `100-`: a closing `$` must not be followed by a digit, as in pandoc.
-
-### Changed
-
-- Each equation is tinted and sized like the text at its opening delimiter:
-  an equation in a Gnus Subject, an Org heading or a link has the color and
-  the font height of that text (issue #3: the equations of a Subject were
-  white and the Subject yellow). The color is read again at every redraw, so
-  a theme change re-tints them. Equations in text with the default
-  foreground and the default font look as before.
-- `latex-to-svg-frontend-foreground-color` now colors the equations in text
-  drawn in the default foreground; an equation in colored text keeps the
-  color of the text. Before, it colored every equation.
-- Inline math directly followed by a digit, such as `$x$2`, is no longer
-  detected; this is the price of the digit rule above, which pandoc also
-  applies. What still reads as math is shell variables such as `$HOME/$USER`
-  (see `latex-to-svg-frontend-detect-dollar-inline`).
-
-## [0.20.0] - 2026-10-09
+## [0.20.0] - 2026-10-10
 
 ### Added
 
@@ -61,12 +30,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `latex-to-svg-for-latex-mode` keeps a global `latex-to-svg-frontend-engine`
   of `texres`, since texres reads the preamble. It still replaces a global
   `ratex` with `latex`.
-
 - A `% engine=` cookie naming an engine whose program is not found no longer
   warns from the front-end: the equation is sent to the backend like any
   other, and the backend warns, naming the engine and the program, for the
   cookie and for `latex-to-svg-frontend-engine` alike. Before, only a cookie
   warned, and an engine set by the option drew the backend's placeholder.
+- Each equation is tinted and sized like the text at its opening delimiter:
+  an equation in a Gnus Subject, an Org heading or a link has the color and
+  the font height of that text (issue #3: the equations of a Subject were
+  white and the Subject yellow). The color is read again at every redraw, so
+  a theme change re-tints them. Equations in text with the default
+  foreground and the default font look as before.
+- `latex-to-svg-frontend-foreground-color` now colors the equations in text
+  drawn in the default foreground; an equation in colored text keeps the
+  color of the text. Before, it colored every equation.
+- Inline math directly followed by a digit, such as `$x$2`, is no longer
+  detected; this is the price of the digit rule above, which pandoc also
+  applies. What still reads as math is shell variables such as `$HOME/$USER`
+  (see `latex-to-svg-frontend-detect-dollar-inline`).
 
 ### Fixed
 
@@ -78,6 +59,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   every `face` property. The keyword is now added only when the major mode
   sets `font-lock-defaults`, as Org, Markdown and LaTeX modes do; it undoes
   their font-lock, and a buffer without one needs nothing undone.
+- `latex-to-svg-for-org-mode` read Org syntax with `$` in it as math (issue
+  #4): a table formula such as `#+TBLFM: $2=$1*2`, which refers to columns as
+  `$1`, `$2`, …, and a fixed-width line (`: …`, a literal example) such as
+  `: echo ${VARNAME}`, whose `$` could pair with a `$` later in the paragraph
+  and hide a real equation. Both are now excluded, like comment lines.
+- A `$` that cannot close an inline `$…$` (it follows whitespace) no longer
+  lets the span run on to a later `$`: in `it costs $5 and $x$`, the scanner
+  read `$5 and $x$` as one equation and lost `$x$`. As in TeX, the first `$`
+  after an opening one ends the span, and when it cannot close it there is no
+  span. This holds in every adaptor.
+- A no-space price range such as `$100-$200` is no longer read as the equation
+  `100-`: a closing `$` must not be followed by a digit, as in pandoc.
 
 ## [0.19.1] - 2026-10-08
 
