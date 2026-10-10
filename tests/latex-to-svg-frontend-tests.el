@@ -79,6 +79,19 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar l2sf-tests--image-width nil
   "What the stubbed `latex-to-svg-backend-image-width' returns.")
 
+;; What the stubbed backend returns and records; `l2sf-tests--with-stub'
+;; binds each of them.
+(defvar l2sf-tests--appearance)
+(defvar l2sf-tests--invalidated)
+(defvar l2sf-tests--invalidated-engines)
+(defvar l2sf-tests--formats-invalidated)
+(defvar l2sf-tests--metadata)
+(defvar l2sf-tests--metadata-engines)
+(defvar l2sf-tests--last-rescale)
+(defvar l2sf-tests--last-args)
+(defvar l2sf-tests--calls)
+(defvar l2sf-tests--engine-used)
+
 (defmacro l2sf-tests--with-stub (&rest body)
   "Run BODY with the backend stubbed to return `l2sf-tests--image'."
   (declare (indent 0) (debug t))
@@ -309,6 +322,9 @@ A plain buffer suffices — detection is a regexp scanner."
     (should (equal (mapcar #'latex-to-svg-frontend--math-value
                            (latex-to-svg-frontend--elements (point-min) (point-max)))
                    '("\\(y\\)")))))
+
+;; Org's; declared so the test below binds it dynamically without Org.
+(defvar org-verbatim-re)
 
 (ert-deftest l2sf-org-adaptor-inline-verbatim-fallback ()
   ;; Same, with Org's own `org-verbatim-re' unavailable: the built-in fallback
@@ -1230,8 +1246,9 @@ merely *contains* inline math) is left untouched."
     (setq buffer-file-name nil)
     (should-not (latex-to-svg-for-latex--aux-file))))
 
-;; AUCTeX's; declared so the test below binds it dynamically without AUCTeX.
+;; AUCTeX's; declared so the tests below bind them dynamically without AUCTeX.
 (defvar TeX-output-dir)
+(defvar LaTeX-mode-hook)
 
 (ert-deftest l2sf-latex-aux-file-from-auctex ()
   ;; In `LaTeX-mode' the `.aux' comes from `TeX-master-output-file', whose

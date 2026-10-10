@@ -91,6 +91,9 @@ jobs:
           done
           exit 1
 
+      # The test file is compiled too: a variable a test binds with `let'
+      # and nothing declares compiles as a lexical binding, which loading
+      # the source does not catch.
       - name: Byte-compile, warnings as errors
         run: |
           emacs -Q -batch \
@@ -101,7 +104,8 @@ jobs:
             latex-to-svg-for-org.el \
             latex-to-svg-for-markdown.el \
             latex-to-svg-for-latex.el \
-            latex-to-svg-for-gnus.el
+            latex-to-svg-for-gnus.el \
+            tests/latex-to-svg-frontend-tests.el
 
       # Docstring conventions, exiting non-zero on any finding.  Both flags
       # are set rather than left at their defaults, so the step reports the
