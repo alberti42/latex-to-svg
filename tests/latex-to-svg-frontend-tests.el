@@ -80,8 +80,6 @@ them again: `latex main.tex' twice in that directory, keeping only the
 
 (defvar l2sf-tests--image 'fake-image)
 
-(defvar l2sf-tests--image-width nil
-  "What the stubbed `latex-to-svg-backend-image-width' returns.")
 
 ;; What the stubbed backend returns and records; `l2sf-tests--with-stub'
 ;; binds each of them.
@@ -98,15 +96,21 @@ them again: `latex main.tex' twice in that directory, keeping only the
 
 (defun l2sf-tests--check-colors (args)
   "Signal an error unless ARGS meet `latex-to-svg-backend' 0.14.0.
-That is: `:color' and `:background' are nil or `#rrggbb' strings, and
-`:color' is non-nil whenever `:font-height' is."
+That is: `:color' and `:background' are nil or `#rrggbb' strings,
+`:font-size' is nil or a positive number, and `:color' is non-nil
+whenever `:font-size' is.  The removed `:font-height' is an error."
+  (when (plist-member args :font-height)
+    (error ":font-height is removed: pass :font-size"))
   (let ((hex "\\`#[[:xdigit:]]\\{6\\}\\'"))
     (dolist (key '(:color :background))
       (let ((value (plist-get args key)))
         (when (and value (not (and (stringp value) (string-match-p hex value))))
           (error "%s is not a #rrggbb string: %S" key value))))
-    (when (and (plist-get args :font-height) (not (plist-get args :color)))
-      (error ":color is nil with :font-height %S" (plist-get args :font-height)))))
+    (let ((size (plist-get args :font-size)))
+      (unless (or (null size) (and (numberp size) (> size 0)))
+        (error ":font-size is not a positive number: %S" size))
+      (when (and size (not (plist-get args :color)))
+        (error ":color is nil with :font-size %S" size)))))
 
 (defmacro l2sf-tests--with-stub (&rest body)
   "Run BODY with the backend stubbed to return `l2sf-tests--image'.
@@ -148,9 +152,7 @@ The stub signals as the backend does when the colors break its contract
                   (push latex l2sf-tests--invalidated)
                   (push engine l2sf-tests--invalidated-engines)))
                ((symbol-function 'latex-to-svg-backend-invalidate-format)
-                (lambda () (cl-incf l2sf-tests--formats-invalidated)))
-               ((symbol-function 'latex-to-svg-backend-image-width)
-                (lambda (_image) l2sf-tests--image-width)))
+                (lambda () (cl-incf l2sf-tests--formats-invalidated))))
        ,@body)))
 
 (defmacro l2sf-tests--md (text &rest body)
@@ -700,8 +702,9 @@ A batch Emacs resolves a name to the nearest of its terminal's colors.")
 
 (defmacro l2sf-tests--with-frame (&rest body)
   "Run BODY with every buffer shown on the selected frame, as if graphical.
-The `default' face is white on black there, and `color-values' resolves
-the names in `l2sf-tests--colors' and `#rrggbb' strings."
+The `default' face is white on black there, `color-values' resolves
+the names in `l2sf-tests--colors' and `#rrggbb' strings, and the
+`default' face's font has a pixel size of 20 and a height of 23."
   (declare (indent 0) (debug t))
   `(let ((fg (face-attribute 'default :foreground))
          (bg (face-attribute 'default :background)))
@@ -717,7 +720,13 @@ the names in `l2sf-tests--colors' and `#rrggbb' strings."
                                       (* 257 (string-to-number
                                               (substring color i (+ i 2)) 16)))
                                     '(1 3 5))
-                          (cdr (assoc color l2sf-tests--colors))))))
+                          (cdr (assoc color l2sf-tests--colors)))))
+                     ((symbol-function 'face-font)
+                      (lambda (&rest _) "l2sf-tests-font"))
+                     ((symbol-function 'font-info)
+                      (lambda (name &rest _)
+                        (and (equal name "l2sf-tests-font")
+                             [name nil 20 23 18 5 nil nil nil]))))
              ,@body))
        (set-face-attribute 'default nil :foreground fg :background bg))))
 
@@ -767,14 +776,12 @@ the names in `l2sf-tests--colors' and `#rrggbb' strings."
 
 (ert-deftest l2sf-appearance-reads-the-display-frame ()
   ;; The signature is the `default' face's colors on the frame that shows
-  ;; the buffer, and the font height there; nil, nil, nil on no frame.
+  ;; the buffer, and the font size there; nil, nil, nil on no frame.
   (with-temp-buffer
     (should (equal (latex-to-svg-frontend--appearance) '(nil nil nil)))
     (l2sf-tests--with-frame
-      (cl-letf (((symbol-function 'latex-to-svg-frontend--font-height)
-                 (lambda (&optional _buffer) 20)))
-        (should (equal (latex-to-svg-frontend--appearance)
-                       '("white" "black" 20)))))))
+      (should (equal (latex-to-svg-frontend--appearance)
+                     '("white" "black" 20))))))
 
 (defmacro l2sf-tests--with-colors (var &rest body)
   "Run BODY with VAR bound to a list of the (LATEX . COLOR) backend calls.
@@ -806,8 +813,8 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
           (should (equal (sort colors (lambda (x y) (string< (car x) (car y))))
                          '(("$a$" . "#ffffff") ("$b$" . "#ff0000")))))))))
 
-(ert-deftest l2sf-color-with-every-font-height ()
-  ;; The backend requires a `#rrggbb' `:color' whenever `:font-height' is
+(ert-deftest l2sf-color-with-every-font-size ()
+  ;; The backend requires a `#rrggbb' `:color' whenever `:font-size' is
   ;; given, and accepts nil for both when the buffer is shown nowhere.
   (l2sf-tests--with-stub
     (let ((calls nil)
@@ -815,7 +822,7 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
       (cl-letf (((symbol-function 'latex-to-svg-backend)
                  (lambda (latex &rest args)
                    (push (list (plist-get args :color)
-                               (plist-get args :font-height))
+                               (plist-get args :font-size))
                          calls)
                    (apply stub latex args))))
         (l2sf-tests--md "$a$ \\[b\\]\n"
@@ -833,17 +840,18 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
 
 (ert-deftest l2sf-equation-sized-like-its-text ()
   ;; Each equation is sized by the font at its opening delimiter: its
-  ;; ascent plus descent, when drawn and on refresh.  Batch has no
-  ;; graphical window, so the window (`l2sf-tests--with-frame') and the
-  ;; fonts are stubbed: text with a face gets a font 36 pixels high, other
-  ;; text one 23 pixels high.
+  ;; pixel size, its em (slot 2 of `query-font'), when drawn and on
+  ;; refresh.  Batch has no graphical window, so the window
+  ;; (`l2sf-tests--with-frame') and the fonts are stubbed: text with a face
+  ;; gets a font of 27 pixels, 36 high, other text one of 18 pixels, 23
+  ;; high.
   (l2sf-tests--with-stub
     (l2sf-tests--with-frame
       (let ((heights nil)
             (stub (symbol-function 'latex-to-svg-backend)))
         (cl-letf (((symbol-function 'latex-to-svg-backend)
                    (lambda (latex &rest args)
-                     (push (cons latex (plist-get args :font-height)) heights)
+                     (push (cons latex (plist-get args :font-size)) heights)
                      (apply stub latex args)))
                   ((symbol-function 'font-at)
                    (lambda (pos &rest _)
@@ -856,12 +864,12 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
           (l2sf-tests--md "$a$ $b$\n"
             (put-text-property 5 6 'face '(:height 1.5))
             (latex-to-svg-frontend--render-region (point-min) (point-max))
-            (should (equal (reverse heights) '(("$a$" . 23) ("$b$" . 36))))
+            (should (equal (reverse heights) '(("$a$" . 18) ("$b$" . 27))))
             (setq heights nil)
             (put-text-property 5 6 'face nil)
             (latex-to-svg-frontend--refresh-buffer (current-buffer))
             (should (equal (sort heights (lambda (x y) (string< (car x) (car y))))
-                           '(("$a$" . 23) ("$b$" . 23))))))))))
+                           '(("$a$" . 18) ("$b$" . 18))))))))))
 
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
@@ -1738,23 +1746,26 @@ other buffer BODY opened."
 
 ;;;; Minor mode
 
-(ert-deftest l2sf-font-height-reports-unmeasurable-font ()
-  ;; A font the frame cannot measure leaves the height unknown, so the backend
+(ert-deftest l2sf-font-size-is-the-em ()
+  ;; The buffer's font size is the pixel size of the `default' face's font,
+  ;; slot 2 of `font-info', not its height (slot 3).
+  (with-temp-buffer
+    (l2sf-tests--with-frame
+      (should (= (latex-to-svg-frontend--font-size) 20)))))
+
+(ert-deftest l2sf-font-size-reports-unmeasurable-font ()
+  ;; A font the frame cannot open leaves the size unknown, so the backend
   ;; defers sizing -- but it is reported, once per buffer, never swallowed.
   (let ((warnings 0))
     (with-temp-buffer
-      (cl-letf (((symbol-function 'get-buffer-window)
-                 (lambda (&rest _) (selected-window)))
-                ((symbol-function 'window-frame) (lambda (&rest _) (selected-frame)))
-                ((symbol-function 'display-graphic-p) (lambda (&rest _) t))
-                ((symbol-function 'default-font-height)
-                 (lambda (&rest _) (signal 'wrong-type-argument (list 'arrayp nil))))
-                ((symbol-function 'display-warning)
-                 (lambda (&rest _) (cl-incf warnings))))
-        (should-not (latex-to-svg-frontend--font-height))
-        (should-not (latex-to-svg-frontend--font-height))
-        ;; One diagnosis for the buffer, not one per equation.
-        (should (= 1 warnings))))))
+      (l2sf-tests--with-frame
+        (cl-letf (((symbol-function 'font-info) (lambda (&rest _) nil))
+                  ((symbol-function 'display-warning)
+                   (lambda (&rest _) (cl-incf warnings))))
+          (should-not (latex-to-svg-frontend--font-size))
+          (should-not (latex-to-svg-frontend--font-size))
+          ;; One diagnosis for the buffer, not one per equation.
+          (should (= 1 warnings)))))))
 
 (ert-deftest l2sf-markdown-mode-renders-and-clears ()
   ;; The Markdown adaptor mode installs the protocol and turns on the core.
@@ -1993,8 +2004,8 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
     (l2sf-tests--md "$a$\n"
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (should (equal l2sf-tests--calls '(("$a$" . latex))))
-      (should (plist-member l2sf-tests--last-args :font-height))
-      (should-not (plist-get l2sf-tests--last-args :font-height))
+      (should (plist-member l2sf-tests--last-args :font-size))
+      (should-not (plist-get l2sf-tests--last-args :font-size))
       (should (plist-member l2sf-tests--last-args :color))
       (should-not (plist-get l2sf-tests--last-args :color))
       (should latex-to-svg-frontend--undrawn))))
@@ -2009,7 +2020,7 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
         (cl-letf (((symbol-function 'latex-to-svg-backend)
                    (lambda (latex &rest args)
                      (let ((image (apply stub latex args)))
-                       (and (plist-get args :font-height) image)))))
+                       (and (plist-get args :font-size) image)))))
           (l2sf-tests--md "$a$ \\[b\\]\n"
             (goto-char (point-max))
             (setq-local latex-to-svg-frontend-mode t)
@@ -2839,19 +2850,6 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                                  `(space :align-to
                                          (- center (0.5 . ,l2sf-tests--image))))))
               (should-not (overlay-get ov 'before-string)))))))))
-
-(ert-deftest l2sf-image-width-for-pretty-tables ()
-  ;; A shown image carries its width in pixels for pretty-tables; a hidden
-  ;; one does not.
-  (l2sf-tests--with-stub
-    (let ((latex-to-svg-frontend-number-equations nil)
-          (l2sf-tests--image-width 42.0))
-      (l2sf-tests--md "a $x$ b\n"
-        (latex-to-svg-frontend--render-region (point-min) (point-max))
-        (let ((ov (car (l2sf-tests--overlays))))
-          (should (equal (overlay-get ov 'pretty-tables-image-width) 42.0))
-          (latex-to-svg-frontend--hide-image ov)
-          (should-not (overlay-get ov 'pretty-tables-image-width)))))))
 
 (ert-deftest l2sf-image-in-a-table-redraws-it ()
   ;; pretty-tables draws a row from what its cells display when jit-lock

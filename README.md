@@ -88,9 +88,9 @@ on the same backend:
 
 Equations in a table cell are drawn in the tables of
 [`pretty-tables`](https://github.com/alberti42/pretty-tables.el), which
-aligns and wraps Markdown and Org tables: each preview overlay gives its
-image's width in the property `pretty-tables-image-width`, and the table is
-drawn again when an image in it is shown.
+aligns and wraps Markdown and Org tables: each image carries its width in
+pixels as `:width`, which pretty-tables reads, and the table is drawn again
+when an image in it is shown.
 
 Several other Emacs packages preview LaTeX math — the built-in Org
 `org-latex-preview` and the tecosaur/karthink fork of it, AUCTeX's
@@ -177,9 +177,13 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 - Emacs 29.1+ with SVG image support. Each adaptor's page lists the major
   modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.13.0+ (the backend) — the floor is set by
-  `latex-to-svg-backend-image-width`, which came with 0.13.0 and gives
-  pretty-tables the width of each equation image. The `texres` engine came
+  0.14.0+ (the backend) — the floor is set by 0.14.0, which reads no faces
+  and no frames: the front-end passes the colors and the font size it reads
+  on the frame that shows the buffer, as `#rrggbb` strings and as
+  `:font-size`, the em of the text in pixels. With 0.14.0 each image has
+  `:width` in pixels, which pretty-tables reads, and an inline equation sits
+  on the text's baseline. `latex-to-svg-backend-image-width` came with
+  0.13.0. The `texres` engine came
   with 0.12.0 together with the backend's warning for a program that is not
   found; 0.12.1 fixed the texres engine on Emacs 29 to 31. The per-project
   preambles came with 0.11.1: the
@@ -190,9 +194,8 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
   `% engine=` cookie), the LaTeX fallback and quiet failures (`:fallback` /
   `:quiet`, behind `latex-to-svg-frontend-fallback` and `-quiet`), and
   `latex-to-svg-backend-engine-used`, which the tooltip uses to name the
-  engine, came with 0.10.0. The display-time `:color` / `:background` / `:padding` overrides and
-  `:font-height`, which lets the front-end measure the buffer font against the
-  frame that actually displays it, came earlier.
+  engine, came with 0.10.0. The display-time `:color` / `:background` /
+  `:padding` overrides came earlier.
 - `latex` + `dvisvgm` on `exec-path` (any TeX distribution), or RaTeX's
   `render-svg` for the `ratex` engine, or texres and `pdftocairo` for the
   `texres` engine (see [Engine](#engine)).
@@ -519,7 +522,7 @@ a &= b
 
 Each preview is tinted and sized like the text at its opening delimiter: an
 equation in a heading, a link or a Gnus Subject has the color and the font
-height of that text. In text drawn in the default foreground it has the
+size of that text: its letters are as large as the text's. In text drawn in the default foreground it has the
 foreground of the `default` face (so it tracks your theme), on a transparent
 background. You can override these appearance options — they apply from cache
 (no recompiling), and setting one updates the previews on its own:

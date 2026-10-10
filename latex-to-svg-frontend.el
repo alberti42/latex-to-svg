@@ -586,11 +586,18 @@ obsolete `latex-to-svg-frontend-padding'."
       (with-suppressed-warnings ((obsolete latex-to-svg-frontend-padding))
         latex-to-svg-frontend-padding)))
 
+;; Defined only in an Emacs built with a window system; it is called only
+;; while a graphical window shows the buffer.
+(declare-function font-info "font.c" (name &optional frame))
+
 (defvar-local latex-to-svg-frontend--font-warned nil
   "Non-nil once an unmeasurable buffer font has been reported in this buffer.")
 
-(defun latex-to-svg-frontend--font-height (&optional buffer)
-  "Return BUFFER's font pixel height in a graphical frame showing it, or nil.
+(defun latex-to-svg-frontend--font-size (&optional buffer)
+  "Return the pixel size of BUFFER's default font in a graphical frame, or nil.
+That is the size Emacs opened the font of the `default' face at, its
+em: slot 2 of `font-info' of `face-font', which follows the buffer's
+face remapping, so `text-scale-mode' applies.
 
 Measured against the frame that actually displays BUFFER, so previews
 size correctly even when the selected frame is a TTY/daemon frame (an
@@ -598,32 +605,30 @@ async compile callback firing while a terminal frame is current).
 Uses `with-selected-frame' — a temporary, non-raising, non-focus-stealing
 selection — so it never makes a parked child frame appear.  Returns nil
 when BUFFER is shown in no graphical window, in which case the backend
-defers sizing to display time and the refresh hook redraws it then.
+compiles the equation but sizes nothing, and the refresh hook draws it
+once a graphical window shows BUFFER.
 
-A font the frame cannot measure yields nil as well, but is reported once
-per buffer rather than passed over: `default-font-height' reads
-`font-info', which returns nil for a font it cannot open, and then signals
-`wrong-type-argument'."
+A font the frame cannot open yields nil as well, but is reported once
+per buffer rather than passed over: `font-info' returns nil for it."
   (let ((buffer (or buffer (current-buffer))))
     (when-let* ((window (latex-to-svg-frontend--display-window buffer)))
       (with-selected-frame (window-frame window)
         (with-current-buffer buffer
-          (condition-case err
-              (default-font-height)
-            (wrong-type-argument
-             (unless latex-to-svg-frontend--font-warned
-               (setq latex-to-svg-frontend--font-warned t)
-               (display-warning
-                'latex-to-svg-frontend
-                (format "Cannot measure the buffer font: %s"
-                        (error-message-string err))
-                :warning))
-             nil)))))))
+          (let ((font (face-font 'default)))
+            (if-let* ((info (and font (font-info font))))
+                (aref info 2)
+              (unless latex-to-svg-frontend--font-warned
+                (setq latex-to-svg-frontend--font-warned t)
+                (display-warning
+                 'latex-to-svg-frontend
+                 (format "Cannot measure the buffer font: %S" font)
+                 :warning))
+              nil)))))))
 
 (defun latex-to-svg-frontend--display-window (buffer)
   "Return a window showing BUFFER on a graphical frame, or nil.
 Previews are measured and tinted against its frame (see
-`latex-to-svg-frontend--font-height')."
+`latex-to-svg-frontend--font-size')."
   (when-let* ((win (get-buffer-window buffer t))
               ((display-graphic-p (window-frame win))))
     win))
@@ -652,23 +657,23 @@ See `latex-to-svg-frontend--display-window'."
   (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
     (window-frame win)))
 
-(defun latex-to-svg-frontend--font-height-at (pos &optional buffer)
-  "Return the pixel height of the font of the text at POS in BUFFER, or nil.
-That is the ascent plus the descent of the font Emacs uses at POS, the
-opening delimiter of an equation, in a window showing BUFFER (see
-`latex-to-svg-frontend--display-window').  The faces at POS and their
-`:height' apply, and so does `text-scale-mode'; text in the default
-font measures what `default-font-height' does.  When no font is found
-at POS, it is `latex-to-svg-frontend--font-height', which is nil when
-BUFFER is shown in no graphical window."
+(defun latex-to-svg-frontend--font-size-at (pos &optional buffer)
+  "Return the pixel size of the font of the text at POS in BUFFER, or nil.
+That is the pixel size of the font Emacs uses at POS, the opening
+delimiter of an equation, in a window showing BUFFER (see
+`latex-to-svg-frontend--display-window'): its em, slot 2 of
+`query-font'.  The faces at POS and their `:height' apply, and so does
+`text-scale-mode'.  When no font is found at POS, it is
+`latex-to-svg-frontend--font-size', which is nil when BUFFER is shown
+in no graphical window."
   (let ((buffer (or buffer (current-buffer))))
     (or (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
           (with-selected-frame (window-frame win)
             (with-current-buffer buffer
               (when-let* ((font (ignore-errors (font-at pos win)))
                           (info (query-font font)))
-                (+ (aref info 4) (aref info 5))))))
-        (latex-to-svg-frontend--font-height buffer))))
+                (aref info 2)))))
+        (latex-to-svg-frontend--font-size buffer))))
 
 (defun latex-to-svg-frontend--text-foreground (pos &optional frame)
   "Return the foreground the faces of the text at POS give it, or nil.
@@ -770,16 +775,16 @@ Nil, a transparent box, when the option is nil or FRAME is nil."
 
 (defun latex-to-svg-frontend--appearance (&optional buffer)
   "Return the appearance signature of BUFFER's previews (default current).
-A list (FOREGROUND BACKGROUND FONT-HEIGHT): the foreground and the
+A list (FOREGROUND BACKGROUND FONT-SIZE): the foreground and the
 background of the `default' face on the frame that shows BUFFER (see
 `latex-to-svg-frontend--display-frame'), and
-`latex-to-svg-frontend--font-height'.  All three are nil when BUFFER
+`latex-to-svg-frontend--font-size'.  All three are nil when BUFFER
 is shown in no graphical window."
   (let* ((buffer (or buffer (current-buffer)))
          (frame (latex-to-svg-frontend--display-frame buffer)))
     (list (and frame (face-foreground 'default frame t))
           (and frame (face-background 'default frame t))
-          (latex-to-svg-frontend--font-height buffer))))
+          (latex-to-svg-frontend--font-size buffer))))
 
 (defconst latex-to-svg-frontend--numbered-environments-single
   '("equation" "math" "displaymath" "multline" "dmath" "empheq")
@@ -1183,13 +1188,10 @@ The centering prefix embeds IMAGE, so it is rebuilt here rather than
 kept across a re-render: every path that shows an image goes through
 this function, and `latex-to-svg-frontend--hide-image' undoes it.  So
 are the line breaks around the image (see
-`latex-to-svg-frontend--line-breaks').  The image's width in pixels
-goes in `pretty-tables-image-width', with which pretty-tables draws a
-table cell holding the image; see
-`latex-to-svg-frontend--redraw-table'."
+`latex-to-svg-frontend--line-breaks').  The image carries its width in
+pixels as `:width', with which pretty-tables draws a table cell holding
+it; see `latex-to-svg-frontend--redraw-table'."
   (overlay-put ov 'display image)
-  (overlay-put ov 'pretty-tables-image-width
-               (latex-to-svg-backend-image-width image))
   (overlay-put ov 'before-string
                (latex-to-svg-frontend--center-prefix ov image))
   (latex-to-svg-frontend--show-line-breaks ov)
@@ -1200,7 +1202,6 @@ table cell holding the image; see
 Drops the centering prefix and the line breaks with it, so revealed
 source is not indented by a leftover stretch."
   (overlay-put ov 'display nil)
-  (overlay-put ov 'pretty-tables-image-width nil)
   (overlay-put ov 'before-string nil)
   (latex-to-svg-frontend--delete-line-breaks ov))
 
@@ -1881,7 +1882,7 @@ Overlays immediately on a cache hit, else schedules an async compile and
 overlays when it finishes.  BEG / END should be markers.  The image is
 tinted and sized like the text at BEG (see
 `latex-to-svg-frontend--foreground-for' and
-`latex-to-svg-frontend--font-height-at').
+`latex-to-svg-frontend--font-size-at').
 ENGINE is passed to the backend as `:engine' (nil means `latex'), with
 `:fallback' from `--fallback-for' and `:quiet' from
 `latex-to-svg-frontend-quiet'.
@@ -1907,7 +1908,7 @@ That, or no graphical window showing BUFFER, sets
                        :color (latex-to-svg-frontend--foreground-for beg frame)
                        :background (latex-to-svg-frontend--background-for frame)
                        :padding (latex-to-svg-frontend--padding-for display-p)
-                       :font-height (latex-to-svg-frontend--font-height-at
+                       :font-size (latex-to-svg-frontend--font-size-at
                                      beg buffer)
                        :metadata (car enums-fallback)
                        :engine engine
@@ -2274,7 +2275,7 @@ so math still being typed is never compiled."
 Uses the value, engine and fallback recorded on OV, and tints and sizes
 it like the text at its start now (see
 `latex-to-svg-frontend--foreground-for' and
-`latex-to-svg-frontend--font-height-at').
+`latex-to-svg-frontend--font-size-at').
 When the cache has no picture for them, because a backend option in the
 cache key changed \(`latex-to-svg-backend-preamble',
 `latex-to-svg-backend-preamble-not-precompiled') or the entry was
@@ -2296,7 +2297,7 @@ fetched while `latex-to-svg-frontend--graphical-p' is nil."
                               :background (latex-to-svg-frontend--background-for frame)
                               :padding (latex-to-svg-frontend--padding-for
                                         (overlay-get ov 'latex-to-svg-frontend-display-math))
-                              :font-height (latex-to-svg-frontend--font-height-at
+                              :font-size (latex-to-svg-frontend--font-size-at
                                             (overlay-start ov) buffer)
                               :metadata (car (overlay-get
                                               ov 'latex-to-svg-frontend-enums))
