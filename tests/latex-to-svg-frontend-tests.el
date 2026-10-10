@@ -669,6 +669,34 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
                              "#123456")))))
       (set-face-attribute 'default nil :foreground old))))
 
+(defmacro l2sf-tests--with-colors (var &rest body)
+  "Run BODY with VAR bound to a list of the (LATEX . COLOR) backend calls.
+The newest call is first.  Use inside `l2sf-tests--with-stub'."
+  (declare (indent 1) (debug t))
+  `(let ((,var nil)
+         (stub (symbol-function 'latex-to-svg-backend)))
+     (cl-letf (((symbol-function 'latex-to-svg-backend)
+                (lambda (latex &rest args)
+                  (push (cons latex (plist-get args :color)) ,var)
+                  (apply stub latex args))))
+       ,@body)))
+
+(ert-deftest l2sf-equation-tinted-like-its-text ()
+  ;; Each equation is tinted with the foreground of the text at its opening
+  ;; delimiter, when it is drawn and when it is fetched again on refresh:
+  ;; the face is read then, so a face changed in the meantime is followed.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-colors colors
+      (l2sf-tests--md "$a$ $b$\n"
+        (put-text-property 5 6 'face 'l2sf-tests--gold)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (equal (reverse colors) '(("$a$") ("$b$" . "gold"))))
+        (setq colors nil)
+        (put-text-property 5 6 'face '(:foreground "red"))
+        (latex-to-svg-frontend--refresh-buffer (current-buffer))
+        (should (equal (sort colors (lambda (x y) (string< (car x) (car y))))
+                       '(("$a$") ("$b$" . "red"))))))))
+
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
 (no overlay), colour and all."

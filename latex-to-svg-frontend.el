@@ -1757,9 +1757,11 @@ none."
 (defun latex-to-svg-frontend--place (buffer beg end value &optional source enums-fallback display-p engine)
   "Ensure BEG..END in BUFFER shows the current image for render VALUE.
 Overlays immediately on a cache hit, else schedules an async compile and
-overlays when it finishes.  BEG / END should be markers.  ENGINE is
-passed to the backend as `:engine' (nil means `latex'), with `:fallback'
-from `--fallback-for' and `:quiet' from `latex-to-svg-frontend-quiet'.
+overlays when it finishes.  BEG / END should be markers.  The image is
+tinted like the text at BEG (see `latex-to-svg-frontend--foreground-for').
+ENGINE is passed to the backend as `:engine' (nil means `latex'), with
+`:fallback' from `--fallback-for' and `:quiet' from
+`latex-to-svg-frontend-quiet'.
 Any other ENGINE (`skip', or a warning string: see `--engine-for') sends
 nothing to the backend and installs `--set-unrendered-overlay' instead."
   (when (buffer-live-p buffer)
@@ -1771,7 +1773,8 @@ nothing to the backend and installs `--set-unrendered-overlay' instead."
              (image (latex-to-svg-backend
                     value
                     :rescale-by (latex-to-svg-frontend--rescale-for display-p)
-                    :color latex-to-svg-frontend-foreground-color
+                    :color (latex-to-svg-frontend--foreground-for
+                            beg (latex-to-svg-frontend--display-frame buffer))
                     :background latex-to-svg-frontend-background-color
                     :padding (latex-to-svg-frontend--padding-for display-p)
                     :font-height (latex-to-svg-frontend--font-height buffer)
@@ -2135,12 +2138,13 @@ so math still being typed is never compiled."
 
 (defun latex-to-svg-frontend--refresh-overlay (ov font-height)
   "Fetch preview overlay OV's image again, measured at FONT-HEIGHT.
-Uses the value, engine and fallback recorded on OV.  When the cache has
-no picture for them, because a backend option in the cache key changed
-\(`latex-to-svg-backend-preamble',
+Uses the value, engine and fallback recorded on OV, and tints it like
+the text at its start now (see `latex-to-svg-frontend--foreground-for').
+When the cache has no picture for them, because a backend option in the
+cache key changed \(`latex-to-svg-backend-preamble',
 `latex-to-svg-backend-preamble-not-precompiled') or the entry was
-collected, the backend compiles it and this runs again
-when the compile is done.  OV keeps its old image until then; an OV
+collected, the backend compiles it and this runs again when the compile
+is done.  OV keeps its old image until then; an OV
 deleted in the meantime (edited, renumbered) is left alone."
   (when-let* ((buffer (overlay-buffer ov))
               (value (overlay-get ov 'latex-to-svg-frontend-value)))
@@ -2149,7 +2153,9 @@ deleted in the meantime (edited, renumbered) is left alone."
                           value
                           :rescale-by (latex-to-svg-frontend--rescale-for
                                        (overlay-get ov 'latex-to-svg-frontend-display-math))
-                          :color latex-to-svg-frontend-foreground-color
+                          :color (latex-to-svg-frontend--foreground-for
+                                  (overlay-start ov)
+                                  (latex-to-svg-frontend--display-frame buffer))
                           :background latex-to-svg-frontend-background-color
                           :padding (latex-to-svg-frontend--padding-for
                                     (overlay-get ov 'latex-to-svg-frontend-display-math))
