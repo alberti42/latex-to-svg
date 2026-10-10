@@ -45,7 +45,7 @@ as dependencies.
 
 The backend compiles each unique equation **once** (content-addressed on disk),
 **color-independent** (tinted at display, with either engine) and
-**size-independent** (scaled at display to the buffer font). So the previews do
+**size-independent** (scaled at display to the font of the text it is in). So the previews do
 what a browser/pandoc pipeline can't:
 
 - **Recolor on theme switch** — flip your OS light/dark theme and previews
@@ -509,14 +509,16 @@ a &= b
 
 ### Colors and box
 
-By default previews use the buffer foreground (so they track your theme) on a
-transparent background. You can override these appearance options — they
-apply from cache (no recompiling), and setting one updates the previews on its
-own:
+Each preview is tinted and sized like the text at its opening delimiter: an
+equation in a heading, a link or a Gnus Subject has the color and the font
+height of that text. In text drawn in the default foreground it has the
+foreground of the `default` face (so it tracks your theme), on a transparent
+background. You can override these appearance options — they apply from cache
+(no recompiling), and setting one updates the previews on its own:
 
 | Option | Default | Description |
 |--------|---------|-------------|
-| `latex-to-svg-frontend-foreground-color` | `nil` | Fixed ink color; `nil` follows the buffer foreground (tracks the theme). |
+| `latex-to-svg-frontend-foreground-color` | `nil` | Ink color of equations in text drawn in the default foreground; equations in colored text keep the color of the text. `nil` uses the foreground of the `default` face (tracks the theme). |
 | `latex-to-svg-frontend-background-color` | `nil` | Box color behind previews; `nil` is transparent. A very light gray reads best (e.g. `gray97` / `#f7f7f7`). |
 | `latex-to-svg-frontend-center-display-math` | `nil` | Center display-math previews in the window (inline math is never centered). A display-time indent — redisplay re-centers on resize, split or font change, and setting the option updates the previews on its own. |
 | `latex-to-svg-frontend-padding-inline` | `nil` | Padding (pt) between an inline equation and the box edge. A number applies to all four sides; a list of four numbers pads each side separately — `(TOP RIGHT BOTTOM LEFT)`, so `(0 0 0 6)` is a left gutter. `0` crops to the ink; `nil` takes the obsolete `latex-to-svg-frontend-padding`. |

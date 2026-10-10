@@ -51,7 +51,9 @@ In any other major mode, the mode refuses to turn on.
 Gnus reuses one article buffer and replaces its text for each article, so the
 mode draws the previews again from `gnus-article-prepare-hook`, every time
 Gnus shows an article. It draws all the math of the article, the headers
-included, such as a `Subject:` with `$…$` in it.
+included, such as a `Subject:` with `$…$` in it. An equation has the color and
+the font height of the text it is in, so an equation in the Subject has the
+Subject's color and height.
 
 The article buffer is read-only, so with the default of
 `latex-to-svg-frontend-reveal`, `writable`, a preview stays drawn when point

@@ -29,6 +29,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Each equation is tinted and sized like the text at its opening delimiter:
+  an equation in a Gnus Subject, an Org heading or a link has the color and
+  the font height of that text (issue #3: the equations of a Subject were
+  white and the Subject yellow). The color is read again at every redraw, so
+  a theme change re-tints them. Equations in text with the default
+  foreground and the default font look as before.
+- `latex-to-svg-frontend-foreground-color` now colors the equations in text
+  drawn in the default foreground; an equation in colored text keeps the
+  color of the text. Before, it colored every equation.
 - Inline math directly followed by a digit, such as `$x$2`, is no longer
   detected; this is the price of the digit rule above, which pandoc also
   applies. What still reads as math is shell variables such as `$HOME/$USER`

@@ -229,18 +229,21 @@ own."
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-foreground-color nil
-  "Color equation previews are tinted with, or nil to follow the buffer.
+  "Color of equations in text drawn in the default foreground, or nil.
 
-When nil (the default) previews use the buffer foreground and track
-the theme (see `latex-to-svg-backend-foreground-color').  Set to a
-color — a `#rrggbb' string or any name `color-name-to-rgb'
-understands (e.g. \"black\", \"#1a1a1a\") — to tint every preview
-with that fixed color regardless of theme.  Passed to
+Each equation is tinted with the foreground of the text at its opening
+delimiter, so an equation in a heading, a link or a Gnus Subject has
+the color of that text.  When that text has no foreground of its own,
+or the foreground of the `default' face, the equation is tinted with
+this color instead, if it is non-nil: a `#rrggbb' string or any name
+`color-name-to-rgb' understands (e.g. \"black\", \"#1a1a1a\").  Nil
+\(the default) leaves those equations in the foreground of the
+`default' face, which tracks the theme.  Passed to
 `latex-to-svg-backend' as `:color'; re-tints from cache (no recompile).
 Setting it with `setq', `setq-local' or Customize updates the previews
 on its own."
-  :type '(choice (const :tag "Follow buffer foreground" nil)
-                 (color :tag "Fixed color"))
+  :type '(choice (const :tag "Follow the default foreground" nil)
+                 (color :tag "Color for default-colored text"))
   :safe (lambda (v) (or (null v) (stringp v)))
   :group 'latex-to-svg-frontend)
 
