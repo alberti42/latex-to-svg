@@ -593,11 +593,25 @@ obsolete `latex-to-svg-frontend-padding'."
 (defvar-local latex-to-svg-frontend--font-warned nil
   "Non-nil once an unmeasurable buffer font has been reported in this buffer.")
 
-(defun latex-to-svg-frontend--font-size (&optional buffer)
-  "Return the pixel size of BUFFER's default font in a graphical frame, or nil.
-That is the size Emacs opened the font of the `default' face at, its
-em: slot 2 of `font-info' of `face-font', which follows the buffer's
-face remapping, so `text-scale-mode' applies.
+(defun latex-to-svg-frontend--x-height-ratio (name frame)
+  "Return the x-height of the font NAME on FRAME as a share of its size.
+That is the ascent of its glyph for `x' divided by the pixel size,
+read with the font opened at 1000 pixels: `font-get-glyphs' gives
+whole pixels, which at a text size of 18 pixels is off by up to 5%.
+Emacs keeps the opened font, so a second call costs little.  Nil when
+FRAME finds no font NAME, or the font has no glyph for `x', as a symbol
+font has none."
+  (when-let* ((entity (find-font (font-spec :name name) frame))
+              (font (open-font entity 1000 frame))
+              (glyph (aref (font-get-glyphs font 0 1 "x") 0)))
+    (/ (aref glyph 7) 1000.0)))
+
+(defun latex-to-svg-frontend--x-height (&optional buffer)
+  "Return the x-height of BUFFER's default font in a graphical frame, or nil.
+That is the height of the lowercase `x' of the font of the `default'
+face, in pixels: its pixel size, slot 2 of `font-info' of `face-font',
+times `latex-to-svg-frontend--x-height-ratio'.  `face-font' follows the
+buffer's face remapping, so `text-scale-mode' applies.
 
 Measured against the frame that actually displays BUFFER, so previews
 size correctly even when the selected frame is a TTY/daemon frame (an
@@ -608,27 +622,31 @@ when BUFFER is shown in no graphical window, in which case the backend
 compiles the equation but sizes nothing, and the refresh hook draws it
 once a graphical window shows BUFFER.
 
-A font the frame cannot open yields nil as well, but is reported once
-per buffer rather than passed over: `font-info' returns nil for it."
+A font the frame cannot open, or one with no glyph for `x', yields nil
+as well, but is reported once per buffer rather than passed over."
   (let ((buffer (or buffer (current-buffer))))
     (when-let* ((window (latex-to-svg-frontend--display-window buffer)))
       (with-selected-frame (window-frame window)
         (with-current-buffer buffer
-          (let ((font (face-font 'default)))
-            (if-let* ((info (and font (font-info font))))
-                (aref info 2)
+          (let* ((font (face-font 'default))
+                 (info (and font (font-info font)))
+                 (ratio (and info (latex-to-svg-frontend--x-height-ratio
+                                   font (selected-frame)))))
+            (if ratio
+                (* (aref info 2) ratio)
               (unless latex-to-svg-frontend--font-warned
                 (setq latex-to-svg-frontend--font-warned t)
                 (display-warning
                  'latex-to-svg-frontend
-                 (format "Cannot measure the buffer font: %S" font)
+                 (format "Cannot measure the x-height of the buffer font: %S"
+                         font)
                  :warning))
               nil)))))))
 
 (defun latex-to-svg-frontend--display-window (buffer)
   "Return a window showing BUFFER on a graphical frame, or nil.
 Previews are measured and tinted against its frame (see
-`latex-to-svg-frontend--font-size')."
+`latex-to-svg-frontend--x-height')."
   (when-let* ((win (get-buffer-window buffer t))
               ((display-graphic-p (window-frame win))))
     win))
@@ -657,23 +675,26 @@ See `latex-to-svg-frontend--display-window'."
   (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
     (window-frame win)))
 
-(defun latex-to-svg-frontend--font-size-at (pos &optional buffer)
-  "Return the pixel size of the font of the text at POS in BUFFER, or nil.
-That is the pixel size of the font Emacs uses at POS, the opening
-delimiter of an equation, in a window showing BUFFER (see
-`latex-to-svg-frontend--display-window'): its em, slot 2 of
-`query-font'.  The faces at POS and their `:height' apply, and so does
-`text-scale-mode'.  When no font is found at POS, it is
-`latex-to-svg-frontend--font-size', which is nil when BUFFER is shown
-in no graphical window."
+(defun latex-to-svg-frontend--x-height-at (pos &optional buffer)
+  "Return the x-height of the font of the text at POS in BUFFER, or nil.
+That is the height of the lowercase `x' of the font Emacs uses at POS,
+the opening delimiter of an equation, in a window showing BUFFER (see
+`latex-to-svg-frontend--display-window'), in pixels: its pixel size,
+slot 2 of `query-font', times `latex-to-svg-frontend--x-height-ratio'.
+The faces at POS and their `:height' apply, and so does
+`text-scale-mode'.  When no font is found at POS, or it has no glyph
+for `x', it is `latex-to-svg-frontend--x-height', which is nil when
+BUFFER is shown in no graphical window."
   (let ((buffer (or buffer (current-buffer))))
     (or (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
           (with-selected-frame (window-frame win)
             (with-current-buffer buffer
               (when-let* ((font (ignore-errors (font-at pos win)))
-                          (info (query-font font)))
-                (aref info 2)))))
-        (latex-to-svg-frontend--font-size buffer))))
+                          (info (query-font font))
+                          (ratio (latex-to-svg-frontend--x-height-ratio
+                                  (aref info 0) (window-frame win))))
+                (* (aref info 2) ratio)))))
+        (latex-to-svg-frontend--x-height buffer))))
 
 (defun latex-to-svg-frontend--text-foreground (pos &optional frame)
   "Return the foreground the faces of the text at POS give it, or nil.
@@ -775,16 +796,16 @@ Nil, a transparent box, when the option is nil or FRAME is nil."
 
 (defun latex-to-svg-frontend--appearance (&optional buffer)
   "Return the appearance signature of BUFFER's previews (default current).
-A list (FOREGROUND BACKGROUND FONT-SIZE): the foreground and the
+A list (FOREGROUND BACKGROUND X-HEIGHT): the foreground and the
 background of the `default' face on the frame that shows BUFFER (see
 `latex-to-svg-frontend--display-frame'), and
-`latex-to-svg-frontend--font-size'.  All three are nil when BUFFER
+`latex-to-svg-frontend--x-height'.  All three are nil when BUFFER
 is shown in no graphical window."
   (let* ((buffer (or buffer (current-buffer)))
          (frame (latex-to-svg-frontend--display-frame buffer)))
     (list (and frame (face-foreground 'default frame t))
           (and frame (face-background 'default frame t))
-          (latex-to-svg-frontend--font-size buffer))))
+          (latex-to-svg-frontend--x-height buffer))))
 
 (defconst latex-to-svg-frontend--numbered-environments-single
   '("equation" "math" "displaymath" "multline" "dmath" "empheq")
@@ -1886,7 +1907,7 @@ Overlays immediately on a cache hit, else schedules an async compile and
 overlays when it finishes.  BEG / END should be markers.  The image is
 tinted and sized like the text at BEG (see
 `latex-to-svg-frontend--foreground-for' and
-`latex-to-svg-frontend--font-size-at').
+`latex-to-svg-frontend--x-height-at').
 ENGINE is passed to the backend as `:engine' (nil means `latex'), with
 `:fallback' from `--fallback-for' and `:quiet' from
 `latex-to-svg-frontend-quiet'.
@@ -1912,7 +1933,7 @@ That, or no graphical window showing BUFFER, sets
                        :color (latex-to-svg-frontend--foreground-for beg frame)
                        :background (latex-to-svg-frontend--background-for frame)
                        :padding (latex-to-svg-frontend--padding-for display-p)
-                       :font-size (latex-to-svg-frontend--font-size-at
+                       :x-height (latex-to-svg-frontend--x-height-at
                                      beg buffer)
                        :metadata (car enums-fallback)
                        :engine engine
@@ -2279,7 +2300,7 @@ so math still being typed is never compiled."
 Uses the value, engine and fallback recorded on OV, and tints and sizes
 it like the text at its start now (see
 `latex-to-svg-frontend--foreground-for' and
-`latex-to-svg-frontend--font-size-at').
+`latex-to-svg-frontend--x-height-at').
 When the cache has no picture for them, because a backend option in the
 cache key changed \(`latex-to-svg-backend-preamble',
 `latex-to-svg-backend-preamble-not-precompiled') or the entry was
@@ -2301,7 +2322,7 @@ fetched while `latex-to-svg-frontend--graphical-p' is nil."
                               :background (latex-to-svg-frontend--background-for frame)
                               :padding (latex-to-svg-frontend--padding-for
                                         (overlay-get ov 'latex-to-svg-frontend-display-math))
-                              :font-size (latex-to-svg-frontend--font-size-at
+                              :x-height (latex-to-svg-frontend--x-height-at
                                             (overlay-start ov) buffer)
                               :metadata (car (overlay-get
                                               ov 'latex-to-svg-frontend-enums))

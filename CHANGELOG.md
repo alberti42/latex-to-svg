@@ -39,14 +39,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-frontend-foreground-color` or
   `latex-to-svg-frontend-background-color` is resolved there. A name the
   frame cannot resolve is reported with a warning and treated as nil.
-- An equation's letters have the size of the text around it: the
-  front-end passes the em of the font at the equation's opening
-  delimiter (the pixel size Emacs opened it at) as `:font-size`, where it
-  passed the font's line height as `:font-height`. Each image has its
-  width in pixels, so the size is the same on every port; on macOS
-  equations were drawn at 0.75 of the line height. An inline equation
-  sits on the text's baseline. The backend compiles every equation once
-  more after the update.
+- An equation's lowercase letters have the height of the text's around
+  it: the front-end passes the x-height of the font at the equation's
+  opening delimiter, the height of its lowercase `x` in pixels, as
+  `:x-height`, where it passed the font's line height as `:font-height`.
+  The x-height of two fonts of one size differs (at 18 pixels, 9.9 in
+  JetBrains Mono, 8.37 in Calibri); matching it, as CSS's
+  `font-size-adjust` does, sizes an equation to the text in either.
+  Capitals and digits come out about 10% larger than the text's. Each
+  image has its width in pixels, so the size is the same on every port;
+  on macOS equations were drawn at 0.75 of the line height. An inline
+  equation sits on the text's baseline. The backend compiles every
+  equation once more after the update.
 - The check for a theme or font change compares the colors of the
   `default` face on the frame that shows the buffer, where it compared
   those of the selected frame.

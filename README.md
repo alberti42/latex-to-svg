@@ -178,9 +178,9 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
   modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
   0.14.0+ (the backend) — the floor is set by 0.14.0, which reads no faces
-  and no frames: the front-end passes the colors and the font size it reads
+  and no frames: the front-end passes the colors and the x-height it reads
   on the frame that shows the buffer, as `#rrggbb` strings and as
-  `:font-size`, the em of the text in pixels. With 0.14.0 each image has
+  `:x-height`, the height of the text's lowercase `x` in pixels. With 0.14.0 each image has
   `:width` in pixels, which pretty-tables reads, and an inline equation sits
   on the text's baseline. `latex-to-svg-backend-image-width` came with
   0.13.0. The `texres` engine came
@@ -521,8 +521,9 @@ a &= b
 ### Colors and box
 
 Each preview is tinted and sized like the text at its opening delimiter: an
-equation in a heading, a link or a Gnus Subject has the color and the font
-size of that text: its letters are as large as the text's. In text drawn in the default foreground it has the
+equation in a heading, a link or a Gnus Subject has the color and the size of
+that text: its lowercase letters are as high as the text's, as CSS's
+`font-size-adjust` matches two fonts. In text drawn in the default foreground it has the
 foreground of the `default` face (so it tracks your theme), on a transparent
 background. You can override these appearance options — they apply from cache
 (no recompiling), and setting one updates the previews on its own:
