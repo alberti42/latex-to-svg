@@ -86,6 +86,12 @@ on the same backend:
   output. Same backend, same cache: an equation that appears both in your Org
   notes and in an agent's reply compiles only once.
 
+Equations in a table cell are drawn in the tables of
+[`pretty-tables`](https://github.com/alberti42/pretty-tables.el), which
+aligns and wraps Markdown and Org tables: each preview overlay gives its
+image's width in the property `pretty-tables-image-width`, and the table is
+drawn again when an image in it is shown.
+
 Several other Emacs packages preview LaTeX math — the built-in Org
 `org-latex-preview` and the tecosaur/karthink fork of it, AUCTeX's
 `preview-latex`, `texfrag`, `org-latex-impatient`, `org-xlatex`,

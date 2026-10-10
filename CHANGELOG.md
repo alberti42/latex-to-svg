@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Equations in a table cell are drawn in the tables of
+  [pretty-tables](https://github.com/alberti42/pretty-tables.el). A
+  preview overlay gives its image's width in pixels, from
+  `latex-to-svg-backend-image-width`, in the property
+  `pretty-tables-image-width`, and an image shown in a row pretty-tables
+  has drawn has that table drawn again. Needs a `latex-to-svg-backend`
+  with `latex-to-svg-backend-image-width`.
+
 ## [0.20.0] - 2026-10-10
 
 ### Added

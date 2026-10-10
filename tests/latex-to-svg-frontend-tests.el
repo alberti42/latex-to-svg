@@ -76,6 +76,9 @@ them again: `latex main.tex' twice in that directory, keeping only the
 
 (defvar l2sf-tests--image 'fake-image)
 
+(defvar l2sf-tests--image-width nil
+  "What the stubbed `latex-to-svg-backend-image-width' returns.")
+
 (defmacro l2sf-tests--with-stub (&rest body)
   "Run BODY with the backend stubbed to return `l2sf-tests--image'."
   (declare (indent 0) (debug t))
@@ -110,7 +113,9 @@ them again: `latex main.tex' twice in that directory, keeping only the
                   (push latex l2sf-tests--invalidated)
                   (push engine l2sf-tests--invalidated-engines)))
                ((symbol-function 'latex-to-svg-backend-invalidate-format)
-                (lambda () (cl-incf l2sf-tests--formats-invalidated))))
+                (lambda () (cl-incf l2sf-tests--formats-invalidated)))
+               ((symbol-function 'latex-to-svg-backend-image-width)
+                (lambda (_image) l2sf-tests--image-width)))
        ,@body)))
 
 (defmacro l2sf-tests--md (text &rest body)
@@ -2612,6 +2617,36 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                                  `(space :align-to
                                          (- center (0.5 . ,l2sf-tests--image))))))
               (should-not (overlay-get ov 'before-string)))))))))
+
+(ert-deftest l2sf-image-width-for-pretty-tables ()
+  ;; A shown image carries its width in pixels for pretty-tables; a hidden
+  ;; one does not.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-number-equations nil)
+          (l2sf-tests--image-width 42.0))
+      (l2sf-tests--md "a $x$ b\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((ov (car (l2sf-tests--overlays))))
+          (should (equal (overlay-get ov 'pretty-tables-image-width) 42.0))
+          (latex-to-svg-frontend--hide-image ov)
+          (should-not (overlay-get ov 'pretty-tables-image-width)))))))
+
+(ert-deftest l2sf-image-in-a-table-redraws-it ()
+  ;; pretty-tables draws a row from what its cells display when jit-lock
+  ;; reaches it, so an image shown in a drawn row (an overlay with the
+  ;; property `pretty-tables') marks its text for jit-lock again.  Text
+  ;; outside a drawn row is left alone.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--md "| a | $x$ |\n\nb $y$ c\n"
+        (let ((row (make-overlay 1 (line-end-position))))
+          (overlay-put row 'pretty-tables t)
+          (put-text-property (point-min) (point-max) 'fontified t)
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (let ((ovs (l2sf-tests--overlays)))
+            (should (= (length ovs) 2))
+            (should-not (get-text-property (overlay-start (nth 0 ovs)) 'fontified))
+            (should (get-text-property (overlay-start (nth 1 ovs)) 'fontified))))))))
 
 (defun l2sf-tests--line-breaks (ov)
   "Return the text under OV's line-break overlays, with their positions.

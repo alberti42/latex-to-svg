@@ -1088,23 +1088,40 @@ does not see them."
                            o))
                        (latex-to-svg-frontend--line-breaks ov))))
 
+(defun latex-to-svg-frontend--redraw-table (ov)
+  "Have pretty-tables draw again the table row OV is in, if it is in one.
+pretty-tables draws a table row from what its cells display when
+jit-lock reaches it, so an image shown after that is not in the
+drawing.  Its row overlays have the property `pretty-tables', and
+`jit-lock-refontify' has the table drawn again at the next redisplay."
+  (when (seq-some (lambda (o) (overlay-get o 'pretty-tables))
+                  (overlays-at (overlay-start ov)))
+    (jit-lock-refontify (overlay-start ov) (overlay-end ov))))
+
 (defun latex-to-svg-frontend--show-image (ov image)
   "Show IMAGE on OV, centered if it is display math and centering is on.
 The centering prefix embeds IMAGE, so it is rebuilt here rather than
 kept across a re-render: every path that shows an image goes through
 this function, and `latex-to-svg-frontend--hide-image' undoes it.  So
 are the line breaks around the image (see
-`latex-to-svg-frontend--line-breaks')."
+`latex-to-svg-frontend--line-breaks').  The image's width in pixels
+goes in `pretty-tables-image-width', with which pretty-tables draws a
+table cell holding the image; see
+`latex-to-svg-frontend--redraw-table'."
   (overlay-put ov 'display image)
+  (overlay-put ov 'pretty-tables-image-width
+               (latex-to-svg-backend-image-width image))
   (overlay-put ov 'before-string
                (latex-to-svg-frontend--center-prefix ov image))
-  (latex-to-svg-frontend--show-line-breaks ov))
+  (latex-to-svg-frontend--show-line-breaks ov)
+  (latex-to-svg-frontend--redraw-table ov))
 
 (defun latex-to-svg-frontend--hide-image (ov)
   "Hide OV's image, revealing its LaTeX source.
 Drops the centering prefix and the line breaks with it, so revealed
 source is not indented by a leftover stretch."
   (overlay-put ov 'display nil)
+  (overlay-put ov 'pretty-tables-image-width nil)
   (overlay-put ov 'before-string nil)
   (latex-to-svg-frontend--delete-line-breaks ov))
 
