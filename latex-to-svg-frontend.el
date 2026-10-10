@@ -7,7 +7,7 @@
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.20.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.13.0"))
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.14.0"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -236,10 +236,12 @@ delimiter, so an equation in a heading, a link or a Gnus Subject has
 the color of that text.  When that text has no foreground of its own,
 or the foreground of the `default' face, the equation is tinted with
 this color instead, if it is non-nil: a `#rrggbb' string or any name
-`color-name-to-rgb' understands (e.g. \"black\", \"#1a1a1a\").  Nil
+`color-values' understands (e.g. \"black\", \"#1a1a1a\").  Nil
 \(the default) leaves those equations in the foreground of the
-`default' face, which tracks the theme.  Passed to
-`latex-to-svg-backend' as `:color'; re-tints from cache (no recompile).
+`default' face, which tracks the theme.  Colors are read on the frame
+that shows the buffer, and a name that frame cannot resolve is reported
+with a warning and treated as nil.  Passed to `latex-to-svg-backend' as
+`:color', as a `#rrggbb' string; re-tints from cache (no recompile).
 Setting it with `setq', `setq-local' or Customize updates the previews
 on its own."
   :type '(choice (const :tag "Follow the default foreground" nil)
@@ -252,12 +254,14 @@ on its own."
 
 When nil (the default) previews are transparent and blend into the
 buffer.  Set to a color — a `#rrggbb' string or any name
-`color-name-to-rgb' understands — to paint that color behind every
+`color-values' understands — to paint that color behind every
 preview.  A very light gray reads best (e.g. \"gray97\" / \"#f7f7f7\");
-keep it subtle so it doesn't fight the buffer background.  Passed to
-`latex-to-svg-backend' as `:background'; re-boxes from cache (no
-recompile).  Setting it with `setq', `setq-local' or Customize updates
-the previews on its own."
+keep it subtle so it doesn't fight the buffer background.  The color is
+read on the frame that shows the buffer, and a name that frame cannot
+resolve is reported with a warning and treated as nil.  Passed to
+`latex-to-svg-backend' as `:background', as a `#rrggbb' string;
+re-boxes from cache (no recompile).  Setting it with `setq',
+`setq-local' or Customize updates the previews on its own."
   :type '(choice (const :tag "Transparent" nil)
                  (color :tag "Box color"))
   :safe (lambda (v) (or (null v) (stringp v)))
@@ -689,18 +693,75 @@ never the default."
     (and rgb
          (equal rgb (color-values (face-foreground 'default frame t) frame)))))
 
-(defun latex-to-svg-frontend--foreground-for (pos &optional frame)
-  "Return the color to tint the equation that opens at POS with, or nil.
+(defun latex-to-svg-frontend--hex-color (color frame)
+  "Return COLOR as a `#rrggbb' string, resolved on FRAME, or nil.
+A `#rrggbb' string is returned as it is.  Other colors are read with
+`color-values', whose 16-bit components are rounded to 8 bits.  Nil
+when COLOR is nil or FRAME cannot resolve it."
+  (cond ((null color) nil)
+        ((string-match-p "\\`#[[:xdigit:]]\\{6\\}\\'" color) color)
+        ((when-let* ((values (color-values color frame)))
+           (apply #'format "#%02x%02x%02x"
+                  (mapcar (lambda (v) (round (* v 255) 65535)) values))))))
+
+(defvar latex-to-svg-frontend--warned-colors nil
+  "The (OPTION . VALUE) pairs reported as colors no frame resolved.")
+
+(defun latex-to-svg-frontend--option-color (option frame)
+  "Return the color in OPTION as a `#rrggbb' string resolved on FRAME, or nil.
+Nil when OPTION is nil.  A value FRAME cannot resolve is nil too, and
+is reported once with `display-warning'."
+  (when-let* ((color (symbol-value option)))
+    (or (latex-to-svg-frontend--hex-color color frame)
+        (let ((pair (cons option color)))
+          (unless (member pair latex-to-svg-frontend--warned-colors)
+            (push pair latex-to-svg-frontend--warned-colors)
+            (display-warning
+             'latex-to-svg-frontend
+             (format "Cannot resolve `%s' (%S) as a color; ignoring it"
+                     option color)
+             :warning))
+          nil))))
+
+(defun latex-to-svg-frontend--foreground-for (pos frame)
+  "Return the `#rrggbb' color to tint the equation that opens at POS with.
 That is the foreground of the text at POS, the opening delimiter of the
 equation (see `latex-to-svg-frontend--text-foreground'), read on FRAME.
 When the text has no foreground of its own, or the foreground of the
-`default' face, it is `latex-to-svg-frontend-foreground-color'.  Nil
-lets the backend tint with the foreground of the `default' face."
-  (let ((text (latex-to-svg-frontend--text-foreground pos frame)))
-    (if (or (null text)
-            (latex-to-svg-frontend--default-foreground-p text frame))
-        latex-to-svg-frontend-foreground-color
-      text)))
+`default' face, it is `latex-to-svg-frontend-foreground-color', and
+when that is nil, the foreground of the `default' face on FRAME.  Each
+is resolved on FRAME (see `latex-to-svg-frontend--hex-color').  Nil
+only when FRAME is nil: the buffer is shown in no graphical window."
+  (when frame
+    (let ((text (latex-to-svg-frontend--text-foreground pos frame)))
+      (or (and text
+               (not (latex-to-svg-frontend--default-foreground-p text frame))
+               (latex-to-svg-frontend--hex-color text frame))
+          (latex-to-svg-frontend--option-color
+           'latex-to-svg-frontend-foreground-color frame)
+          (latex-to-svg-frontend--hex-color
+           (face-foreground 'default frame t) frame)))))
+
+(defun latex-to-svg-frontend--background-for (frame)
+  "Return the `#rrggbb' color of the box behind each preview, or nil.
+That is `latex-to-svg-frontend-background-color', resolved on FRAME.
+Nil, a transparent box, when the option is nil or FRAME is nil."
+  (and frame
+       (latex-to-svg-frontend--option-color
+        'latex-to-svg-frontend-background-color frame)))
+
+(defun latex-to-svg-frontend--appearance (&optional buffer)
+  "Return the appearance signature of BUFFER's previews (default current).
+A list (FOREGROUND BACKGROUND FONT-HEIGHT): the foreground and the
+background of the `default' face on the frame that shows BUFFER (see
+`latex-to-svg-frontend--display-frame'), and
+`latex-to-svg-frontend--font-height'.  All three are nil when BUFFER
+is shown in no graphical window."
+  (let* ((buffer (or buffer (current-buffer)))
+         (frame (latex-to-svg-frontend--display-frame buffer)))
+    (list (and frame (face-foreground 'default frame t))
+          (and frame (face-background 'default frame t))
+          (latex-to-svg-frontend--font-height buffer))))
 
 (defconst latex-to-svg-frontend--numbered-environments-single
   '("equation" "math" "displaymath" "multline" "dmath" "empheq")
@@ -733,7 +794,7 @@ the `N.a'/`N.b' sub-lettering is not modelled).")
 
 (defvar-local latex-to-svg-frontend--rendered-appearance nil
   "Appearance signature this buffer's previews were last rendered for.
-A value of `latex-to-svg-backend-appearance', compared against the current one
+A value of `latex-to-svg-frontend--appearance', compared against the current one
 so a lazy refresh can detect a theme or font-size change and re-tint /
 re-scale from cache.")
 
@@ -1217,8 +1278,7 @@ same cache entry.  Replaces any existing preview overlay in the span."
         (overlay-put ov 'modification-hooks
                      (list #'latex-to-svg-frontend--on-modify))
         (setq latex-to-svg-frontend--rendered-appearance
-              (latex-to-svg-backend-appearance
-               (latex-to-svg-frontend--font-height (current-buffer))))
+              (latex-to-svg-frontend--appearance))
         ov))))
 
 (defun latex-to-svg-frontend--set-unrendered-overlay (beg end source enums-fallback engine)
@@ -1815,12 +1875,12 @@ nothing to the backend and installs `--set-unrendered-overlay' instead."
           (latex-to-svg-frontend--set-unrendered-overlay
            beg end source enums-fallback engine)
       (let* ((fallback (latex-to-svg-frontend--fallback-for engine))
+             (frame (latex-to-svg-frontend--display-frame buffer))
              (image (latex-to-svg-backend
                     value
                     :rescale-by (latex-to-svg-frontend--rescale-for display-p)
-                    :color (latex-to-svg-frontend--foreground-for
-                            beg (latex-to-svg-frontend--display-frame buffer))
-                    :background latex-to-svg-frontend-background-color
+                    :color (latex-to-svg-frontend--foreground-for beg frame)
+                    :background (latex-to-svg-frontend--background-for frame)
                     :padding (latex-to-svg-frontend--padding-for display-p)
                     :font-height (latex-to-svg-frontend--font-height-at
                                   beg buffer)
@@ -2197,32 +2257,32 @@ deleted in the meantime (edited, renumbered) is left alone."
   (when-let* ((buffer (overlay-buffer ov))
               (value (overlay-get ov 'latex-to-svg-frontend-value)))
     (with-current-buffer buffer
-      (when-let* ((image (latex-to-svg-backend
-                          value
-                          :rescale-by (latex-to-svg-frontend--rescale-for
-                                       (overlay-get ov 'latex-to-svg-frontend-display-math))
-                          :color (latex-to-svg-frontend--foreground-for
-                                  (overlay-start ov)
-                                  (latex-to-svg-frontend--display-frame buffer))
-                          :background latex-to-svg-frontend-background-color
-                          :padding (latex-to-svg-frontend--padding-for
-                                    (overlay-get ov 'latex-to-svg-frontend-display-math))
-                          :font-height (latex-to-svg-frontend--font-height-at
-                                        (overlay-start ov) buffer)
-                          :metadata (car (overlay-get
-                                          ov 'latex-to-svg-frontend-enums))
-                          :engine (overlay-get
-                                   ov 'latex-to-svg-frontend-engine)
-                          :fallback (overlay-get
-                                     ov 'latex-to-svg-frontend-fallback)
-                          :quiet latex-to-svg-frontend-quiet
-                          :callback
-                          (lambda ()
-                            (when (overlay-buffer ov)
-                              (latex-to-svg-frontend--refresh-overlay ov))))))
-        (overlay-put ov 'latex-to-svg-frontend-image image)
-        (when (overlay-get ov 'display)
-          (latex-to-svg-frontend--show-image ov image))))))
+      (let ((frame (latex-to-svg-frontend--display-frame buffer)))
+        (when-let* ((image (latex-to-svg-backend
+                            value
+                            :rescale-by (latex-to-svg-frontend--rescale-for
+                                         (overlay-get ov 'latex-to-svg-frontend-display-math))
+                            :color (latex-to-svg-frontend--foreground-for
+                                    (overlay-start ov) frame)
+                            :background (latex-to-svg-frontend--background-for frame)
+                            :padding (latex-to-svg-frontend--padding-for
+                                      (overlay-get ov 'latex-to-svg-frontend-display-math))
+                            :font-height (latex-to-svg-frontend--font-height-at
+                                          (overlay-start ov) buffer)
+                            :metadata (car (overlay-get
+                                            ov 'latex-to-svg-frontend-enums))
+                            :engine (overlay-get
+                                     ov 'latex-to-svg-frontend-engine)
+                            :fallback (overlay-get
+                                       ov 'latex-to-svg-frontend-fallback)
+                            :quiet latex-to-svg-frontend-quiet
+                            :callback
+                            (lambda ()
+                              (when (overlay-buffer ov)
+                                (latex-to-svg-frontend--refresh-overlay ov))))))
+          (overlay-put ov 'latex-to-svg-frontend-image image)
+          (when (overlay-get ov 'display)
+            (latex-to-svg-frontend--show-image ov image)))))))
 
 (defun latex-to-svg-frontend--refresh-buffer (buffer)
   "Fetch BUFFER's previews again for the current appearance.
@@ -2230,11 +2290,10 @@ Each preview is fetched by `--refresh-overlay': from the cache, re-tinted
 and re-scaled, or compiled when the cache has no picture for it."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
-      (let ((font-height (latex-to-svg-frontend--font-height (current-buffer))))
+      (let ((appearance (latex-to-svg-frontend--appearance)))
         (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
           (latex-to-svg-frontend--refresh-overlay ov))
-        (setq latex-to-svg-frontend--rendered-appearance
-              (latex-to-svg-backend-appearance font-height))))))
+        (setq latex-to-svg-frontend--rendered-appearance appearance)))))
 
 ;;;###autoload
 (defun latex-to-svg-frontend-refresh (&optional buffer recompile)
@@ -2385,8 +2444,7 @@ changed, or that has no local value of an option whose default changed."
 (defun latex-to-svg-frontend--refresh-if-changed ()
   "Refresh the current buffer's previews if its appearance changed."
   (when (and (latex-to-svg-frontend--present-p)
-             (not (equal (latex-to-svg-backend-appearance
-                          (latex-to-svg-frontend--font-height (current-buffer)))
+             (not (equal (latex-to-svg-frontend--appearance)
                          latex-to-svg-frontend--rendered-appearance)))
     (latex-to-svg-frontend--refresh-buffer (current-buffer))))
 

@@ -12,6 +12,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Requires `latex-to-svg-backend` 0.14.0, which reads no faces and no
+  frames. The front-end reads the colors on the frame that shows the
+  buffer and passes them to the backend as `#rrggbb` strings: the tint of
+  an equation in text with no foreground of its own, when
+  `latex-to-svg-frontend-foreground-color` is nil, is the foreground of
+  the `default` face on that frame, and a name in
+  `latex-to-svg-frontend-foreground-color` or
+  `latex-to-svg-frontend-background-color` is resolved there. A name the
+  frame cannot resolve is reported with a warning and treated as nil.
+- The check for a theme or font change compares the colors of the
+  `default` face on the frame that shows the buffer, where it compared
+  those of the selected frame.
+
 ### Added
 
 - Equations in a table cell are drawn in the tables of

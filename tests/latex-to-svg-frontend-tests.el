@@ -115,8 +115,8 @@ them again: `latex main.tex' twice in that directory, keeping only the
                ((symbol-function 'latex-to-svg-backend-engine-used)
                 (lambda (_latex &optional engine _fallback)
                   (or l2sf-tests--engine-used engine)))
-               ((symbol-function 'latex-to-svg-backend-appearance)
-                (lambda (&optional _font-height) l2sf-tests--appearance))
+               ((symbol-function 'latex-to-svg-frontend--appearance)
+                (lambda (&optional _buffer) l2sf-tests--appearance))
                ((symbol-function 'latex-to-svg-backend-metadata)
                 (lambda (value &optional engine)
                   (push engine l2sf-tests--metadata-engines)
@@ -667,28 +667,92 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
     (should (equal (foreground-color-at-point) "red"))
     (should (equal (latex-to-svg-frontend--text-foreground 1) "gold"))))
 
+(defconst l2sf-tests--colors
+  '(("gold" 65535 55255 0)
+    ("red" 65535 0 0)
+    ("white" 65535 65535 65535)
+    ("black" 0 0 0)
+    ("gray97" 63479 63479 63479))
+  "The values `color-values' gives these names on a graphical frame.
+A batch Emacs resolves a name to the nearest of its terminal's colors.")
+
+(defmacro l2sf-tests--with-frame (&rest body)
+  "Run BODY with every buffer shown on the selected frame, as if graphical.
+The `default' face is white on black there, and `color-values' resolves
+the names in `l2sf-tests--colors' and `#rrggbb' strings."
+  (declare (indent 0) (debug t))
+  `(let ((fg (face-attribute 'default :foreground))
+         (bg (face-attribute 'default :background)))
+     (unwind-protect
+         (progn
+           (set-face-attribute 'default nil :foreground "white" :background "black")
+           (cl-letf (((symbol-function 'latex-to-svg-frontend--display-window)
+                      (lambda (_buffer) (selected-window)))
+                     ((symbol-function 'color-values)
+                      (lambda (color &optional _frame)
+                        (if (string-match-p "\\`#[[:xdigit:]]\\{6\\}\\'" color)
+                            (mapcar (lambda (i)
+                                      (* 257 (string-to-number
+                                              (substring color i (+ i 2)) 16)))
+                                    '(1 3 5))
+                          (cdr (assoc color l2sf-tests--colors))))))
+             ,@body))
+       (set-face-attribute 'default nil :foreground fg :background bg))))
+
 (ert-deftest l2sf-foreground-for-rule ()
   ;; An equation in coloured text takes the text's colour.  In text with no
   ;; foreground of its own, or the `default' face's, it takes
-  ;; `latex-to-svg-frontend-foreground-color' (nil: the backend's default).
-  (let ((old (face-attribute 'default :foreground)))
-    (unwind-protect
-        (progn
-          (set-face-attribute 'default nil :foreground "white")
-          (with-temp-buffer
-            (insert "$a$ $b$ $c$")
-            (put-text-property 5 6 'face 'l2sf-tests--gold)
-            (put-text-property 9 10 'face '(:foreground "#ffffff"))
-            (let ((latex-to-svg-frontend-foreground-color nil))
-              (should-not (latex-to-svg-frontend--foreground-for 1))
-              (should (equal (latex-to-svg-frontend--foreground-for 5) "gold"))
-              (should-not (latex-to-svg-frontend--foreground-for 9)))
-            (let ((latex-to-svg-frontend-foreground-color "#123456"))
-              (should (equal (latex-to-svg-frontend--foreground-for 1) "#123456"))
-              (should (equal (latex-to-svg-frontend--foreground-for 5) "gold"))
-              (should (equal (latex-to-svg-frontend--foreground-for 9)
-                             "#123456")))))
-      (set-face-attribute 'default nil :foreground old))))
+  ;; `latex-to-svg-frontend-foreground-color', and when that is nil the
+  ;; `default' face's.  Each is a `#rrggbb' string; with no frame, nil.
+  (l2sf-tests--with-frame
+    (with-temp-buffer
+      (insert "$a$ $b$ $c$")
+      (put-text-property 5 6 'face 'l2sf-tests--gold)
+      (put-text-property 9 10 'face '(:foreground "#ffffff"))
+      (let ((frame (selected-frame)))
+        (let ((latex-to-svg-frontend-foreground-color nil))
+          (should (equal (latex-to-svg-frontend--foreground-for 1 frame) "#ffffff"))
+          (should (equal (latex-to-svg-frontend--foreground-for 5 frame) "#ffd700"))
+          (should (equal (latex-to-svg-frontend--foreground-for 9 frame) "#ffffff"))
+          (should-not (latex-to-svg-frontend--foreground-for 5 nil)))
+        (let ((latex-to-svg-frontend-foreground-color "#123456"))
+          (should (equal (latex-to-svg-frontend--foreground-for 1 frame) "#123456"))
+          (should (equal (latex-to-svg-frontend--foreground-for 5 frame) "#ffd700"))
+          (should (equal (latex-to-svg-frontend--foreground-for 9 frame)
+                         "#123456")))
+        (let ((latex-to-svg-frontend-foreground-color "red"))
+          (should (equal (latex-to-svg-frontend--foreground-for 1 frame)
+                         "#ff0000")))))))
+
+(ert-deftest l2sf-unresolved-option-color-warns-once ()
+  ;; A color name the frame cannot resolve is reported once, and the
+  ;; equation takes the `default' face's foreground and no box.
+  (l2sf-tests--with-frame
+    (let ((latex-to-svg-frontend--warned-colors nil)
+          (latex-to-svg-frontend-foreground-color "no-such-color")
+          (latex-to-svg-frontend-background-color "no-such-color")
+          (warnings nil)
+          (frame (selected-frame)))
+      (cl-letf (((symbol-function 'display-warning)
+                 (lambda (_type message &rest _) (push message warnings))))
+        (with-temp-buffer
+          (insert "$a$")
+          (dotimes (_ 2)
+            (should (equal (latex-to-svg-frontend--foreground-for 1 frame)
+                           "#ffffff"))
+            (should-not (latex-to-svg-frontend--background-for frame)))))
+      (should (= (length warnings) 2)))))
+
+(ert-deftest l2sf-appearance-reads-the-display-frame ()
+  ;; The signature is the `default' face's colors on the frame that shows
+  ;; the buffer, and the font height there; nil, nil, nil on no frame.
+  (with-temp-buffer
+    (should (equal (latex-to-svg-frontend--appearance) '(nil nil nil)))
+    (l2sf-tests--with-frame
+      (cl-letf (((symbol-function 'latex-to-svg-frontend--font-height)
+                 (lambda (&optional _buffer) 20)))
+        (should (equal (latex-to-svg-frontend--appearance)
+                       '("white" "black" 20)))))))
 
 (defmacro l2sf-tests--with-colors (var &rest body)
   "Run BODY with VAR bound to a list of the (LATEX . COLOR) backend calls.
@@ -707,16 +771,43 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
   ;; delimiter, when it is drawn and when it is fetched again on refresh:
   ;; the face is read then, so a face changed in the meantime is followed.
   (l2sf-tests--with-stub
-    (l2sf-tests--with-colors colors
-      (l2sf-tests--md "$a$ $b$\n"
-        (put-text-property 5 6 'face 'l2sf-tests--gold)
-        (latex-to-svg-frontend--render-region (point-min) (point-max))
-        (should (equal (reverse colors) '(("$a$") ("$b$" . "gold"))))
-        (setq colors nil)
-        (put-text-property 5 6 'face '(:foreground "red"))
-        (latex-to-svg-frontend--refresh-buffer (current-buffer))
-        (should (equal (sort colors (lambda (x y) (string< (car x) (car y))))
-                       '(("$a$") ("$b$" . "red"))))))))
+    (l2sf-tests--with-frame
+      (l2sf-tests--with-colors colors
+        (l2sf-tests--md "$a$ $b$\n"
+          (put-text-property 5 6 'face 'l2sf-tests--gold)
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (should (equal (reverse colors)
+                         '(("$a$" . "#ffffff") ("$b$" . "#ffd700"))))
+          (setq colors nil)
+          (put-text-property 5 6 'face '(:foreground "red"))
+          (latex-to-svg-frontend--refresh-buffer (current-buffer))
+          (should (equal (sort colors (lambda (x y) (string< (car x) (car y))))
+                         '(("$a$" . "#ffffff") ("$b$" . "#ff0000")))))))))
+
+(ert-deftest l2sf-color-with-every-font-height ()
+  ;; The backend requires a `#rrggbb' `:color' whenever `:font-height' is
+  ;; given, and accepts nil for both when the buffer is shown nowhere.
+  (l2sf-tests--with-stub
+    (let ((calls nil)
+          (stub (symbol-function 'latex-to-svg-backend)))
+      (cl-letf (((symbol-function 'latex-to-svg-backend)
+                 (lambda (latex &rest args)
+                   (push (list (plist-get args :color)
+                               (plist-get args :font-height))
+                         calls)
+                   (apply stub latex args))))
+        (l2sf-tests--md "$a$ \\[b\\]\n"
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (latex-to-svg-frontend--refresh-buffer (current-buffer))
+          (should (equal calls (make-list 4 '(nil nil))))
+          (setq calls nil)
+          (l2sf-tests--with-frame
+            (latex-to-svg-frontend--refresh-buffer (current-buffer)))
+          (should (= (length calls) 2))
+          (dolist (call calls)
+            (should (cadr call))
+            (should (string-match-p "\\`#[[:xdigit:]]\\{6\\}\\'"
+                                    (car call)))))))))
 
 (ert-deftest l2sf-equation-sized-like-its-text ()
   ;; Each equation is sized by the font at its opening delimiter: its
@@ -2849,23 +2940,25 @@ Each element is (BEG END TEXT); every overlay must display a newline."
 
 (ert-deftest l2sf-passes-color-background-padding ()
   ;; The three appearance defcustoms are threaded to the backend as
-  ;; :color / :background / :padding (both on first render and on refresh).
+  ;; :color / :background / :padding (both on first render and on refresh),
+  ;; the two colors resolved to `#rrggbb' strings.
   (l2sf-tests--with-stub
-    (let ((latex-to-svg-frontend-foreground-color "red")
-          (latex-to-svg-frontend-background-color "gray97")
-          (latex-to-svg-frontend-padding 6)
-          (latex-to-svg-frontend-number-equations nil))
-      (l2sf-tests--md "\\[b\\]\n"
-        (latex-to-svg-frontend--render-region (point-min) (point-max))
-        (should (equal (plist-get l2sf-tests--last-args :color) "red"))
-        (should (equal (plist-get l2sf-tests--last-args :background) "gray97"))
-        (should (equal (plist-get l2sf-tests--last-args :padding) 6))
-        ;; Refresh re-threads them too.
-        (setq l2sf-tests--last-args nil)
-        (latex-to-svg-frontend-refresh)
-        (should (equal (plist-get l2sf-tests--last-args :color) "red"))
-        (should (equal (plist-get l2sf-tests--last-args :background) "gray97"))
-        (should (equal (plist-get l2sf-tests--last-args :padding) 6))))))
+    (l2sf-tests--with-frame
+      (let ((latex-to-svg-frontend-foreground-color "red")
+            (latex-to-svg-frontend-background-color "gray97")
+            (latex-to-svg-frontend-padding 6)
+            (latex-to-svg-frontend-number-equations nil))
+        (l2sf-tests--md "\\[b\\]\n"
+          (latex-to-svg-frontend--render-region (point-min) (point-max))
+          (should (equal (plist-get l2sf-tests--last-args :color) "#ff0000"))
+          (should (equal (plist-get l2sf-tests--last-args :background) "#f7f7f7"))
+          (should (equal (plist-get l2sf-tests--last-args :padding) 6))
+          ;; Refresh re-threads them too.
+          (setq l2sf-tests--last-args nil)
+          (latex-to-svg-frontend-refresh)
+          (should (equal (plist-get l2sf-tests--last-args :color) "#ff0000"))
+          (should (equal (plist-get l2sf-tests--last-args :background) "#f7f7f7"))
+          (should (equal (plist-get l2sf-tests--last-args :padding) 6)))))))
 
 (ert-deftest l2sf-refresh-rescales-by-kind ()
   (l2sf-tests--with-stub
