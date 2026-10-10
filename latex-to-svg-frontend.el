@@ -161,28 +161,6 @@ in a mode hook or in `.dir-locals.el', to silence one kind of document."
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-render-on-non-graphic nil
-  "When non-nil, render equations even when no graphical frame exists.
-
-By default an equation is compiled only while some frame is graphical
-\(see `latex-to-svg-frontend--graphical-p'), whether or not a window
-shows its buffer: a buffer buried in a graphical session has its images
-in the cache when it is shown.  While every frame is a terminal frame,
-as in an Emacs daemon with only terminal clients, nothing is compiled,
-and the equations are compiled when a graphical window first shows the
-buffer, appearing when each compile ends.
-
-Set non-nil, typically in an Emacs daemon whose buffers are later
-viewed in a graphical frame, to compile them ahead: the raw LaTeX shows
-on a terminal, and the images are drawn from the cache as soon as a
-graphical window shows the buffer.  The trade-off is that a purely
-terminal session then runs LaTeX compiles whose images it never
-displays.  Setting it with `setq', `setq-local' or Customize updates
-the previews on its own."
-  :type 'boolean
-  :safe #'booleanp
-  :group 'latex-to-svg-frontend)
-
 (defcustom latex-to-svg-frontend-number-equations t
   "Whether to compute and bake equation numbers into display-math previews.
 
@@ -653,23 +631,17 @@ Previews are measured and tinted against its frame (see
 (defun latex-to-svg-frontend--graphical-p ()
   "Return non-nil when some live frame is graphical.
 An image can then be displayed in this session, whether or not a window
-shows the buffer.  This decides whether to render at all (see
-`latex-to-svg-frontend-render-on-non-graphic'); the frame an equation
-is measured and tinted against is `--display-frame'.  A frame found
-here is neither measured nor selected, so a parked child frame, which
-exists only in a graphical session, gives the right answer too."
+shows the buffer.  This decides whether to render at all: while every
+frame is a terminal frame, nothing is sent to the backend.  The frame
+an equation is measured and tinted against is `--display-frame'.  A
+frame found here is neither measured nor selected, so a parked child
+frame, which exists only in a graphical session, gives the right answer
+too."
   (seq-some #'display-graphic-p (frame-list)))
-
-(defun latex-to-svg-frontend--render-p ()
-  "Return non-nil when equations are to be sent to the backend now.
-That is while `latex-to-svg-frontend--graphical-p', or always with
-`latex-to-svg-frontend-render-on-non-graphic' non-nil."
-  (or latex-to-svg-frontend-render-on-non-graphic
-      (latex-to-svg-frontend--graphical-p)))
 
 (defvar-local latex-to-svg-frontend--undrawn nil
   "Non-nil when math may lack a preview until a graphical window shows it.
-`--place' sets it when it sends no request (see `--render-p') or sends
+`--place' sets it when it sends no request (see `--graphical-p') or sends
 one with no display frame, for which the backend compiles and returns
 no image.  `--refresh-if-changed' renders that math once a graphical
 window shows the buffer.")
@@ -1915,7 +1887,7 @@ ENGINE is passed to the backend as `:engine' (nil means `latex'), with
 `latex-to-svg-frontend-quiet'.
 Any other ENGINE (`skip', or a warning string: see `--engine-for') sends
 nothing to the backend and installs `--set-unrendered-overlay' instead.
-Nothing is sent either while `latex-to-svg-frontend--render-p' is nil.
+Nothing is sent either while `latex-to-svg-frontend--graphical-p' is nil.
 That, or no graphical window showing BUFFER, sets
 `latex-to-svg-frontend--undrawn'."
   (when (buffer-live-p buffer)
@@ -1924,7 +1896,7 @@ That, or no graphical window showing BUFFER, sets
        ((not (memq engine '(nil latex ratex texres)))
         (latex-to-svg-frontend--set-unrendered-overlay
          beg end source enums-fallback engine))
-       ((not (latex-to-svg-frontend--render-p))
+       ((not (latex-to-svg-frontend--graphical-p))
         (setq latex-to-svg-frontend--undrawn t))
        (t
         (let* ((fallback (latex-to-svg-frontend--fallback-for engine))
@@ -2309,11 +2281,11 @@ cache key changed \(`latex-to-svg-backend-preamble',
 collected, the backend compiles it and this runs again when the compile
 is done.  OV keeps its old image until then; an OV
 deleted in the meantime (edited, renumbered) is left alone.  Nothing is
-fetched while `latex-to-svg-frontend--render-p' is nil."
+fetched while `latex-to-svg-frontend--graphical-p' is nil."
   (when-let* ((buffer (overlay-buffer ov))
               (value (overlay-get ov 'latex-to-svg-frontend-value)))
     (with-current-buffer buffer
-      (when (latex-to-svg-frontend--render-p)
+      (when (latex-to-svg-frontend--graphical-p)
         (let ((frame (latex-to-svg-frontend--display-frame buffer)))
           (when-let* ((image (latex-to-svg-backend
                               value
@@ -2424,7 +2396,6 @@ fallback than the options now give it (see `--engine-for' and
 (defconst latex-to-svg-frontend--watched-options
   '(latex-to-svg-frontend-engine
     latex-to-svg-frontend-fallback
-    latex-to-svg-frontend-render-on-non-graphic
     latex-to-svg-frontend-foreground-color
     latex-to-svg-frontend-background-color
     latex-to-svg-frontend-padding
@@ -2505,13 +2476,16 @@ When `latex-to-svg-frontend--undrawn' is set and a graphical window
 shows the buffer, render the math with no preview (see
 `--update-buffer'): math skipped while no frame was graphical, or
 requested while no window showed the buffer.  Otherwise refresh the
-previews if the appearance changed."
+previews if the appearance changed.  Nothing can be drawn without a
+graphical window, so neither runs while none shows the buffer; the
+check runs again when one does."
   (cond ((and latex-to-svg-frontend-mode
               latex-to-svg-frontend--undrawn
               (latex-to-svg-frontend--display-window (current-buffer)))
          (setq latex-to-svg-frontend--undrawn nil)
          (latex-to-svg-frontend--update-buffer (current-buffer)))
         ((and (latex-to-svg-frontend--present-p)
+              (latex-to-svg-frontend--display-window (current-buffer))
               (not (equal (latex-to-svg-frontend--appearance)
                           latex-to-svg-frontend--rendered-appearance)))
          (latex-to-svg-frontend--refresh-buffer (current-buffer)))))

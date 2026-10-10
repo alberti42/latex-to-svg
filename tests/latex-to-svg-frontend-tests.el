@@ -1929,16 +1929,32 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
 
 (ert-deftest l2sf-refresh-if-changed-gated-on-appearance ()
   (l2sf-tests--with-stub
+    (l2sf-tests--with-frame
+      (l2sf-tests--md "$a$\n"
+        (setq-local latex-to-svg-frontend-mode t)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((l2sf-tests--image 'should-not-apply))
+          (latex-to-svg-frontend--refresh-if-changed)
+          (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display) 'fake-image)))
+        (setq l2sf-tests--appearance '("#fff" "#000" 28))
+        (let ((l2sf-tests--image 'applied))
+          (latex-to-svg-frontend--refresh-if-changed)
+          (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display) 'applied)))))))
+
+(ert-deftest l2sf-appearance-refresh-needs-a-window ()
+  ;; While no graphical window shows the buffer, a changed appearance
+  ;; fetches nothing: no image could be drawn.  The appearance there is
+  ;; (nil nil nil), as on a terminal frame of a daemon.
+  (l2sf-tests--with-stub
     (l2sf-tests--md "$a$\n"
       (setq-local latex-to-svg-frontend-mode t)
-      (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (let ((l2sf-tests--image 'should-not-apply))
-        (latex-to-svg-frontend--refresh-if-changed)
-        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display) 'fake-image)))
-      (setq l2sf-tests--appearance '("#fff" "#000" 28))
-      (let ((l2sf-tests--image 'applied))
-        (latex-to-svg-frontend--refresh-if-changed)
-        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display) 'applied))))))
+      (l2sf-tests--with-frame
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (should (latex-to-svg-frontend--present-p))
+      (setq l2sf-tests--appearance '(nil nil nil))
+      (cl-letf (((symbol-function 'latex-to-svg-frontend--refresh-buffer)
+                 (lambda (_buffer) (error "Refreshed with no window"))))
+        (latex-to-svg-frontend--refresh-if-changed)))))
 
 (ert-deftest l2sf-graphical-p-any-frame ()
   ;; Some live frame is graphical, whichever frame is selected.
@@ -1954,7 +1970,7 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
 
 (ert-deftest l2sf-no-request-without-graphical-frame ()
   ;; While no frame is graphical, nothing is sent to the backend, on a
-  ;; render or a refresh, unless `-render-on-non-graphic' is non-nil.
+  ;; render or a refresh.
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ \\[b\\]\n"
       (setq-local latex-to-svg-frontend-mode t)
@@ -1968,10 +1984,7 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
         (latex-to-svg-frontend--render-region (point-min) (point-max))
         (should-not l2sf-tests--calls)
         (should-not (l2sf-tests--overlays))
-        (should latex-to-svg-frontend--undrawn)
-        (let ((latex-to-svg-frontend-render-on-non-graphic t))
-          (latex-to-svg-frontend--render-region (point-min) (point-max))
-          (should (= (length l2sf-tests--calls) 2)))))))
+        (should latex-to-svg-frontend--undrawn)))))
 
 (ert-deftest l2sf-request-for-a-buried-buffer ()
   ;; With a graphical frame and no window showing the buffer, the request
@@ -2013,43 +2026,39 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
             (should (equal (l2sf-tests--values) '("$a$" "\\[b\\]")))
             (should-not latex-to-svg-frontend--undrawn)))))))
 
-(ert-deftest l2sf-render-on-non-graphic-is-watched ()
-  (should (memq 'latex-to-svg-frontend-render-on-non-graphic
-                latex-to-svg-frontend--watched-options))
-  (should (eq (get 'latex-to-svg-frontend-render-on-non-graphic 'safe-local-variable)
-              #'booleanp)))
-
 (ert-deftest l2sf-on-appearance-change-refreshes-changed-buffers ()
   ;; A frame font change is global: the handler sweeps every mode buffer,
   ;; but still only refreshes the ones whose appearance actually changed.
   (l2sf-tests--with-stub
-    (l2sf-tests--md "$a$\n"
-      (setq-local latex-to-svg-frontend-mode t)
-      (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (let ((l2sf-tests--image 'should-not-apply))
-        (latex-to-svg-frontend-on-appearance-change)
-        (sit-for 0.1)
-        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
-                    'fake-image)))
-      ;; Same font, bigger frame font -> new measured height.
-      (setq l2sf-tests--appearance '("#000" "#fff" 40))
-      (let ((l2sf-tests--image 'rescaled))
-        (latex-to-svg-frontend-on-appearance-change)
-        (sit-for 0.1)
-        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
-                    'rescaled))))))
+    (l2sf-tests--with-frame
+      (l2sf-tests--md "$a$\n"
+        (setq-local latex-to-svg-frontend-mode t)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((l2sf-tests--image 'should-not-apply))
+          (latex-to-svg-frontend-on-appearance-change)
+          (sit-for 0.1)
+          (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                      'fake-image)))
+        ;; Same font, bigger frame font -> new measured height.
+        (setq l2sf-tests--appearance '("#000" "#fff" 40))
+        (let ((l2sf-tests--image 'rescaled))
+          (latex-to-svg-frontend-on-appearance-change)
+          (sit-for 0.1)
+          (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                      'rescaled)))))))
 
 (ert-deftest l2sf-on-appearance-change-skips-buffers-without-the-mode ()
   (l2sf-tests--with-stub
-    (l2sf-tests--md "$a$\n"
-      (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (setq-local latex-to-svg-frontend-mode nil)
-      (setq l2sf-tests--appearance '("#000" "#fff" 40))
-      (let ((l2sf-tests--image 'should-not-apply))
-        (latex-to-svg-frontend-on-appearance-change)
-        (sit-for 0.1)
-        (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
-                    'fake-image))))))
+    (l2sf-tests--with-frame
+      (l2sf-tests--md "$a$\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (setq-local latex-to-svg-frontend-mode nil)
+        (setq l2sf-tests--appearance '("#000" "#fff" 40))
+        (let ((l2sf-tests--image 'should-not-apply))
+          (latex-to-svg-frontend-on-appearance-change)
+          (sit-for 0.1)
+          (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                      'fake-image)))))))
 
 (ert-deftest l2sf-first-render-sees-dir-locals ()
   ;; Emacs runs a major mode's hooks before it applies `.dir-locals.el'.

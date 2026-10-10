@@ -20,19 +20,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-backend-image-width`, in the property
   `pretty-tables-image-width`, and an image shown in a row pretty-tables
   has drawn has that table drawn again.
-- `latex-to-svg-frontend-render-on-non-graphic`, default nil: when
-  non-nil, equations are compiled even when no frame is graphical, as in
-  an Emacs daemon with only terminal clients, so their images are in the
-  cache when a graphical window shows the buffer. It replaces
-  `latex-to-svg-backend-render-on-non-graphic`, which is obsolete and has
-  no effect in `latex-to-svg-backend` 0.14.0.
 
 ### Changed
 
 - An equation is compiled only while some frame is graphical, whether or
   not a window shows its buffer: a buffer buried in a graphical session
-  is compiled ahead. Up to `latex-to-svg-backend` 0.13.0 the backend
-  compiled only while the selected frame was graphical.
+  is compiled ahead. While every frame is a terminal frame, as in an
+  Emacs daemon with only terminal clients, nothing is compiled. Up to
+  `latex-to-svg-backend` 0.13.0 the backend compiled only while the
+  selected frame was graphical, or always with
+  `latex-to-svg-backend-render-on-non-graphic`; 0.14.0 makes that option
+  obsolete, and this package has no replacement for it.
 - Requires `latex-to-svg-backend` 0.14.0, which reads no faces and no
   frames. The front-end reads the colors on the frame that shows the
   buffer and passes them to the backend as `#rrggbb` strings: the tint of
@@ -45,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The check for a theme or font change compares the colors of the
   `default` face on the frame that shows the buffer, where it compared
   those of the selected frame.
+- The check for a theme or font change does nothing while no graphical
+  window shows the buffer.
 
 ### Fixed
 
