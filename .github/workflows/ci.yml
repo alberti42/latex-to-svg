@@ -136,6 +136,25 @@ jobs:
   # newest backend there, and CHANGELOG.md must have the version's dated
   # section.  After the tag exists, ordinary pushes skip it.  One Emacs is
   # enough; the result does not depend on the Emacs version.
+  # `latex-to-svg-frontend--text-foreground' follows two functions of
+  # Emacs's faces.el; tests/fixtures/emacs-faces-attribute-at-point.el holds
+  # a copy of them.  On Emacs snapshot, where they would change first, this
+  # compares them with the copy and prints a diff when they differ.  A
+  # change in Emacs is no failure of this package, so the job may fail.
+  emacs-faces:
+    runs-on: ubuntu-latest
+    name: Emacs faces.el vs. our copy
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: purcell/setup-emacs@master
+        with:
+          version: snapshot
+
+      - name: Compare faces--attribute-at-point and foreground-color-at-point
+        run: emacs -Q -batch -l scripts/emacs-faces-check.el
+
   release-check:
     runs-on: ubuntu-latest
     name: Release check
