@@ -38,7 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the `default` face on that frame, and a name in
   `latex-to-svg-frontend-foreground-color` or
   `latex-to-svg-frontend-background-color` is resolved there. A name the
-  frame cannot resolve is reported with a warning and treated as nil.
+  frame cannot resolve, or a value that is not a string, is reported with
+  a warning and treated as nil.
 - An equation's lowercase letters have the height of the text's around
   it: the front-end passes the x-height of the font at the equation's
   opening delimiter, the height of its lowercase `x` in pixels, as

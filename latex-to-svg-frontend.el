@@ -239,11 +239,11 @@ this color instead, if it is non-nil: a `#rrggbb' string or any name
 `color-values' understands (e.g. \"black\", \"#1a1a1a\").  Nil
 \(the default) leaves those equations in the foreground of the
 `default' face, which tracks the theme.  Colors are read on the frame
-that shows the buffer, and a name that frame cannot resolve is reported
-with a warning and treated as nil.  Passed to `latex-to-svg-backend' as
-`:color', as a `#rrggbb' string; re-tints from cache (no recompile).
-Setting it with `setq', `setq-local' or Customize updates the previews
-on its own."
+that shows the buffer, and a name that frame cannot resolve, or a value
+that is not a string, is reported with a warning and treated as nil.
+Passed to `latex-to-svg-backend' as `:color', as a `#rrggbb' string;
+re-tints from cache (no recompile).  Setting it with `setq',
+`setq-local' or Customize updates the previews on its own."
   :type '(choice (const :tag "Follow the default foreground" nil)
                  (color :tag "Color for default-colored text"))
   :safe (lambda (v) (or (null v) (stringp v)))
@@ -258,10 +258,10 @@ buffer.  Set to a color — a `#rrggbb' string or any name
 preview.  A very light gray reads best (e.g. \"gray97\" / \"#f7f7f7\");
 keep it subtle so it doesn't fight the buffer background.  The color is
 read on the frame that shows the buffer, and a name that frame cannot
-resolve is reported with a warning and treated as nil.  Passed to
-`latex-to-svg-backend' as `:background', as a `#rrggbb' string;
-re-boxes from cache (no recompile).  Setting it with `setq',
-`setq-local' or Customize updates the previews on its own."
+resolve, or a value that is not a string, is reported with a warning
+and treated as nil.  Passed to `latex-to-svg-backend' as `:background',
+as a `#rrggbb' string; re-boxes from cache (no recompile).  Setting it
+with `setq', `setq-local' or Customize updates the previews on its own."
   :type '(choice (const :tag "Transparent" nil)
                  (color :tag "Box color"))
   :safe (lambda (v) (or (null v) (stringp v)))
@@ -755,10 +755,11 @@ when COLOR is nil or FRAME cannot resolve it."
 
 (defun latex-to-svg-frontend--option-color (option frame)
   "Return the color in OPTION as a `#rrggbb' string resolved on FRAME, or nil.
-Nil when OPTION is nil.  A value FRAME cannot resolve is nil too, and
-is reported once with `display-warning'."
+Nil when OPTION is nil.  A value FRAME cannot resolve, or one that is
+not a string, is nil too, and is reported once with `display-warning'."
   (when-let* ((color (symbol-value option)))
-    (or (latex-to-svg-frontend--hex-color color frame)
+    (or (and (stringp color)
+             (latex-to-svg-frontend--hex-color color frame))
         (let ((pair (cons option color)))
           (unless (member pair latex-to-svg-frontend--warned-colors)
             (push pair latex-to-svg-frontend--warned-colors)

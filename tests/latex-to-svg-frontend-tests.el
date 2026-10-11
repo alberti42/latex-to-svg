@@ -788,6 +788,26 @@ a height of 23.  `latex-to-svg-frontend--x-height-ratio' reads
             (should-not (latex-to-svg-frontend--background-for frame)))))
       (should (= (length warnings) 2)))))
 
+(ert-deftest l2sf-option-color-not-a-string-warns-once ()
+  ;; A value that is not a string, such as the symbol `black', is reported
+  ;; once and treated as nil, like a name the frame cannot resolve; it
+  ;; does not signal, which would stop every equation from being drawn.
+  (l2sf-tests--with-frame
+    (let ((latex-to-svg-frontend--warned-colors nil)
+          (latex-to-svg-frontend-foreground-color 'black)
+          (latex-to-svg-frontend-background-color 'white)
+          (warnings nil)
+          (frame (selected-frame)))
+      (cl-letf (((symbol-function 'display-warning)
+                 (lambda (_type message &rest _) (push message warnings))))
+        (with-temp-buffer
+          (insert "$a$")
+          (dotimes (_ 2)
+            (should (equal (latex-to-svg-frontend--foreground-for 1 frame)
+                           "#ffffff"))
+            (should-not (latex-to-svg-frontend--background-for frame)))))
+      (should (= (length warnings) 2)))))
+
 (ert-deftest l2sf-appearance-reads-the-display-frame ()
   ;; The signature is the `default' face's colors on the frame that shows
   ;; the buffer, and the x-height there; nil, nil, nil on no frame.
