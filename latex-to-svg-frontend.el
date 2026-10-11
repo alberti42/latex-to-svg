@@ -249,6 +249,26 @@ re-tints from cache (no recompile).  Setting it with `setq',
   :safe (lambda (v) (or (null v) (stringp v)))
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-foreground-ignored-faces nil
+  "Faces whose foreground the color of an equation does not follow.
+Each equation is tinted with the foreground of the text at its opening
+delimiter (see `latex-to-svg-frontend-foreground-color').  A face in
+this list is skipped when that foreground is read, and the next face of
+the text that specifies a foreground is used.  When no face is left,
+the equation is tinted with `latex-to-svg-frontend-foreground-color',
+or the foreground of the `default' face.  A face that inherits from a
+face in this list is not skipped.
+
+In a LaTeX buffer, AUCTeX puts `font-latex-math-face' on the opening
+delimiter, `font-latex-sedate-face' as well on `\\(', and
+`font-lock-keyword-face' on `\\begin'.  With these three faces in this
+list, an equation is drawn in the color of the text around it, and one
+in a `\\section' title in the color of the title.  Setting it with
+`setq', `setq-local' or Customize updates the previews on its own."
+  :type '(repeat face)
+  :safe (lambda (v) (and (listp v) (seq-every-p #'symbolp v)))
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-background-color nil
   "Box color painted behind equation previews, or nil for transparent.
 
@@ -701,9 +721,10 @@ in no graphical window."
 (defun latex-to-svg-frontend--text-foreground (pos &optional frame)
   "Return the foreground the faces of the text at POS give it, or nil.
 Follows `foreground-color-at-point' (see `faces--attribute-at-point'),
-with three differences.  It reads text properties only, not overlays,
+with four differences.  It reads text properties only, not overlays,
 so the preview overlay of this package at POS does not hide the face
 of the text.  It reads the faces on FRAME (nil: the selected frame).
+It skips the faces in `latex-to-svg-frontend-foreground-ignored-faces'.
 When no face at POS specifies a foreground, it returns nil, not the
 foreground of the `default' face.
 
@@ -717,6 +738,7 @@ face such as (:foreground \"gold\") or (foreground-color . \"gold\")."
         (found nil))
     (dolist (face (if (face-list-p faces) faces (list faces)))
       (cond (found)
+            ((memq face latex-to-svg-frontend-foreground-ignored-faces))
             ((and face (symbolp face))
              (let ((value (face-attribute-specified-or
                            (face-attribute face :foreground frame t)
@@ -2426,6 +2448,7 @@ fallback than the options now give it (see `--engine-for' and
   '(latex-to-svg-frontend-engine
     latex-to-svg-frontend-fallback
     latex-to-svg-frontend-foreground-color
+    latex-to-svg-frontend-foreground-ignored-faces
     latex-to-svg-frontend-background-color
     latex-to-svg-frontend-padding
     latex-to-svg-frontend-padding-inline

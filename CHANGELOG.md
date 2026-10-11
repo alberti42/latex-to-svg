@@ -19,6 +19,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image carries its width in pixels as `:width`, which pretty-tables
   reads, and an image shown in a row pretty-tables has drawn has that
   table drawn again.
+- `latex-to-svg-frontend-foreground-ignored-faces`: faces whose
+  foreground the color of an equation does not follow. The next face of
+  the text at the opening delimiter that specifies a foreground is used,
+  else `latex-to-svg-frontend-foreground-color`. In a LaTeX buffer,
+  AUCTeX puts `font-latex-sedate-face` on `\(` and
+  `font-lock-keyword-face` on `\begin`, so those equations had the color
+  of these faces.
 
 ### Changed
 

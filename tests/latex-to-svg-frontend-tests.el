@@ -693,6 +693,26 @@ so markup font-lock (e.g. Org emphasis) never draws a line across the image."
     (should (equal (foreground-color-at-point) "red"))
     (should (equal (latex-to-svg-frontend--text-foreground 1) "gold"))))
 
+(ert-deftest l2sf-text-foreground-skips-ignored-faces ()
+  ;; A face in `latex-to-svg-frontend-foreground-ignored-faces' is skipped
+  ;; and the next face with a foreground is read; with none left, nil.  A
+  ;; face that inherits from an ignored face is not skipped.  The option
+  ;; is watched, like the other appearance options.
+  (with-temp-buffer
+    (insert "$a$ $b$ $c$")
+    (put-text-property 1 2 'face '(l2sf-tests--gold (:foreground "red")))
+    (put-text-property 5 6 'face 'l2sf-tests--gold)
+    (put-text-property 9 10 'face 'l2sf-tests--inherits-gold)
+    (let ((latex-to-svg-frontend-foreground-ignored-faces nil))
+      (should (equal (latex-to-svg-frontend--text-foreground 1) "gold"))
+      (should (equal (latex-to-svg-frontend--text-foreground 5) "gold")))
+    (let ((latex-to-svg-frontend-foreground-ignored-faces '(l2sf-tests--gold)))
+      (should (equal (latex-to-svg-frontend--text-foreground 1) "red"))
+      (should-not (latex-to-svg-frontend--text-foreground 5))
+      (should (equal (latex-to-svg-frontend--text-foreground 9) "gold"))))
+  (should (memq 'latex-to-svg-frontend-foreground-ignored-faces
+                latex-to-svg-frontend--watched-options)))
+
 (defconst l2sf-tests--colors
   '(("gold" 65535 55255 0)
     ("red" 65535 0 0)
