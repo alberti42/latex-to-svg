@@ -483,12 +483,19 @@ very start of a reference, where the preview's keymap is already active.
 (defcustom latex-to-svg-frontend-reveal 'writable
   "When the preview point is on is shown as its LaTeX source.
 `always' means in every buffer, `writable' in a buffer that is not
-read-only, and nil never.  During an Isearch the preview point is on is
-shown as its LaTeX source whatever the value, so a match in it can be
-seen.  Editing a preview shows its source whatever the value."
+read-only, and nil never.  A function is called with no arguments
+after every command, and non-nil means the source is shown; with modal
+editing, `evil-insert-state-p' shows it only in Evil's insert state.
+When the value of the function changes with point on a preview, the
+preview opens or closes there: an edited one is rendered again.
+
+During an Isearch the preview point is on is shown as its LaTeX source
+whatever the value, so a match in it can be seen.  Editing a preview
+shows its source whatever the value."
   :type '(choice (const :tag "In every buffer" always)
                  (const :tag "In a buffer that is not read-only" writable)
-                 (const :tag "Never" nil))
+                 (const :tag "Never" nil)
+                 (function :tag "When a function returns non-nil"))
   :safe (lambda (value) (memq value '(always writable nil)))
   :group 'latex-to-svg-frontend)
 
@@ -1385,6 +1392,9 @@ the exported document does.  Leaving it after an edit re-renders it."
 (defvar-local latex-to-svg-frontend--last-point nil
   "Marker at point after the previous command (for cursor reveal tracking).")
 
+(defvar-local latex-to-svg-frontend--last-reveal nil
+  "Value of `latex-to-svg-frontend--reveal-p' after the previous command.")
+
 (defun latex-to-svg-frontend--on-modify (ov after &rest _)
   "Modification hook for preview overlay OV.
 AFTER is non-nil after the change; reveal OV's source and flag it for
@@ -1411,14 +1421,31 @@ and unrendered math (see `--set-unrendered-overlay') qualify."
                                         (funcall revealable o)))
                        (overlays-at (1- pos)))))))
 
+(defvar latex-to-svg-frontend--warned-reveal-functions nil
+  "The values of `latex-to-svg-frontend-reveal' reported as failing.")
+
 (defun latex-to-svg-frontend--reveal-p ()
   "Non-nil if the preview point is on is shown as its LaTeX source.
 That is when `latex-to-svg-frontend-reveal' says so, or during an
-Isearch."
+Isearch.  A function that signals an error counts as nil, and the
+error is reported once with `display-warning': an error in
+`post-command-hook' would remove `--handle-cursor' from it."
   (or isearch-mode
       (pcase latex-to-svg-frontend-reveal
         ('always t)
-        ('writable (not buffer-read-only)))))
+        ('writable (not buffer-read-only))
+        ('nil nil)
+        (fn (condition-case err
+                (funcall fn)
+              (error
+               (unless (member fn latex-to-svg-frontend--warned-reveal-functions)
+                 (push fn latex-to-svg-frontend--warned-reveal-functions)
+                 (display-warning
+                  'latex-to-svg-frontend
+                  (format "`latex-to-svg-frontend-reveal' (%S) failed: %s"
+                          fn (error-message-string err))
+                  :warning))
+               nil))))))
 
 (defun latex-to-svg-frontend--open-overlay (ov)
   "Reveal OV's LaTeX source by hiding its image / reference text."
@@ -1490,7 +1517,9 @@ happens until it is closed and left."
 (defun latex-to-svg-frontend--handle-cursor ()
   "Handle a cursor move around math previews.
 Reveal the preview point moved into, re-hide the one it left, and render
-any newly finished equation the cursor just left.
+any newly finished equation the cursor just left.  When revealing starts
+or stops with point on a preview (see `--reveal-p'), open or close that
+preview, as entering or leaving it would.
 On `post-command-hook' while the mode is on."
   (when latex-to-svg-frontend-mode
     (let ((last (and latex-to-svg-frontend--last-point
@@ -1500,16 +1529,33 @@ On `post-command-hook' while the mode is on."
         (latex-to-svg-frontend--render-on-leave last (point)))
       (let* ((prev (and last (latex-to-svg-frontend--revealable-overlay-at last)))
              (cur (latex-to-svg-frontend--revealable-overlay-at (point)))
-             (reveal (latex-to-svg-frontend--reveal-p)))
+             (reveal (latex-to-svg-frontend--reveal-p))
+             (started (and reveal (not latex-to-svg-frontend--last-reveal)))
+             (stopped (and latex-to-svg-frontend--last-reveal (not reveal))))
+      (setq latex-to-svg-frontend--last-reveal reveal)
       ;; Close the preview point left.  Also close the one point stays on
       ;; once revealing stops, as when an Isearch ends in a read-only
-      ;; buffer; never an edited one, which re-renders only on leave.
+      ;; buffer.  An edited one closes, and so re-renders, only when
+      ;; revealing has just stopped, as when Evil leaves insert state:
+      ;; while revealing stays off, as with nil, editing shows the source
+      ;; and point stays in it.
       (when (and prev
                  (or (not (eq prev cur))
                      (and (not reveal)
                           (null (overlay-get prev 'display))
-                          (not (overlay-get prev 'latex-to-svg-frontend-modified)))))
+                          (or stopped
+                              (not (overlay-get
+                                    prev 'latex-to-svg-frontend-modified))))))
         (latex-to-svg-frontend--close-overlay prev))
+      ;; Math typed since revealing started has no preview yet.  When
+      ;; revealing stops with point in it, render it, as leaving it would.
+      (when-let* ((stopped)
+                  ((not cur))
+                  (el (latex-to-svg-frontend--element-at (point)))
+                  ((not (latex-to-svg-frontend--overlays-in
+                         (latex-to-svg-frontend--math-begin el)
+                         (latex-to-svg-frontend--math-end el)))))
+        (latex-to-svg-frontend--render-on-leave-element el))
       ;; A reference reached by *mouse* is never revealed: a click there is a
       ;; jump, not an edit.  This is not just taste -- it is required for
       ;; `follow-link' to work at all.  Emacs classifies a button press+release
@@ -1520,7 +1566,7 @@ On `post-command-hook' while the mode is on."
       ;; different position and the release is reported as `drag-mouse-1' --
       ;; which never follows a link.  Point-motion reveal stays for the
       ;; keyboard, which is where editing intent actually comes from.
-      (when (and cur reveal (not (eq cur prev))
+      (when (and cur reveal (or started (not (eq cur prev)))
                  (not (and (overlay-get cur 'latex-to-svg-frontend-ref)
                            (mouse-event-p last-command-event))))
         (latex-to-svg-frontend--open-overlay cur))
@@ -2889,7 +2935,8 @@ an option of this package updates the previews on its own (see
     (latex-to-svg-frontend--remove-font-lock-keywords)
     (when (markerp latex-to-svg-frontend--last-point)
       (set-marker latex-to-svg-frontend--last-point nil))
-    (setq latex-to-svg-frontend--last-point nil)
+    (setq latex-to-svg-frontend--last-point nil
+          latex-to-svg-frontend--last-reveal nil)
     (when (timerp latex-to-svg-frontend--reconcile-timer)
       (cancel-timer latex-to-svg-frontend--reconcile-timer)
       (setq latex-to-svg-frontend--reconcile-timer nil))

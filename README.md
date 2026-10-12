@@ -291,6 +291,21 @@ except an equation the cursor is in.
 its LaTeX source: `always`, `writable` (default; in a buffer that is not
 read-only) or `nil` (never). During an Isearch it is shown whatever the value.
 
+The value can also be a function, called with no arguments after every
+command; non-nil means the source is shown. With modal editing, this shows the
+source only in the insert state:
+
+```elisp
+;; Evil
+(setq latex-to-svg-frontend-reveal #'evil-insert-state-p)
+;; Meow
+(setq latex-to-svg-frontend-reveal (lambda () (bound-and-true-p meow-insert-mode)))
+```
+
+Entering the insert state with point on an equation shows its source;
+leaving it shows the preview again, and renders the equation if you
+changed it or typed it new.
+
 ### Per-mode configuration
 
 The size multipliers, colors, numbering, and detection toggles are ordinary

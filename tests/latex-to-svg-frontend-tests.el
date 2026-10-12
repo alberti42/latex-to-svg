@@ -1188,6 +1188,91 @@ character further it is not."
         (should (null (overlay-get ov 'display)))
         (should (overlay-get ov 'latex-to-svg-frontend-modified))))))
 
+(defvar l2sf-tests--insert-state nil
+  "Stand-in for a modal editor's insert state, read by a reveal function.")
+
+(defmacro l2sf-tests--modal (text &rest body)
+  "Run BODY on rendered TEXT with revealing only in the insert state.
+The insert state is `l2sf-tests--insert-state', off at the start."
+  (declare (indent 1) (debug t))
+  `(l2sf-tests--with-stub
+     (l2sf-tests--md ,text
+       (setq-local latex-to-svg-frontend-mode t)
+       (setq-local latex-to-svg-frontend-reveal
+                   (lambda () l2sf-tests--insert-state))
+       (let ((l2sf-tests--insert-state nil))
+         (latex-to-svg-frontend--render-region (point-min) (point-max))
+         ,@body))))
+
+(ert-deftest l2sf-reveal-function-opens-and-closes-in-place ()
+  "With a function as `latex-to-svg-frontend-reveal', the preview point is
+on opens when the function turns non-nil and closes when it turns nil,
+with point not moving."
+  (l2sf-tests--modal "$a$ after\n"
+    (let ((ov (car (l2sf-tests--overlays))))
+      (goto-char (+ (point-min) 1))
+      (latex-to-svg-frontend--handle-cursor)
+      (should (eq (overlay-get ov 'display) 'fake-image))
+      (setq l2sf-tests--insert-state t)
+      (latex-to-svg-frontend--handle-cursor)
+      (should (null (overlay-get ov 'display)))
+      (setq l2sf-tests--insert-state nil)
+      (latex-to-svg-frontend--handle-cursor)
+      (should (eq (overlay-get ov 'display) 'fake-image)))))
+
+(ert-deftest l2sf-reveal-function-stop-renders-edited-preview ()
+  "An equation edited while the function is non-nil is rendered again
+when it turns nil, with point still in it."
+  (l2sf-tests--modal "$a$ after\n"
+    (goto-char (+ (point-min) 2))
+    (setq l2sf-tests--insert-state t)
+    (latex-to-svg-frontend--handle-cursor)
+    (insert "b")
+    (latex-to-svg-frontend--handle-cursor)
+    (should (null (overlay-get (car (l2sf-tests--overlays)) 'display)))
+    (setq l2sf-tests--insert-state nil)
+    (latex-to-svg-frontend--handle-cursor)
+    (let ((ov (car (l2sf-tests--overlays))))
+      (should (equal (overlay-get ov 'latex-to-svg-frontend-source) "$ab$"))
+      (should (eq (overlay-get ov 'display) 'fake-image))
+      (should-not (overlay-get ov 'latex-to-svg-frontend-modified)))))
+
+(ert-deftest l2sf-reveal-function-stop-renders-new-math ()
+  "Math typed while the function is non-nil is rendered when it turns
+nil, with point still in it."
+  (l2sf-tests--modal "intro\n"
+    (goto-char (point-max))
+    (setq l2sf-tests--insert-state t)
+    (latex-to-svg-frontend--handle-cursor)
+    (insert "$x$")
+    (backward-char 1)
+    (latex-to-svg-frontend--handle-cursor)
+    (should (null (l2sf-tests--overlays)))
+    (setq l2sf-tests--insert-state nil)
+    (latex-to-svg-frontend--handle-cursor)
+    (let ((ov (car (l2sf-tests--overlays))))
+      (should ov)
+      (should (eq (overlay-get ov 'display) 'fake-image)))))
+
+(ert-deftest l2sf-reveal-function-that-fails-counts-as-nil ()
+  "A reveal function that signals counts as nil and is reported once."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$ after\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (setq-local latex-to-svg-frontend-reveal
+                  (lambda () (error "Not loaded")))
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((latex-to-svg-frontend--warned-reveal-functions nil)
+            (warnings 0))
+        (cl-letf (((symbol-function 'display-warning)
+                   (lambda (&rest _) (setq warnings (1+ warnings)))))
+          (goto-char (+ (point-min) 1))
+          (latex-to-svg-frontend--handle-cursor)
+          (latex-to-svg-frontend--handle-cursor)
+          (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                      'fake-image))
+          (should (= warnings 1)))))))
+
 (ert-deftest l2sf-cursor-jump-between-previews ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ $b$\n"

@@ -12,6 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `latex-to-svg-frontend-reveal` accepts a function, called with no
+  arguments after every command; non-nil means the source is shown. With
+  `evil-insert-state-p`, the source is shown only in Evil's insert
+  state. When the value of the function changes with point on an
+  equation, its preview opens or closes there, and an equation edited or
+  typed new is rendered. A function that signals an error counts as nil
+  and is reported once.
+
 ### Changed
 
 - Point right after the closing delimiter of an equation reveals its
