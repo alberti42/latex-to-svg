@@ -12,6 +12,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Point right after the closing delimiter of an equation reveals its
+  source, so `DEL` there deletes a character you can see. This is the
+  position at which newly typed math was already not rendered yet. Where
+  one equation ends and the next starts, point reveals the next.
+
 ### Fixed
 
 - In `markdown-ts-mode` with `markdown-ts-hide-markup` on, the delimiters

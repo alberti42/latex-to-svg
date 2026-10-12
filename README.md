@@ -279,7 +279,9 @@ the line. With the mode on, all math renders when the buffer opens. See
   Either way it touches only the current buffer.
 
 Move point into a preview to reveal its LaTeX source for editing; leaving
-re-shows the image, or re-renders if you changed the text. **Newly typed math
+re-shows the image, or re-renders if you changed the text. Point right
+after the closing delimiter is still in the preview, so `DEL` there
+deletes a character you can see. **Newly typed math
 renders the moment the cursor leaves it** — never while you're still inside, so
 half-typed equations aren't compiled. Math you paste, yank or restore with an
 undo renders a moment later (`latex-to-svg-frontend-reconcile-idle`, 0.4 s),

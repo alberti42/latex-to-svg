@@ -1110,6 +1110,34 @@ the delimiters of math visible and an escape outside math hidden."
         (latex-to-svg-frontend--handle-cursor)
         (should (eq (overlay-get ov 'display) 'fake-image))))))
 
+(ert-deftest l2sf-reveals-preview-with-point-after-it ()
+  "Point right after the closing delimiter is on the preview; one
+character further it is not."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$ after\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((ov (car (l2sf-tests--overlays))))
+        (goto-char (overlay-end ov))
+        (latex-to-svg-frontend--handle-cursor)
+        (should (null (overlay-get ov 'display)))
+        (forward-char 1)
+        (latex-to-svg-frontend--handle-cursor)
+        (should (eq (overlay-get ov 'display) 'fake-image))))))
+
+(ert-deftest l2sf-reveals-preview-starting-at-point ()
+  "Where one preview ends and the next starts, point is on the next."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$a$\\(b\\) after\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (pcase-let ((`(,first ,second) (l2sf-tests--overlays)))
+        (should (= (overlay-end first) (overlay-start second)))
+        (goto-char (overlay-start second))
+        (latex-to-svg-frontend--handle-cursor)
+        (should (eq (overlay-get first 'display) 'fake-image))
+        (should (null (overlay-get second 'display)))))))
+
 (ert-deftest l2sf-reveal-follows-option-and-read-only ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ after\n"

@@ -70,7 +70,8 @@
 ;; equation.
 ;;
 ;; Move point into a preview and it reveals its LaTeX source; leaving re-shows
-;; the preview, or re-renders it if the text changed.  Newly typed math renders
+;; the preview, or re-renders it if the text changed.  Point right after the
+;; closing delimiter is still in the preview.  Newly typed math renders
 ;; the moment the cursor leaves it (`--render-on-leave', on `post-command-hook'),
 ;; never while still inside — so half-typed equations are not compiled.  That
 ;; same discrete leave event reconciles numbers and references synchronously;
@@ -1393,13 +1394,22 @@ re-render."
     (latex-to-svg-frontend--hide-image ov)))
 
 (defun latex-to-svg-frontend--revealable-overlay-at (pos)
-  "Return this package's preview overlay covering POS, or nil.
-Image previews, `\\eqref' / `\\ref' text previews and unrendered math
-\(see `--set-unrendered-overlay') qualify."
-  (seq-find (lambda (o) (or (overlay-get o 'latex-to-svg-frontend-image)
-                            (overlay-get o 'latex-to-svg-frontend-ref)
-                            (overlay-get o 'latex-to-svg-frontend-unrendered)))
-            (overlays-at pos)))
+  "Return this package's preview overlay that POS is on, or nil.
+POS is on a preview from its start to its end, both included: right
+after the closing delimiter, \\[delete-backward-char] deletes it, so its
+source is shown.  This is the span `--render-on-leave' treats as not
+left.  When one preview ends where another starts, POS is on the one
+that starts there.  Image previews, `\\eqref' / `\\ref' text previews
+and unrendered math (see `--set-unrendered-overlay') qualify."
+  (let ((revealable
+         (lambda (o) (or (overlay-get o 'latex-to-svg-frontend-image)
+                         (overlay-get o 'latex-to-svg-frontend-ref)
+                         (overlay-get o 'latex-to-svg-frontend-unrendered)))))
+    (or (seq-find revealable (overlays-at pos))
+        (and (> pos (point-min))
+             (seq-find (lambda (o) (and (= (overlay-end o) pos)
+                                        (funcall revealable o)))
+                       (overlays-at (1- pos)))))))
 
 (defun latex-to-svg-frontend--reveal-p ()
   "Non-nil if the preview point is on is shown as its LaTeX source.
