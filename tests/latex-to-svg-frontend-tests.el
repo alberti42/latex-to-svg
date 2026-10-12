@@ -1258,7 +1258,7 @@ The insert state is `l2sf-tests--insert-state', off at the start."
      (l2sf-tests--md ,text
        (setq-local latex-to-svg-frontend-mode t)
        (setq-local latex-to-svg-frontend-reveal
-                   (lambda () l2sf-tests--insert-state))
+                   (lambda (_kind) l2sf-tests--insert-state))
        (let ((l2sf-tests--insert-state nil))
          (latex-to-svg-frontend--render-region (point-min) (point-max))
          ,@body))))
@@ -1313,13 +1313,52 @@ nil, with point still in it."
       (should ov)
       (should (eq (overlay-get ov 'display) 'fake-image)))))
 
+(ert-deftest l2sf-reveal-function-gets-the-kind ()
+  "The reveal function receives the kind of the span point is on, so it
+can reveal equations and leave references as text."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        (concat "\\begin{equation}\\label{eq:a}\nx\n\\end{equation}\n\n"
+                "As in \\eqref{eq:a} and $y$.\n")
+      (setq-local latex-to-svg-frontend-mode t)
+      (let ((kinds nil))
+        (setq-local latex-to-svg-frontend-reveal
+                    (lambda (kind) (push kind kinds) (not (eq kind 'reference))))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (pcase-let ((`(,equation ,ref ,y) (l2sf-tests--overlays)))
+          (goto-char (1+ (overlay-start ref)))
+          (latex-to-svg-frontend--handle-cursor)
+          (should (overlay-get ref 'display))
+          (goto-char (1+ (overlay-start y)))
+          (latex-to-svg-frontend--handle-cursor)
+          (should (null (overlay-get y 'display)))
+          (goto-char (1+ (overlay-start equation)))
+          (latex-to-svg-frontend--handle-cursor)
+          (should (null (overlay-get equation 'display)))
+          (should (equal (reverse kinds) '(reference inline environment))))))))
+
+(ert-deftest l2sf-reveal-function-not-called-off-spans ()
+  "Away from every span, the reveal function is not called."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "text $a$ text\n"
+      (setq-local latex-to-svg-frontend-mode t)
+      (let ((calls 0))
+        (setq-local latex-to-svg-frontend-reveal
+                    (lambda (_kind) (setq calls (1+ calls)) t))
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (goto-char (point-min))
+        (latex-to-svg-frontend--handle-cursor)
+        (forward-char 1)
+        (latex-to-svg-frontend--handle-cursor)
+        (should (= calls 0))))))
+
 (ert-deftest l2sf-reveal-function-that-fails-counts-as-nil ()
   "A reveal function that signals counts as nil and is reported once."
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ after\n"
       (setq-local latex-to-svg-frontend-mode t)
       (setq-local latex-to-svg-frontend-reveal
-                  (lambda () (error "Not loaded")))
+                  (lambda (_kind) (error "Not loaded")))
       (latex-to-svg-frontend--render-region (point-min) (point-max))
       (let ((latex-to-svg-frontend--warned-reveal-functions nil)
             (warnings 0))

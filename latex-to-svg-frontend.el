@@ -483,11 +483,14 @@ very start of a reference, where the preview's keymap is already active.
 (defcustom latex-to-svg-frontend-reveal 'writable
   "When the preview point is on is shown as its LaTeX source.
 `always' means in every buffer, `writable' in a buffer that is not
-read-only, and nil never.  A function is called with no arguments
-after every command, and non-nil means the source is shown; with modal
-editing, `evil-insert-state-p' shows it only in Evil's insert state.
-When the value of the function changes with point on a preview, the
-preview opens or closes there: an edited one is rendered again.
+read-only, and nil never.  A function is called after every command
+with point on math or a reference, with one argument, its kind:
+`inline', `display', `environment' or `reference' (see
+`latex-to-svg-frontend-spans').  Non-nil means the source is shown.
+With modal editing, (lambda (_kind) (evil-insert-state-p)) shows it
+only in Evil's insert state.  When the value of the function changes
+with point on a preview, the preview opens or closes there: an edited
+one, or math typed new, is rendered.
 
 During an Isearch the preview point is on is shown as its LaTeX source
 whatever the value, so a match in it can be seen.  Editing a preview
@@ -1481,19 +1484,35 @@ and unrendered math (see `--set-unrendered-overlay') qualify."
 (defvar latex-to-svg-frontend--warned-reveal-functions nil
   "The values of `latex-to-svg-frontend-reveal' reported as failing.")
 
-(defun latex-to-svg-frontend--reveal-p ()
-  "Non-nil if the preview point is on is shown as its LaTeX source.
+(defun latex-to-svg-frontend--overlay-kind (ov)
+  "Return the kind of the span under preview OV (see `--source-kind')."
+  (if (overlay-get ov 'latex-to-svg-frontend-ref)
+      'reference
+    (latex-to-svg-frontend--source-kind
+     (overlay-get ov 'latex-to-svg-frontend-source))))
+
+(defun latex-to-svg-frontend--new-element-at (pos)
+  "Return the math record at POS that has no preview yet, or nil."
+  (when-let* ((el (latex-to-svg-frontend--element-at pos))
+              ((not (latex-to-svg-frontend--overlays-in
+                     (latex-to-svg-frontend--math-begin el)
+                     (latex-to-svg-frontend--math-end el)))))
+    el))
+
+(defun latex-to-svg-frontend--reveal-p (kind)
+  "Non-nil if the span point is on, of KIND, is shown as its LaTeX source.
 That is when `latex-to-svg-frontend-reveal' says so, or during an
-Isearch.  A function that signals an error counts as nil, and the
-error is reported once with `display-warning': an error in
-`post-command-hook' would remove `--handle-cursor' from it."
+Isearch.  KIND is nil when point is on no span; a function is then not
+called, and the value is nil.  A function that signals an error counts
+as nil, and the error is reported once with `display-warning': an error
+in `post-command-hook' would remove `--handle-cursor' from it."
   (or isearch-mode
       (pcase latex-to-svg-frontend-reveal
         ('always t)
         ('writable (not buffer-read-only))
         ('nil nil)
         (fn (condition-case err
-                (funcall fn)
+                (and kind (funcall fn kind))
               (error
                (unless (member fn latex-to-svg-frontend--warned-reveal-functions)
                  (push fn latex-to-svg-frontend--warned-reveal-functions)
@@ -1586,7 +1605,16 @@ On `post-command-hook' while the mode is on."
         (latex-to-svg-frontend--render-on-leave last (point)))
       (let* ((prev (and last (latex-to-svg-frontend--revealable-overlay-at last)))
              (cur (latex-to-svg-frontend--revealable-overlay-at (point)))
-             (reveal (latex-to-svg-frontend--reveal-p))
+             ;; Math with no preview yet, which a function is asked about:
+             ;; when it says no, the math is rendered.
+             (new (and (not cur)
+                       (not (memq latex-to-svg-frontend-reveal
+                                  '(always writable nil)))
+                       (latex-to-svg-frontend--new-element-at (point))))
+             (reveal (latex-to-svg-frontend--reveal-p
+                      (cond (cur (latex-to-svg-frontend--overlay-kind cur))
+                            (new (latex-to-svg-frontend--source-kind
+                                  (latex-to-svg-frontend--math-value new))))))
              (started (and reveal (not latex-to-svg-frontend--last-reveal)))
              (stopped (and latex-to-svg-frontend--last-reveal (not reveal))))
       (setq latex-to-svg-frontend--last-reveal reveal)
@@ -1608,10 +1636,7 @@ On `post-command-hook' while the mode is on."
       ;; revealing stops with point in it, render it, as leaving it would.
       (when-let* ((stopped)
                   ((not cur))
-                  (el (latex-to-svg-frontend--element-at (point)))
-                  ((not (latex-to-svg-frontend--overlays-in
-                         (latex-to-svg-frontend--math-begin el)
-                         (latex-to-svg-frontend--math-end el)))))
+                  (el (or new (latex-to-svg-frontend--new-element-at (point)))))
         (latex-to-svg-frontend--render-on-leave-element el))
       ;; A reference reached by *mouse* is never revealed: a click there is a
       ;; jump, not an edit.  This is not just taste -- it is required for

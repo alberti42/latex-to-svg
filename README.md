@@ -291,15 +291,25 @@ except an equation the cursor is in.
 its LaTeX source: `always`, `writable` (default; in a buffer that is not
 read-only) or `nil` (never). During an Isearch it is shown whatever the value.
 
-The value can also be a function, called with no arguments after every
-command; non-nil means the source is shown. With modal editing, this shows the
-source only in the insert state:
+The value can also be a function, called after every command with point on
+math or a reference. Its one argument is the kind of what point is on:
+`inline`, `display`, `environment` or `reference` (see
+[Functions for other packages](#functions-for-other-packages)). Non-nil means
+the source is shown. With modal editing, this shows the source only in the
+insert state:
 
 ```elisp
 ;; Evil
-(setq latex-to-svg-frontend-reveal #'evil-insert-state-p)
+(setq latex-to-svg-frontend-reveal (lambda (_kind) (evil-insert-state-p)))
 ;; Meow
-(setq latex-to-svg-frontend-reveal (lambda () (bound-and-true-p meow-insert-mode)))
+(setq latex-to-svg-frontend-reveal (lambda (_kind) (bound-and-true-p meow-insert-mode)))
+```
+
+A function can also treat the kinds differently. This one never shows the
+source of a reference, so `(3)` stays as it is:
+
+```elisp
+(setq latex-to-svg-frontend-reveal (lambda (kind) (not (eq kind 'reference))))
 ```
 
 Entering the insert state with point on an equation shows its source;

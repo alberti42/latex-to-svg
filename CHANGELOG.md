@@ -14,10 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- `latex-to-svg-frontend-reveal` accepts a function, called with no
-  arguments after every command; non-nil means the source is shown. With
-  `evil-insert-state-p`, the source is shown only in Evil's insert
-  state. When the value of the function changes with point on an
+- `latex-to-svg-frontend-reveal` accepts a function, called after every
+  command with point on math or a reference, with its kind (`inline`,
+  `display`, `environment` or `reference`); non-nil means the source is
+  shown. With `(lambda (_kind) (evil-insert-state-p))`, the source is
+  shown only in Evil's insert state. When the value of the function changes with point on an
   equation, its preview opens or closes there, and an equation edited or
   typed new is rendered. A function that signals an error counts as nil
   and is reported once.
