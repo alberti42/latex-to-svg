@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- In `markdown-ts-mode` with `markdown-ts-hide-markup` on, the delimiters
+  of math are visible: the `$` of `$...$` when point is on the equation,
+  and the backslash of `\(` and `\[`, which showed as `(x^2)` with no
+  preview. The mode removes the `invisible` property from math source
+  wherever the markup's font-lock sets it (`invisible` is in
+  `font-lock-extra-managed-props`).
+
 ## [0.21.0] - 2026-10-11
 
 ### Added

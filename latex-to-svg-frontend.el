@@ -2755,8 +2755,33 @@ not colour -- matters.)"
   (goto-char limit)
   nil)
 
+(defun latex-to-svg-frontend--unhide-math (limit)
+  "Font-lock keyword: remove the `invisible' property from math source.
+Only when `invisible' is in `font-lock-extra-managed-props', that is
+when the markup's font-lock sets it: `markdown-ts-mode' with
+`markdown-ts-hide-markup' on hides the `$' of `$...$' and the backslash
+of `\\(' and `\\['.  These delimiters are part of the LaTeX source, so
+they stay visible when the source is shown: with no preview, or with
+point on the equation.
+
+The scan covers the blank-line blocks around POINT..LIMIT: font-lock
+may fontify part of an equation that spans several lines, and the
+markup hides its delimiters outside that part.  Returns nil (own
+fontification, one call per chunk)."
+  (when (memq 'invisible font-lock-extra-managed-props)
+    (let ((beg (car (latex-to-svg-frontend--block-bounds (point))))
+          (end (cdr (latex-to-svg-frontend--block-bounds
+                     (max (point) (1- limit))))))
+      (dolist (el (latex-to-svg-frontend--detect beg end))
+        (remove-text-properties (latex-to-svg-frontend--math-begin el)
+                                (latex-to-svg-frontend--math-end el)
+                                '(invisible nil)))))
+  (goto-char limit)
+  nil)
+
 (defconst latex-to-svg-frontend--font-lock-keywords
-  '((latex-to-svg-frontend--suppress-emphasis))
+  '((latex-to-svg-frontend--suppress-emphasis)
+    (latex-to-svg-frontend--unhide-math))
   "Font-lock keywords added while the mode is on (appended, so they run last).
 They are added only in a buffer whose major mode sets `font-lock-defaults'
 \(see `latex-to-svg-frontend--add-font-lock-keywords').")

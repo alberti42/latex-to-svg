@@ -1012,6 +1012,72 @@ merely *contains* inline math) is left untouched."
         (should (equal (get-text-property (+ (point-min) 5) 'face)
                        '(:strike-through t)))))))
 
+(defun l2sf-tests--invisible-chars ()
+  "Return the characters of the buffer with a non-nil `invisible' property."
+  (let (chars)
+    (dotimes (i (1- (point-max)))
+      (when (get-text-property (1+ i) 'invisible)
+        (push (char-after (1+ i)) chars)))
+    (concat (nreverse chars))))
+
+(defun l2sf-tests--hide (&rest strings)
+  "Put `invisible' on every occurrence of each of STRINGS in the buffer."
+  (dolist (s strings)
+    (goto-char (point-min))
+    (while (search-forward s nil t)
+      (put-text-property (match-beginning 0) (match-end 0) 'invisible t))))
+
+(ert-deftest l2sf-unhide-math-removes-managed-invisible ()
+  "When font-lock manages `invisible', math delimiters become visible;
+an escape outside math stays hidden."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "a $x$ and \\(y\\) and \\*z\n"
+      (setq-local font-lock-extra-managed-props '(invisible))
+      (l2sf-tests--hide "$" "\\")
+      (goto-char (point-min))
+      (latex-to-svg-frontend--unhide-math (point-max))
+      (should (equal (l2sf-tests--invisible-chars) "\\")))))
+
+(ert-deftest l2sf-unhide-math-needs-managed-invisible ()
+  "When font-lock does not manage `invisible', the property is kept."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "a $x$ b\n"
+      (l2sf-tests--hide "$")
+      (goto-char (point-min))
+      (latex-to-svg-frontend--unhide-math (point-max))
+      (should (equal (l2sf-tests--invisible-chars) "$$")))))
+
+(ert-deftest l2sf-unhide-math-chunk-inside-equation ()
+  "A chunk that starts inside an equation of several lines unhides both
+of its delimiters."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "$$\nx\n$$\n"
+      (setq-local font-lock-extra-managed-props '(invisible))
+      (l2sf-tests--hide "$$")
+      (goto-char (point-min))
+      (forward-line 1)
+      (latex-to-svg-frontend--unhide-math (line-end-position))
+      (should (equal (l2sf-tests--invisible-chars) "")))))
+
+(ert-deftest l2sf-unhide-math-markdown-ts-hide-markup ()
+  "In `markdown-ts-mode' with `markdown-ts-hide-markup' on, the mode keeps
+the delimiters of math visible and an escape outside math hidden."
+  (skip-unless (and (require 'markdown-ts-mode nil t)
+                    (treesit-language-available-p 'markdown)
+                    (treesit-language-available-p 'markdown-inline)))
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "a $x$ and \\(y\\) and \\*z\n"
+      (markdown-ts-mode)
+      (setq-local markdown-ts-hide-markup t)
+      (font-lock-ensure)
+      (should (equal (l2sf-tests--invisible-chars) "$$\\\\\\"))
+      (latex-to-svg-frontend-mode 1)
+      (font-lock-ensure)
+      (should (equal (l2sf-tests--invisible-chars) "\\"))
+      (latex-to-svg-frontend-mode -1)
+      (font-lock-ensure)
+      (should (equal (l2sf-tests--invisible-chars) "$$\\\\\\")))))
+
 (ert-deftest l2sf-clears-overlays ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ $b$\n"
