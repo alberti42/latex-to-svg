@@ -194,6 +194,65 @@ A plain buffer suffices — detection is a regexp scanner."
                      ;; trailing newline — bounds cover exactly the source.
                      "\\begin{equation}\nx=1\n\\end{equation}")))))
 
+(defun l2sf-tests--span-texts (spans)
+  "Return (KIND TEXT) for each of SPANS, (KIND START END) lists."
+  (mapcar (lambda (s)
+            (list (nth 0 s) (buffer-substring-no-properties (nth 1 s) (nth 2 s))))
+          spans))
+
+(ert-deftest l2sf-spans ()
+  "`latex-to-svg-frontend-spans' returns the spans overlapping the range
+with their kind, from the blank-line blocks around it, without excluded
+regions."
+  (l2sf-tests--md
+      (concat "a $x$ \\(y\\) $$z$$ \\[w\\]\n\n"
+              "\\begin{equation}\ny\n\\end{equation}\n\n"
+              "see \\eqref{e}, $\\ref{e}$ CODE $z$\n")
+    (setq-local latex-to-svg-frontend-exclude-function
+                (lambda (_beg _end)
+                  (save-excursion
+                    (goto-char (point-min))
+                    (when (search-forward "CODE" nil t)
+                      (list (cons (match-beginning 0) (point-max)))))))
+    (should (equal (l2sf-tests--span-texts
+                    (latex-to-svg-frontend-spans (point-min) (point-max)))
+                   '((inline "$x$") (inline "\\(y\\)")
+                     (display "$$z$$") (display "\\[w\\]")
+                     (environment "\\begin{equation}\ny\n\\end{equation}")
+                     (reference "\\eqref{e}") (reference "$\\ref{e}$"))))
+    ;; A range inside an equation of several lines returns all of it.
+    (goto-char (point-min))
+    (search-forward "\ny\n")
+    (should (equal (l2sf-tests--span-texts
+                    (latex-to-svg-frontend-spans (- (point) 2) (1- (point))))
+                   '((environment "\\begin{equation}\ny\n\\end{equation}"))))
+    ;; A range that only touches a span does not overlap it.
+    (should-not (latex-to-svg-frontend-spans (+ (point-min) 5)
+                                             (+ (point-min) 6)))))
+
+(ert-deftest l2sf-spans-reference-off ()
+  "With `latex-to-svg-frontend-detect-references' off, `$\\ref{e}$' is
+inline math and a bare `\\ref' is no span."
+  (l2sf-tests--md "see \\ref{e} and $\\ref{e}$\n"
+    (setq-local latex-to-svg-frontend-detect-references nil)
+    (should (equal (l2sf-tests--span-texts
+                    (latex-to-svg-frontend-spans (point-min) (point-max)))
+                   '((inline "$\\ref{e}$"))))))
+
+(ert-deftest l2sf-span-at ()
+  "`latex-to-svg-frontend-span-at' takes START..END, both included, and
+prefers the span that starts at POS."
+  (l2sf-tests--md "a $x$\\(y\\) b\n"
+    (let ((x '(inline 3 6)) (y '(inline 6 11)))
+      (should (equal (l2sf-tests--span-texts (list x y))
+                     '((inline "$x$") (inline "\\(y\\)"))))
+      (should-not (latex-to-svg-frontend-span-at 2))
+      (should (equal (latex-to-svg-frontend-span-at 3) x))
+      (should (equal (latex-to-svg-frontend-span-at 4) x))
+      (should (equal (latex-to-svg-frontend-span-at 6) y))
+      (should (equal (latex-to-svg-frontend-span-at 11) y))
+      (should-not (latex-to-svg-frontend-span-at 12)))))
+
 (ert-deftest l2sf-exclude-function-honored ()
   ;; The core skips any opener inside a region returned by the buffer-local
   ;; `exclude-function' (grammar-independent: a trivial region-returning fn).

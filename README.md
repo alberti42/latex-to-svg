@@ -735,6 +735,31 @@ See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` /
 
 Pull requests adding adaptors for other major modes are welcome.
 
+## Functions for other packages
+
+A package that decorates the same buffer can ask where the math and the
+references are, so it leaves them alone:
+
+- `latex-to-svg-frontend-spans` — `(fn BEG END)` → the spans that overlap
+  BEG..END, as `(kind start end)` lists in order. The spans are what this
+  package detects: the delimiters, environments and references the
+  `-detect-*` options enable, outside the regions the adaptor excludes. KIND
+  is one of:
+
+  | Kind | Source |
+  |---|---|
+  | `inline` | `$…$`, `\(…\)` |
+  | `display` | `$$…$$`, `\[…\]` |
+  | `environment` | `\begin{…}…\end{…}` |
+  | `reference` | `\eqref{…}`, `\ref{…}`, bare or in `$…$` / `\(…\)`; drawn as text, such as (3) |
+
+- `latex-to-svg-frontend-span-at` — `(fn POS)` → the `(kind start end)` of
+  the span POS is on, or nil. POS is on a span from start to end, both
+  included: this is where this package shows the source of a span.
+
+Call them in a buffer where `latex-to-svg-frontend-mode` is on, since the
+excluded regions come from the adaptor.
+
 ## Limitations
 
 - **`\tag`-based references and `subequations` sub-lettering** aren't modelled

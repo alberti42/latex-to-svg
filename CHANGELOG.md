@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   equation, its preview opens or closes there, and an equation edited or
   typed new is rendered. A function that signals an error counts as nil
   and is reported once.
+- `latex-to-svg-frontend-spans` and `latex-to-svg-frontend-span-at`:
+  where the math and the references are in the buffer, as this package
+  detects them, each with its kind (`inline`, `display`, `environment`
+  or `reference`), for a package that decorates the same buffer and
+  leaves them alone.
 
 ### Changed
 

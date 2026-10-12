@@ -1142,6 +1142,63 @@ enough to run on every command (see `--handle-cursor')."
   (cons (latex-to-svg-frontend--math-begin el)
         (latex-to-svg-frontend--math-end el)))
 
+(defun latex-to-svg-frontend--source-kind (source)
+  "Return the kind of SOURCE: `inline', `display', `environment' or `reference'.
+SOURCE is the text of a detected span.  `reference' is an `\\eqref' /
+`\\ref', bare or in `$...$' / `\\(...\\)', which is drawn as text,
+when `latex-to-svg-frontend-detect-references' is on."
+  (cond
+   ((and latex-to-svg-frontend-detect-references
+         (latex-to-svg-frontend--reference-parse source))
+    'reference)
+   ((string-prefix-p "\\begin" (string-trim-left source)) 'environment)
+   ((latex-to-svg-frontend--display-p source) 'display)
+   (t 'inline)))
+
+(defun latex-to-svg-frontend--spans-near (beg end)
+  "Return (KIND START END) of the spans in the blank-line blocks of BEG..END."
+  (mapcar (lambda (el)
+            (list (latex-to-svg-frontend--source-kind
+                   (latex-to-svg-frontend--math-value el))
+                  (latex-to-svg-frontend--math-begin el)
+                  (latex-to-svg-frontend--math-end el)))
+          (latex-to-svg-frontend--detect
+           (car (latex-to-svg-frontend--block-bounds beg))
+           (cdr (latex-to-svg-frontend--block-bounds end)))))
+
+;;;; Public functions for other packages
+
+(defun latex-to-svg-frontend-spans (beg end)
+  "Return the spans that overlap BEG..END, as (KIND START END) lists in order.
+A span is math or a reference, as this package detects it: the
+delimiters, environments and references that the
+`latex-to-svg-frontend-detect-*' options enable, outside the regions
+the adaptor excludes (code and verbatim).  START is the position of
+the opening delimiter, `\\begin' or `\\eqref', END the position after
+the closing one.  KIND is one of:
+
+  `inline'       `$...$', `\\(...\\)'
+  `display'      `$$...$$', `\\[...\\]'
+  `environment'  `\\begin{...}...\\end{...}'
+  `reference'    `\\eqref{...}', `\\ref{...}', bare or in `$...$' /
+                 `\\(...\\)'; this package draws it as text, such as (3)
+
+The excluded regions come from the adaptor, so call this in a buffer
+where `latex-to-svg-frontend-mode' is on."
+  (seq-filter (lambda (span) (and (< (nth 1 span) end) (> (nth 2 span) beg)))
+              (latex-to-svg-frontend--spans-near beg end)))
+
+(defun latex-to-svg-frontend-span-at (pos)
+  "Return (KIND START END) of the span that POS is on, or nil.
+POS is on a span from START to END, both included: this is where this
+package shows the source of a span.  When one span ends at POS and
+another starts there, return the one that starts there.  The spans and
+their KIND are those of `latex-to-svg-frontend-spans'."
+  (let ((spans (latex-to-svg-frontend--spans-near pos pos)))
+    (or (seq-find (lambda (span) (= (nth 1 span) pos)) spans)
+        (seq-find (lambda (span) (and (< (nth 1 span) pos) (<= pos (nth 2 span))))
+                  spans))))
+
 ;;;; Overlays
 
 (defun latex-to-svg-frontend--center-prefix (ov image)
