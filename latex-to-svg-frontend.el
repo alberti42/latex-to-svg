@@ -884,6 +884,11 @@ the `N.a'/`N.b' sub-lettering is not modelled).")
 ;; (above it) installs it on `\eqref' / `\ref' previews.
 (defvar latex-to-svg-frontend--reference-keymap)
 
+;; Forward declaration: the cursor-reveal state is defined with
+;; `--handle-cursor', but `--set-overlay' (above it) reads it.
+(defvar latex-to-svg-frontend--last-point)
+(defvar latex-to-svg-frontend--last-reveal)
+
 (defvar-local latex-to-svg-frontend--rendered-appearance nil
   "Appearance signature this buffer's previews were last rendered for.
 A value of `latex-to-svg-frontend--appearance', compared against the current one
@@ -1349,8 +1354,30 @@ source is not indented by a leftover stretch."
   (seq-filter (lambda (o) (overlay-get o 'latex-to-svg-frontend))
               (overlays-in beg end)))
 
+(defvar-local latex-to-svg-frontend--requests nil
+  "The requests `latex-to-svg-frontend--place' is waiting on.
+Each is a list (BEG END) of the markers of the span it is for.  A
+request's callback installs its picture only while the request is in
+this list.  `latex-to-svg-frontend--drop-requests' removes it when a
+newer request or a preview replaces it, or the preview is cleared.")
+
+(defun latex-to-svg-frontend--drop-requests (beg end)
+  "Forget the pending requests for spans intersecting BEG..END.
+Also forget those whose span was deleted.  Their pictures, when the
+backend finishes them, are not installed."
+  (setq latex-to-svg-frontend--requests
+        (seq-remove (lambda (request)
+                      (let ((b (marker-position (car request)))
+                            (e (marker-position (cadr request))))
+                        (or (not (and b e (< b e)))
+                            (and (< b end) (< beg e)))))
+                    latex-to-svg-frontend--requests)))
+
 (defun latex-to-svg-frontend--clear-region (beg end)
-  "Delete this package's preview overlays intersecting BEG..END."
+  "Delete this package's preview overlays intersecting BEG..END.
+Forget the pending requests for that text too (see
+`latex-to-svg-frontend--drop-requests')."
+  (latex-to-svg-frontend--drop-requests beg end)
   (mapc #'latex-to-svg-frontend--delete-overlay
         (latex-to-svg-frontend--overlays-in beg end)))
 
@@ -1423,6 +1450,15 @@ same cache entry.  Replaces any existing preview overlay in the span."
         (overlay-put ov 'latex-to-svg-frontend-image image)
         ;; After `display-math', which decides whether it is centered.
         (latex-to-svg-frontend--show-image ov image)
+        ;; Point may be on the span, revealed by `--handle-cursor' after
+        ;; the last command, before the picture arrived.
+        (when (and latex-to-svg-frontend--last-reveal
+                   latex-to-svg-frontend--last-point
+                   (eql (marker-position latex-to-svg-frontend--last-point)
+                        (point))
+                   (eq ov (latex-to-svg-frontend--revealable-overlay-at
+                           (point))))
+          (latex-to-svg-frontend--hide-image ov))
         (when enums-fallback
           (let ((meta (plist-get (latex-to-svg-backend-metadata value engine) :nums)))
             (overlay-put ov 'latex-to-svg-frontend-enums (or meta enums-fallback))
@@ -2094,7 +2130,11 @@ Any other ENGINE (`skip', or a warning string: see `--engine-for') sends
 nothing to the backend and installs `--set-unrendered-overlay' instead.
 Nothing is sent either while `latex-to-svg-frontend--graphical-p' is nil.
 That, or no graphical window showing BUFFER, sets
-`latex-to-svg-frontend--undrawn'."
+`latex-to-svg-frontend--undrawn'.
+A request replaces the pending ones for spans intersecting BEG..END
+\(see `latex-to-svg-frontend--requests').  When the backend finishes
+it, its picture is installed only if no newer request, preview or
+clearing replaced it, and BEG..END still holds SOURCE."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (cond
@@ -2104,30 +2144,58 @@ That, or no graphical window showing BUFFER, sets
        ((not (latex-to-svg-frontend--graphical-p))
         (setq latex-to-svg-frontend--undrawn t))
        (t
-        (let* ((fallback (latex-to-svg-frontend--fallback-for engine))
+        (latex-to-svg-frontend--drop-requests beg end)
+        (let* ((request (list beg end))
+               (fallback (latex-to-svg-frontend--fallback-for engine))
                (frame (latex-to-svg-frontend--display-frame buffer))
-               (image (latex-to-svg-backend
-                       value
-                       :rescale-by (latex-to-svg-frontend--rescale-for display-p)
-                       :color (latex-to-svg-frontend--foreground-for beg frame)
-                       :background (latex-to-svg-frontend--background-for frame)
-                       :padding (latex-to-svg-frontend--padding-for display-p)
-                       :x-height (latex-to-svg-frontend--x-height-at
-                                     beg buffer)
-                       :metadata (car enums-fallback)
-                       :engine engine
-                       :fallback fallback
-                       :quiet latex-to-svg-frontend-quiet
-                       :callback (lambda ()
-                                   (latex-to-svg-frontend--place
-                                    buffer beg end value source enums-fallback display-p
-                                    engine)))))
+               (image
+                (progn
+                  (push request latex-to-svg-frontend--requests)
+                  (latex-to-svg-backend
+                   value
+                   :rescale-by (latex-to-svg-frontend--rescale-for display-p)
+                   :color (latex-to-svg-frontend--foreground-for beg frame)
+                   :background (latex-to-svg-frontend--background-for frame)
+                   :padding (latex-to-svg-frontend--padding-for display-p)
+                   :x-height (latex-to-svg-frontend--x-height-at
+                              beg buffer)
+                   :metadata (car enums-fallback)
+                   :engine engine
+                   :fallback fallback
+                   :quiet latex-to-svg-frontend-quiet
+                   :callback
+                   (lambda ()
+                     (latex-to-svg-frontend--place-when-current
+                      request buffer value source enums-fallback display-p
+                      engine))))))
           (unless frame
             (setq latex-to-svg-frontend--undrawn t))
           (when image
+            (setq latex-to-svg-frontend--requests
+                  (delq request latex-to-svg-frontend--requests))
             (latex-to-svg-frontend--set-overlay
              beg end value image source enums-fallback display-p engine
              fallback))))))))
+
+(defun latex-to-svg-frontend--place-when-current (request buffer value source enums-fallback display-p engine)
+  "Place VALUE on the span of REQUEST in BUFFER, if REQUEST is still current.
+The callback of the backend request REQUEST, a list (BEG END) of markers
+\(see `latex-to-svg-frontend--requests').  REQUEST is current while it is
+in `latex-to-svg-frontend--requests' and BEG..END holds SOURCE.  The
+other arguments are those of `latex-to-svg-frontend--place'."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when (memq request latex-to-svg-frontend--requests)
+        (setq latex-to-svg-frontend--requests
+              (delq request latex-to-svg-frontend--requests))
+        (let ((b (marker-position (car request)))
+              (e (marker-position (cadr request))))
+          (when (and b e (<= (point-min) b) (< b e) (<= e (point-max))
+                     (or (null source)
+                         (equal (buffer-substring-no-properties b e) source)))
+            (latex-to-svg-frontend--place
+             buffer (car request) (cadr request) value source enums-fallback
+             display-p engine)))))))
 
 (defun latex-to-svg-frontend--render-numbered (el k)
   "Render numbered environment EL starting at counter K."

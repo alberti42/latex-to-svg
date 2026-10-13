@@ -50,6 +50,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   unit=\si{\meter}, ylabel={$`. The buffer-local variable
   `latex-to-svg-frontend-dollar-guards` (default t) controls this; the
   LaTeX adaptor sets it to nil.
+- A preview whose compile finishes after its request was replaced is
+  no longer installed: when the equation was edited and rendered again,
+  its preview cleared, or the mode turned off. A preview that arrives
+  while point is on its equation and the source is shown leaves the
+  source shown. ([#5](https://github.com/alberti42/latex-to-svg/issues/5))
 
 ## [0.21.0] - 2026-10-11
 

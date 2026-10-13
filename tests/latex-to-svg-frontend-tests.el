@@ -2328,6 +2328,105 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                                (l2sf-tests--overlays))
                        '(compiled)))))))
 
+(defmacro l2sf-tests--with-pending (&rest body)
+  "Run BODY with a backend whose compiles finish when the test says.
+The backend returns the image of LATEX in the alist `ready' when there
+is one, else records LATEX and its callback in the alist `pending' and
+returns nil.  `(finish LATEX IMAGE)' makes IMAGE ready and runs the
+callback recorded for LATEX.  Issue #5."
+  (declare (indent 0) (debug t))
+  `(let ((ready nil) (pending nil))
+     (cl-letf (((symbol-function 'latex-to-svg-backend)
+                (lambda (latex &rest args)
+                  (l2sf-tests--check-colors args)
+                  (or (cdr (assoc latex ready))
+                      (progn (push (cons latex (plist-get args :callback))
+                                   pending)
+                             nil)))))
+       (cl-flet ((finish (latex image)
+                   (push (cons latex image) ready)
+                   (funcall (cdr (assoc latex pending)))))
+         ,@body))))
+
+(ert-deftest l2sf-late-picture-does-not-replace-newer-one ()
+  ;; `$x$' is edited to `$y$' and rendered again; the compile of `$x$'
+  ;; finishes last.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (goto-char 10) (delete-char -1) (insert "y")
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (finish "$y$" 'new-image)
+        (finish "$x$" 'old-image)
+        (should (equal (mapcar (lambda (ov)
+                                 (list (overlay-get ov 'latex-to-svg-frontend-source)
+                                       (overlay-get ov 'display)))
+                               (l2sf-tests--overlays))
+                       '(("$y$" new-image))))))))
+
+(ert-deftest l2sf-late-picture-needs-the-same-source ()
+  ;; `$x$' is edited to `$y$' and not rendered again yet.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (goto-char 10) (delete-char -1) (insert "y")
+        (finish "$x$" 'old-image)
+        (should-not (l2sf-tests--overlays))))))
+
+(ert-deftest l2sf-late-picture-after-clear-is-dropped ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (latex-to-svg-frontend-clear)
+        (finish "$x$" 'image)
+        (should-not (l2sf-tests--overlays))))))
+
+(ert-deftest l2sf-late-picture-keeps-revealed-source ()
+  ;; Point moved into `$x$' while it compiled, and its source is shown.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend-mode 1)
+        (goto-char 9)
+        (latex-to-svg-frontend--handle-cursor)
+        (finish "$x$" 'image)
+        (let ((ov (car (l2sf-tests--overlays))))
+          (should (eq (overlay-get ov 'latex-to-svg-frontend-image) 'image))
+          (should-not (overlay-get ov 'display))
+          (latex-to-svg-frontend--handle-cursor)
+          (should-not (overlay-get ov 'display))
+          (goto-char (point-max))
+          (latex-to-svg-frontend--handle-cursor)
+          (should (eq (overlay-get ov 'display) 'image)))
+        (latex-to-svg-frontend-mode -1)))))
+
+(ert-deftest l2sf-late-picture-after-mode-off-is-dropped ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend-mode 1)
+        (latex-to-svg-frontend-mode -1)
+        (finish "$x$" 'image)
+        (should-not (l2sf-tests--overlays))
+        ;; Turned off and on again: only the new request installs its
+        ;; picture.
+        (setq ready nil pending nil)
+        (latex-to-svg-frontend-mode 1)
+        (latex-to-svg-frontend-mode -1)
+        (latex-to-svg-frontend-mode 1)
+        (pcase-let ((`(,new ,old) (mapcar #'cdr pending)))
+          (push '("$x$" . image) ready)
+          (funcall old)
+          (should-not (l2sf-tests--overlays))
+          (funcall new)
+          (should (equal (mapcar (lambda (ov) (overlay-get ov 'display))
+                                 (l2sf-tests--overlays))
+                         '(image))))
+        (latex-to-svg-frontend-mode -1)))))
+
 (ert-deftest l2sf-refresh-if-changed-gated-on-appearance ()
   (l2sf-tests--with-stub
     (l2sf-tests--with-frame
