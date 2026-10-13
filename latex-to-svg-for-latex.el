@@ -464,7 +464,8 @@ It only remaps the preview-latex commands (see
   "Preview LaTeX math as SVG images (a `latex-to-svg-frontend' adaptor).
 
 Installs the LaTeX comment and verbatim exclusions (see
-`latex-to-svg-for-latex--exclusions'), resolves `\\ref' and `\\eqref'
+`latex-to-svg-for-latex--exclusions'), pairs `$' as TeX does (see
+`latex-to-svg-frontend-dollar-guards'), resolves `\\ref' and `\\eqref'
 from the document's `.aux' file (see `latex-to-svg-for-latex-aux-file';
 \"??\" for a label it lacks), and turns on `latex-to-svg-frontend-mode',
 which does the rendering.  In LaTeX buffers the engine is `latex' by
@@ -485,6 +486,7 @@ AUCTeX's preview-latex commands only say that they are off (see
           (progn
             (setq-local latex-to-svg-frontend-exclude-function
                         #'latex-to-svg-for-latex--exclusions)
+            (setq-local latex-to-svg-frontend-dollar-guards nil)
             (setq latex-to-svg-for-latex--aux-path
                   (latex-to-svg-for-latex--aux-file))
             (setq-local latex-to-svg-frontend-labels-function
@@ -503,6 +505,7 @@ AUCTeX's preview-latex commands only say that they are off (see
         (user-error "`latex-to-svg-for-latex-mode' only works in LaTeX buffers"))
     (latex-to-svg-frontend-mode -1)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
+    (kill-local-variable 'latex-to-svg-frontend-dollar-guards)
     (kill-local-variable 'latex-to-svg-frontend-labels-function)
     (kill-local-variable 'latex-to-svg-frontend-find-label-function)
     (kill-local-variable 'latex-to-svg-for-latex--aux-path)

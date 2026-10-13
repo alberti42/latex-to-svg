@@ -402,7 +402,9 @@ pair with the `$' of an equation later in the paragraph.  Math directly
 followed by a digit, such as `$x$2', is not detected either.  What still
 slips through is shell variables such as \"$HOME/$USER\"; escape them as
 \"\$HOME/\$USER\" for a one-off, or turn this off (leaving the other three
-families on) and use `\(…\)' in buffers where `$' is mostly prose."
+families on) and use `\(…\)' in buffers where `$' is mostly prose.
+The LaTeX and Gnus adaptors turn the guards off (see
+`latex-to-svg-frontend-dollar-guards')."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
@@ -542,6 +544,16 @@ equation labels.")
 reference, when LABEL is not defined by an equation in the buffer.
 E.g. the LaTeX adaptor asks `xref' for a label in another file.  nil
 means the jump reports that the label cannot be found.")
+
+(defvar-local latex-to-svg-frontend-dollar-guards t
+  "Non-nil means inline `$…$' follows pandoc's guards against currency.
+An opening `$' must be followed by a non-space, and a closing `$'
+preceded by a non-space and not followed by a digit (see
+`latex-to-svg-frontend-detect-dollar-inline').  nil means TeX's rule:
+the first `$' after an opening one ends the span, whatever surrounds
+it, so `$\\lambda $' is math.  The Markdown and Org adaptors keep the
+guards; the LaTeX and Gnus adaptors set this to nil.")
+(put 'latex-to-svg-frontend-dollar-guards 'safe-local-variable #'booleanp)
 
 (defvar-local latex-to-svg-frontend-detect-function nil
   "Escape hatch: function (BEG END) -> list of math records.
@@ -975,7 +987,8 @@ unbalanced opener can never run away past the paragraph it lives in."
   "Return the position just after the closing `$' of an inline span, or nil.
 FROM is the position right after the opening `$'; the search is bounded by
 LIMIT (the block end).  The first `$' after FROM ends the span, as in TeX,
-skipping an escaped `\\$' and a `$$'.  It closes the span only if no
+skipping an escaped `\\$' and a `$$'.  With
+`latex-to-svg-frontend-dollar-guards' on, it closes the span only if no
 whitespace precedes it and no digit follows it (pandoc's guards against
 currency dollars); otherwise there is no span, so a currency `$' never
 pairs with a `$' further on, such as the opening `$' of an equation."
@@ -989,8 +1002,9 @@ pairs with a `$' further on, such as the opening `$' of an equation."
            ((latex-to-svg-frontend--escaped-p p) nil) ; \$, keep looking
            ((eq after ?$)                                 ; part of a $$
             (goto-char (1+ (match-end 0))))
-           ((or (memq (char-before p) '(?\s ?\t ?\n))    ; " $" not a close
-                (and after (<= ?0 after ?9)))             ; "$2" not a close
+           ((and latex-to-svg-frontend-dollar-guards
+                 (or (memq (char-before p) '(?\s ?\t ?\n))   ; " $" not a close
+                     (and after (<= ?0 after ?9))))            ; "$2" not a close
             (throw 'done nil))
            (t (throw 'done (match-end 0))))))
       nil)))
@@ -1028,7 +1042,9 @@ swallowing later text."
            :value (buffer-substring-no-properties mb (point))))))
      ((equal tok "$")
       (let ((after (char-after me)))
-        (when (and after (not (memq after '(?\s ?\t ?\n))))
+        (when (and after
+                   (not (and latex-to-svg-frontend-dollar-guards
+                             (memq after '(?\s ?\t ?\n)))))
           (when-let* ((close (latex-to-svg-frontend--find-dollar-close me limit)))
             (latex-to-svg-frontend--math-make
              :type 'fragment :begin mb :end close

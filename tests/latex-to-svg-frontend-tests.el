@@ -466,6 +466,20 @@ prefers the span that starts at POS."
                              (latex-to-svg-frontend--elements (point-min) (point-max)))
                      (cdr case))))))
 
+(ert-deftest l2sf-inline-dollar-without-guards ()
+  ;; With `latex-to-svg-frontend-dollar-guards' nil, the first `$' after an
+  ;; opener ends the span, as in TeX: whitespace and digits around a `$' do
+  ;; not matter.  `\$' is still escaped.
+  (dolist (case '(("xlabel={$\\lambda $}, ylabel={$v$}" . ("$\\lambda $" "$v$"))
+                  ("a $ x $ b"                       . ("$ x $"))
+                  ("math $x$2 then"                  . ("$x$"))
+                  ("escaped \\$5 and \\$9 here"       . ())))
+    (l2sf-tests--md (concat (car case) "\n")
+      (setq-local latex-to-svg-frontend-dollar-guards nil)
+      (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                             (latex-to-svg-frontend--elements (point-min) (point-max)))
+                     (cdr case))))))
+
 (ert-deftest l2sf-toggle-dollar-inline-off ()
   ;; Disabling inline `$…$' leaves display `$$…$$' (and brackets) detected —
   ;; the point of the split: kill the currency-prone inline dollar only.
@@ -1671,7 +1685,8 @@ can reveal equations and leave references as text."
 (ert-deftest l2sf-latex-mode-setup ()
   ;; The adaptor refuses outside LaTeX buffers.  In `latex-mode' it turns
   ;; the core on, sets the engine to `latex' unless the buffer already has
-  ;; a local value or the global value is `texres', and remaps the preview-latex commands; turning it off
+  ;; a local value or the global value is `texres', turns off the pandoc
+  ;; guards on `$', and remaps the preview-latex commands; turning it off
   ;; undoes what it set.
   (l2sf-tests--with-stub
     (with-temp-buffer
@@ -1685,6 +1700,7 @@ can reveal equations and leave references as text."
         (should latex-to-svg-frontend-mode)
         (should (local-variable-p 'latex-to-svg-frontend-engine))
         (should (eq latex-to-svg-frontend-engine 'latex))
+        (should-not latex-to-svg-frontend-dollar-guards)
         (dolist (command '(preview-at-point preview-region preview-buffer
                            preview-document preview-environment preview-section))
           (should (eq (command-remapping command)
@@ -1692,6 +1708,7 @@ can reveal equations and leave references as text."
         (latex-to-svg-for-latex-mode -1)
         (should-not latex-to-svg-frontend-mode)
         (should-not (local-variable-p 'latex-to-svg-frontend-engine))
+        (should-not (local-variable-p 'latex-to-svg-frontend-dollar-guards))
         (should-not (command-remapping 'preview-at-point))))
     (with-temp-buffer
       (let ((latex-mode-hook nil)) (latex-mode))
@@ -2201,19 +2218,22 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
   ;; `gnus-article-mode-hook'.  Each article Gnus shows in the buffer is
   ;; drawn from `gnus-article-prepare-hook', including the equation point is
   ;; in; the previous article's previews are gone.  Numbering is off in the
-  ;; buffer unless set there; turning the mode off restores both.
+  ;; buffer unless set there, and `$' pairs without the pandoc guards;
+  ;; turning the mode off restores both.
   (l2sf-tests--with-stub
     (l2sf-tests--gnus
       (latex-to-svg-for-gnus-mode 1)
       (should latex-to-svg-frontend-mode)
       (should-not latex-to-svg-frontend-number-equations)
-      (l2sf-tests--gnus-show "Subject: on $x$\n\n$a$ and \\(b\\)\n")
-      (should (equal (l2sf-tests--values) '("$x$" "$a$" "\\(b\\)")))
+      (should-not latex-to-svg-frontend-dollar-guards)
+      (l2sf-tests--gnus-show "Subject: on $x$\n\n$a$ and \\(b\\) and $ c $\n")
+      (should (equal (l2sf-tests--values) '("$x$" "$a$" "\\(b\\)" "$ c $")))
       (l2sf-tests--gnus-show "Subject: none\n\n$c$\n")
       (should (equal (l2sf-tests--values) '("$c$")))
       (latex-to-svg-for-gnus-mode -1)
       (should-not latex-to-svg-frontend-mode)
       (should-not (local-variable-p 'latex-to-svg-frontend-number-equations))
+      (should-not (local-variable-p 'latex-to-svg-frontend-dollar-guards))
       (should-not (memq #'latex-to-svg-for-gnus--article-prepared
                         gnus-article-prepare-hook))
       (should (null (l2sf-tests--overlays)))))

@@ -127,6 +127,7 @@ previews again for each article Gnus shows (see
 `latex-to-svg-for-gnus--article-prepared').  In the article buffer,
 equation numbering is off by default: set
 `latex-to-svg-frontend-number-equations' buffer-locally to turn it on.
+Inline `$' pairs as TeX does (see `latex-to-svg-frontend-dollar-guards').
 Gnus's emphasis is removed from inside math.  Enable the mode from
 `gnus-article-mode-hook'."
   :lighter nil
@@ -134,6 +135,7 @@ Gnus's emphasis is removed from inside math.  Enable the mode from
       (if (derived-mode-p 'gnus-article-mode)
           (progn
             (setq-local latex-to-svg-frontend-exclude-function #'ignore)
+            (setq-local latex-to-svg-frontend-dollar-guards nil)
             (unless (local-variable-p 'latex-to-svg-frontend-number-equations)
               (setq-local latex-to-svg-frontend-number-equations nil)
               (setq latex-to-svg-for-gnus--set-numbering t))
@@ -153,6 +155,7 @@ Gnus's emphasis is removed from inside math.  Enable the mode from
                    #'latex-to-svg-for-gnus--article-prepared))
     (latex-to-svg-frontend-mode -1)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
+    (kill-local-variable 'latex-to-svg-frontend-dollar-guards)
     (when latex-to-svg-for-gnus--set-numbering
       (kill-local-variable 'latex-to-svg-frontend-number-equations)
       (setq latex-to-svg-for-gnus--set-numbering nil))))
