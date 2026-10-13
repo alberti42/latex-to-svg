@@ -884,10 +884,9 @@ the `N.a'/`N.b' sub-lettering is not modelled).")
 ;; (above it) installs it on `\eqref' / `\ref' previews.
 (defvar latex-to-svg-frontend--reference-keymap)
 
-;; Forward declaration: the cursor-reveal state is defined with
+;; Forward declaration: the cursor-reveal marker is defined with
 ;; `--handle-cursor', but `--set-overlay' (above it) reads it.
 (defvar latex-to-svg-frontend--last-point)
-(defvar latex-to-svg-frontend--last-reveal)
 
 (defvar-local latex-to-svg-frontend--rendered-appearance nil
   "Appearance signature this buffer's previews were last rendered for.
@@ -1355,23 +1354,37 @@ source is not indented by a leftover stretch."
               (overlays-in beg end)))
 
 (defvar-local latex-to-svg-frontend--requests nil
-  "The requests `latex-to-svg-frontend--place' is waiting on.
-Each is a list (BEG END) of the markers of the span it is for.  A
-request's callback installs its picture only while the request is in
-this list.  `latex-to-svg-frontend--drop-requests' removes it when a
-newer request or a preview replaces it, or the preview is cleared.")
+  "The requests `latex-to-svg-frontend--place' is waiting on, or nil.
+A hash table whose keys are the requests, with weak keys.  Each is a
+list (BEG END) of the markers of the span it is for.  A request's
+callback installs its picture only while the request is in this table.
+`latex-to-svg-frontend--drop-requests' removes it when a newer request
+or a preview replaces it, or the preview is cleared.  Only the callback
+refers to its request, so a request whose callback the backend did not
+keep (the equation failed before, for instance) is removed by the
+garbage collector, with its markers.")
+
+(defun latex-to-svg-frontend--requests ()
+  "Return the table `latex-to-svg-frontend--requests', made if needed."
+  (or latex-to-svg-frontend--requests
+      (setq latex-to-svg-frontend--requests
+            (make-hash-table :test #'eq :weakness 'key))))
 
 (defun latex-to-svg-frontend--drop-requests (beg end)
   "Forget the pending requests for spans intersecting BEG..END.
 Also forget those whose span was deleted.  Their pictures, when the
 backend finishes them, are not installed."
-  (setq latex-to-svg-frontend--requests
-        (seq-remove (lambda (request)
-                      (let ((b (marker-position (car request)))
-                            (e (marker-position (cadr request))))
-                        (or (not (and b e (< b e)))
-                            (and (< b end) (< beg e)))))
-                    latex-to-svg-frontend--requests)))
+  (when latex-to-svg-frontend--requests
+    (let ((dropped nil))
+      (maphash (lambda (request _)
+                 (let ((b (marker-position (car request)))
+                       (e (marker-position (cadr request))))
+                   (when (or (not (and b e (< b e)))
+                             (and (< b end) (< beg e)))
+                     (push request dropped))))
+               latex-to-svg-frontend--requests)
+      (dolist (request dropped)
+        (remhash request latex-to-svg-frontend--requests)))))
 
 (defun latex-to-svg-frontend--clear-region (beg end)
   "Delete this package's preview overlays intersecting BEG..END.
@@ -1450,14 +1463,14 @@ same cache entry.  Replaces any existing preview overlay in the span."
         (overlay-put ov 'latex-to-svg-frontend-image image)
         ;; After `display-math', which decides whether it is centered.
         (latex-to-svg-frontend--show-image ov image)
-        ;; Point may be on the span, revealed by `--handle-cursor' after
-        ;; the last command, before the picture arrived.
-        (when (and latex-to-svg-frontend--last-reveal
-                   latex-to-svg-frontend--last-point
-                   (eql (marker-position latex-to-svg-frontend--last-point)
-                        (point))
+        ;; Point may be on the span, whose source `--handle-cursor'
+        ;; shows.  Not before it has run once: a buffer shows its
+        ;; pictures until the first command.
+        (when (and latex-to-svg-frontend--last-point
                    (eq ov (latex-to-svg-frontend--revealable-overlay-at
-                           (point))))
+                           (point)))
+                   (latex-to-svg-frontend--reveal-p
+                    (latex-to-svg-frontend--overlay-kind ov)))
           (latex-to-svg-frontend--hide-image ov))
         (when enums-fallback
           (let ((meta (plist-get (latex-to-svg-backend-metadata value engine) :nums)))
@@ -2150,7 +2163,7 @@ clearing replaced it, and BEG..END still holds SOURCE."
                (frame (latex-to-svg-frontend--display-frame buffer))
                (image
                 (progn
-                  (push request latex-to-svg-frontend--requests)
+                  (puthash request t (latex-to-svg-frontend--requests))
                   (latex-to-svg-backend
                    value
                    :rescale-by (latex-to-svg-frontend--rescale-for display-p)
@@ -2171,8 +2184,7 @@ clearing replaced it, and BEG..END still holds SOURCE."
           (unless frame
             (setq latex-to-svg-frontend--undrawn t))
           (when image
-            (setq latex-to-svg-frontend--requests
-                  (delq request latex-to-svg-frontend--requests))
+            (remhash request (latex-to-svg-frontend--requests))
             (latex-to-svg-frontend--set-overlay
              beg end value image source enums-fallback display-p engine
              fallback))))))))
@@ -2185,9 +2197,8 @@ in `latex-to-svg-frontend--requests' and BEG..END holds SOURCE.  The
 other arguments are those of `latex-to-svg-frontend--place'."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
-      (when (memq request latex-to-svg-frontend--requests)
-        (setq latex-to-svg-frontend--requests
-              (delq request latex-to-svg-frontend--requests))
+      (when (gethash request (latex-to-svg-frontend--requests))
+        (remhash request latex-to-svg-frontend--requests)
         (let ((b (marker-position (car request)))
               (e (marker-position (cadr request))))
           (when (and b e (<= (point-min) b) (< b e) (<= e (point-max))

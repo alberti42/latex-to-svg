@@ -2403,6 +2403,30 @@ callback recorded for LATEX.  Issue #5."
           (should (eq (overlay-get ov 'display) 'image)))
         (latex-to-svg-frontend-mode -1)))))
 
+(ert-deftest l2sf-late-picture-after-point-moved-in-a-command ()
+  ;; Point moved into `$x$' after the last `--handle-cursor', as inside a
+  ;; command, when the picture arrived.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend-mode 1)
+        (goto-char (point-max))
+        (latex-to-svg-frontend--handle-cursor)
+        (goto-char 9)
+        (finish "$x$" 'image)
+        (should-not (overlay-get (car (l2sf-tests--overlays)) 'display))
+        (latex-to-svg-frontend-mode -1)))))
+
+(ert-deftest l2sf-request-the-backend-did-not-keep-is-collected ()
+  ;; The backend keeps no callback for an equation that failed before.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "Before $x$ after\n"
+      (cl-letf (((symbol-function 'latex-to-svg-backend)
+                 (lambda (_latex &rest _) nil)))
+        (latex-to-svg-frontend--render-region (point-min) (point-max)))
+      (garbage-collect)
+      (should (zerop (hash-table-count latex-to-svg-frontend--requests))))))
+
 (ert-deftest l2sf-late-picture-after-mode-off-is-dropped ()
   (l2sf-tests--with-stub
     (l2sf-tests--with-pending
