@@ -2218,22 +2218,21 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
   ;; `gnus-article-mode-hook'.  Each article Gnus shows in the buffer is
   ;; drawn from `gnus-article-prepare-hook', including the equation point is
   ;; in; the previous article's previews are gone.  Numbering is off in the
-  ;; buffer unless set there, and `$' pairs without the pandoc guards;
-  ;; turning the mode off restores both.
+  ;; buffer unless set there; turning the mode off restores it.  The
+  ;; pandoc guards on `$' stay, so prices in a mail are not math.
   (l2sf-tests--with-stub
     (l2sf-tests--gnus
       (latex-to-svg-for-gnus-mode 1)
       (should latex-to-svg-frontend-mode)
       (should-not latex-to-svg-frontend-number-equations)
-      (should-not latex-to-svg-frontend-dollar-guards)
-      (l2sf-tests--gnus-show "Subject: on $x$\n\n$a$ and \\(b\\) and $ c $\n")
-      (should (equal (l2sf-tests--values) '("$x$" "$a$" "\\(b\\)" "$ c $")))
+      (should latex-to-svg-frontend-dollar-guards)
+      (l2sf-tests--gnus-show "Subject: on $x$\n\n$a$ and \\(b\\), $30 and $50\n")
+      (should (equal (l2sf-tests--values) '("$x$" "$a$" "\\(b\\)")))
       (l2sf-tests--gnus-show "Subject: none\n\n$c$\n")
       (should (equal (l2sf-tests--values) '("$c$")))
       (latex-to-svg-for-gnus-mode -1)
       (should-not latex-to-svg-frontend-mode)
       (should-not (local-variable-p 'latex-to-svg-frontend-number-equations))
-      (should-not (local-variable-p 'latex-to-svg-frontend-dollar-guards))
       (should-not (memq #'latex-to-svg-for-gnus--article-prepared
                         gnus-article-prepare-hook))
       (should (null (l2sf-tests--overlays)))))

@@ -403,7 +403,7 @@ followed by a digit, such as `$x$2', is not detected either.  What still
 slips through is shell variables such as \"$HOME/$USER\"; escape them as
 \"\$HOME/\$USER\" for a one-off, or turn this off (leaving the other three
 families on) and use `\(…\)' in buffers where `$' is mostly prose.
-The LaTeX and Gnus adaptors turn the guards off (see
+The LaTeX adaptor turns the guards off (see
 `latex-to-svg-frontend-dollar-guards')."
   :type 'boolean
   :safe #'booleanp
@@ -551,8 +551,8 @@ An opening `$' must be followed by a non-space, and a closing `$'
 preceded by a non-space and not followed by a digit (see
 `latex-to-svg-frontend-detect-dollar-inline').  nil means TeX's rule:
 the first `$' after an opening one ends the span, whatever surrounds
-it, so `$\\lambda $' is math.  The Markdown and Org adaptors keep the
-guards; the LaTeX and Gnus adaptors set this to nil.")
+it, so `$\\lambda $' is math.  The LaTeX adaptor sets this to nil;
+the Markdown, Org and Gnus adaptors keep the guards.")
 (put 'latex-to-svg-frontend-dollar-guards 'safe-local-variable #'booleanp)
 
 (defvar-local latex-to-svg-frontend-detect-function nil

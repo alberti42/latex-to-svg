@@ -649,7 +649,7 @@ in the paragraph. The price of the digit rule: math directly followed by a
 digit, such as `$x$2`, is not detected either. What still slips through is
 shell variables such as `$HOME/$USER`, which read as the equation `HOME/`.
 
-The LaTeX and Gnus adaptors turn these guards off: there, the first `$` after
+The LaTeX adaptor turns these guards off: there, the first `$` after
 an opening one ends the span, whatever surrounds it, as in TeX, so
 `$\lambda $` is math. The buffer-local variable
 `latex-to-svg-frontend-dollar-guards` controls this.
