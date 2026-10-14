@@ -78,6 +78,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   buffer-local variable `latex-to-svg-frontend-emphasis-faces` holds the
   list, which each adaptor sets.
   ([#8](https://github.com/alberti42/latex-to-svg/issues/8))
+- Detecting math in a region that ends inside an equation signaled
+  "Invalid search bound (wrong side of point)". Font-lock passes such a
+  region when a chunk it fontifies ends inside a display equation, and so
+  can the pass after an edit with no clean leave, such as a paste. The
+  equation is now found whole.
 
 ## [0.21.0] - 2026-10-11
 

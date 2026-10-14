@@ -1039,6 +1039,20 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
       (should-not (latex-to-svg-frontend--x-height-ratio "None" nil))
       (should (equal sizes '(1000 1000))))))
 
+(ert-deftest l2sf-scan-ends-inside-an-equation ()
+  ;; END inside an equation, as font-lock's limit or the end of a changed
+  ;; range can be: the equation is returned whole, with no error.
+  (l2sf-tests--md "a\n\\begin{equation}\nx\n\\end{equation}\nb $y$ c\n"
+    (dolist (end '(25 33 40))
+      (should (equal (mapcar (lambda (el)
+                               (list (latex-to-svg-frontend--math-begin el)
+                                     (latex-to-svg-frontend--math-end el)))
+                             (latex-to-svg-frontend--scan 1 end))
+                     (if (< end 39) '((3 36)) '((3 36) (39 42))))))
+    (setq-local latex-to-svg-frontend-emphasis-faces '(bold))
+    (goto-char 1)
+    (latex-to-svg-frontend--suppress-emphasis 25)))
+
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
 (no overlay), colour and all."

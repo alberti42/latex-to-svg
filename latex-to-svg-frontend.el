@@ -1093,7 +1093,9 @@ swallowing later text."
   "Return LaTeX math records within BEG..END (default whole buffer), in order.
 Skips openers inside excluded regions (`--exclusions'), backslash-escaped
 openers, and any delimiter family disabled by its `-detect-*' toggle.
-Passing a small BEG..END (e.g. one blank-line block) keeps scans cheap."
+Passing a small BEG..END (e.g. one blank-line block) keeps scans cheap.
+A record whose opener is before END may end after END: font-lock's
+limit, or the end of a changed range, can fall inside an equation."
   (let* ((beg (or beg (point-min)))
          (end (or end (point-max)))
          ;; Exclusion regions sorted by start.  Since openers are swept in
@@ -1112,7 +1114,10 @@ Passing a small BEG..END (e.g. one blank-line block) keeps scans cheap."
       (save-restriction
         (widen)
         (goto-char beg)
-        (while (re-search-forward latex-to-svg-frontend--opener-regexp end t)
+        ;; A record that ends past END leaves point past END, where
+        ;; `re-search-forward' with bound END signals.
+        (while (and (< (point) end)
+                    (re-search-forward latex-to-svg-frontend--opener-regexp end t))
           (let ((mb (match-beginning 0))
                 (me (match-end 0))
                 (tok (match-string 0)))
