@@ -89,6 +89,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   region when a chunk it fontifies ends inside a display equation, and so
   can the pass after an edit with no clean leave, such as a paste. The
   equation is now found whole.
+- Emphasis inside a display equation is removed wherever font-lock
+  starts the chunk it fontifies. When a chunk started inside the
+  equation, its lower part kept the emphasis, so `E_32 = m c^2 +
+  \sum_{k=0}` in Markdown showed in italic from `_32` on.
 
 ## [0.21.0] - 2026-10-11
 

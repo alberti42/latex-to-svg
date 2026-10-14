@@ -1053,6 +1053,18 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
     (goto-char 1)
     (latex-to-svg-frontend--suppress-emphasis 25)))
 
+(ert-deftest l2sf-suppress-emphasis-chunk-starts-inside-an-equation ()
+  ;; Font-lock fontifies a chunk that starts inside a display equation:
+  ;; the emphasis there is removed, as when the whole buffer is fontified.
+  (l2sf-tests--md "Text.\n\\begin{equation}\nE_32 = m c^2 + \\sum_{k=0} k\n\\end{equation}\n"
+    (setq-local latex-to-svg-frontend-emphasis-faces '(italic))
+    (let* ((u (1+ (string-match "_32" (buffer-string))))
+           (chunk (+ u 3)))
+      (put-text-property u (+ u 16) 'face 'italic)
+      (goto-char chunk)
+      (latex-to-svg-frontend--suppress-emphasis (point-max))
+      (should-not (get-text-property chunk 'face)))))
+
 (ert-deftest l2sf-suppress-emphasis-neutralizes-source ()
   "The font-lock pass removes spurious emphasis face from raw math source
 (no overlay), colour and all."

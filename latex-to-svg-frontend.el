@@ -3068,7 +3068,9 @@ other faces of the run stay: a face the markup gives math itself, such as
 preview (see `latex-to-svg-frontend--foreground-for'), and the faces of
 LaTeX font-lock.  A legitimate prose emphasis that merely *contains* inline
 math (its markers in prose, endpoints outside every span) is left untouched.
-Returns nil (own fontification, one call per chunk).
+The spans are found from the start of the blank-line block around POINT,
+so a chunk that starts inside an equation sees it.  Returns nil (own
+fontification, one call per chunk).
 
 \(The masking `latex-to-svg-frontend--neutralize-face' is still used on preview
 overlays, where an image covers the text and only drawn-over decoration --
@@ -3078,7 +3080,12 @@ not colour -- matters.)"
     (let ((spans (mapcar (lambda (el)
                            (cons (latex-to-svg-frontend--math-begin el)
                                  (latex-to-svg-frontend--math-end el)))
-                         (latex-to-svg-frontend--scan (point) limit))))
+                         ;; From the start of the block around point: a
+                         ;; chunk that starts inside an equation still
+                         ;; sees it, as `--unhide-math' does.
+                         (latex-to-svg-frontend--scan
+                          (car (latex-to-svg-frontend--block-bounds (point)))
+                          limit))))
       (when spans
         (let ((p (point))
               (rest spans))
