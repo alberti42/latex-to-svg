@@ -7,7 +7,7 @@
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.21.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.14.0"))
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.15.0"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -2177,10 +2177,11 @@ clearing replaced it, and BEG..END still holds SOURCE."
                    :fallback fallback
                    :quiet latex-to-svg-frontend-quiet
                    :callback
-                   (lambda ()
-                     (latex-to-svg-frontend--place-when-current
-                      request buffer value source enums-fallback display-p
-                      engine))))))
+                   (lambda (outcome)
+                     (unless outcome
+                       (latex-to-svg-frontend--place-when-current
+                        request buffer value source enums-fallback display-p
+                        engine)))))))
           (unless frame
             (setq latex-to-svg-frontend--undrawn t))
           (when image
@@ -2590,8 +2591,8 @@ fetched while `latex-to-svg-frontend--graphical-p' is nil."
                                          ov 'latex-to-svg-frontend-fallback)
                               :quiet latex-to-svg-frontend-quiet
                               :callback
-                              (lambda ()
-                                (when (overlay-buffer ov)
+                              (lambda (outcome)
+                                (when (and (null outcome) (overlay-buffer ov))
                                   (latex-to-svg-frontend--refresh-overlay ov))))))
             (overlay-put ov 'latex-to-svg-frontend-image image)
             (when (overlay-get ov 'display)

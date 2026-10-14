@@ -95,11 +95,16 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar l2sf-tests--engine-used)
 
 (defun l2sf-tests--check-colors (args)
-  "Signal an error unless ARGS meet `latex-to-svg-backend' 0.14.0.
+  "Signal an error unless ARGS meet `latex-to-svg-backend' 0.15.0.
 That is: `:color' and `:background' are nil or `#rrggbb' strings,
 `:x-height' is nil or a positive number, and `:color' is non-nil
 whenever `:x-height' is.  The removed `:font-height' and `:font-size'
-are an error."
+are an error.  `:callback' takes one argument, the outcome."
+  (when-let* ((callback (plist-get args :callback))
+              (arity (func-arity callback))
+              ((not (and (<= (car arity) 1)
+                         (or (eq (cdr arity) 'many) (>= (cdr arity) 1))))))
+    (error ":callback does not take one argument: %S" arity))
   (dolist (key '(:font-height :font-size))
     (when (plist-member args key)
       (error "%s is removed: pass :x-height" key)))
@@ -2323,7 +2328,8 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
           (should (eq (overlay-get ov 'display) 'fake-image)))
         (delete-overlay (car (last (l2sf-tests--overlays))))
         (let ((l2sf-tests--image 'compiled))
-          (mapc #'funcall callbacks))
+          (dolist (callback callbacks)
+            (funcall callback nil)))
         (should (equal (mapcar (lambda (ov) (overlay-get ov 'display))
                                (l2sf-tests--overlays))
                        '(compiled)))))))
@@ -2345,7 +2351,7 @@ callback recorded for LATEX.  Issue #5."
                              nil)))))
        (cl-flet ((finish (latex image)
                    (push (cons latex image) ready)
-                   (funcall (cdr (assoc latex pending)))))
+                   (funcall (cdr (assoc latex pending)) nil)))
          ,@body))))
 
 (ert-deftest l2sf-late-picture-does-not-replace-newer-one ()
@@ -2443,9 +2449,9 @@ callback recorded for LATEX.  Issue #5."
         (latex-to-svg-frontend-mode 1)
         (pcase-let ((`(,new ,old) (mapcar #'cdr pending)))
           (push '("$x$" . image) ready)
-          (funcall old)
+          (funcall old nil)
           (should-not (l2sf-tests--overlays))
-          (funcall new)
+          (funcall new nil)
           (should (equal (mapcar (lambda (ov) (overlay-get ov 'display))
                                  (l2sf-tests--overlays))
                          '(image))))

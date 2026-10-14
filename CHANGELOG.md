@@ -34,6 +34,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source, so `DEL` there deletes a character you can see. This is the
   position at which newly typed math was already not rendered yet. Where
   one equation ends and the next starts, point reveals the next.
+- Requires `latex-to-svg-backend` 0.15.0, which calls the callback of
+  every request with its outcome: nil when the picture is ready, or a
+  plist that describes the failure.
 
 ### Fixed
 
