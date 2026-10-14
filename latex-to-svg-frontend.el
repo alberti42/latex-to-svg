@@ -1483,14 +1483,44 @@ same cache entry.  Replaces any existing preview overlay in the span."
               (latex-to-svg-frontend--appearance))
         ov))))
 
-(defun latex-to-svg-frontend--set-unrendered-overlay (beg end source enums-fallback engine)
-  "Mark BEG..END as math whose cookie leaves it unrendered.
+(defun latex-to-svg-frontend--failure-help-echo (failure)
+  "Return the `help-echo' of an equation whose request ended in FAILURE.
+FAILURE is the plist the backend passes to the callback (see
+`latex-to-svg-backend').  For a `formula' failure it names the engine
+and gives the message: \"LaTeX could not typeset it: MESSAGE\", or
+\"RaTeX could not parse it: MESSAGE\".  For a `setup' failure it gives
+the message, which names the program that was not found.  The log
+follows on its own line when there is one."
+  (let* ((engine (plist-get failure :engine))
+         (message (plist-get failure :message))
+         (log (plist-get failure :log))
+         (text (if (eq (plist-get failure :kind) 'setup)
+                   (or message
+                       (format "%s could not run `%s'"
+                               (latex-to-svg-frontend--engine-name engine)
+                               (plist-get failure :program)))
+                 (concat (format "%s could not %s it"
+                                 (latex-to-svg-frontend--engine-name engine)
+                                 (if (eq engine 'ratex) "parse" "typeset"))
+                         (and message (concat ": " message))))))
+    (latex-to-svg-frontend--help-echo-text
+     (if log (concat text "\nLog: " log) text))))
+
+(defun latex-to-svg-frontend--set-unrendered-overlay (beg end source enums-fallback engine &optional fallback failure)
+  "Mark BEG..END as math whose cookie or failure leaves it unrendered.
 ENGINE is `skip', or a warning string (see `--engine-for'), which is
-shown with `display-warning' and as the overlay's `help-echo'.  The
-overlay shows nothing: the source stays as text.  It keeps SOURCE and,
-when ENUMS-FALLBACK is non-nil, the equation's number range, so the
-incremental renumbering counts the numbers a skipped equation takes, as
-the exported document does.  Leaving it after an edit re-renders it."
+shown with `display-warning' and as the overlay's `help-echo'.  With
+FAILURE, the plist of a request that ended without a picture (see
+`latex-to-svg-backend'), ENGINE and FALLBACK are the ones the request
+was sent with, so `--needs-render-p' renders it again when the options
+give it another engine or fallback.  FAILURE is recorded as
+`latex-to-svg-frontend-failure' and shown as the `help-echo' (see
+`--failure-help-echo'), with no warning: the backend warns, or not, by
+`:quiet'.  The overlay shows nothing: the source stays as text.  It
+keeps SOURCE and, when ENUMS-FALLBACK is non-nil, the equation's number
+range, so the incremental renumbering counts the numbers a skipped or
+failed equation takes, as the exported document does.  Leaving it after
+an edit re-renders it."
   (let ((b (if (markerp beg) (marker-position beg) beg))
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
@@ -1500,14 +1530,20 @@ the exported document does.  Leaving it after an edit re-renders it."
         (overlay-put ov 'latex-to-svg-frontend-unrendered t)
         (overlay-put ov 'latex-to-svg-frontend-source source)
         (overlay-put ov 'latex-to-svg-frontend-engine engine)
+        (overlay-put ov 'latex-to-svg-frontend-fallback fallback)
         (overlay-put ov 'evaporate t)
         (when enums-fallback
           (overlay-put ov 'latex-to-svg-frontend-enums enums-fallback))
-        (when (stringp engine)
+        (cond
+         (failure
+          (overlay-put ov 'latex-to-svg-frontend-failure failure)
+          (overlay-put ov 'help-echo
+                       (latex-to-svg-frontend--failure-help-echo failure)))
+         ((stringp engine)
           (overlay-put ov 'help-echo engine)
           (display-warning 'latex-to-svg-frontend
                            (format "%s, line %d: %s" (buffer-name)
-                                   (line-number-at-pos b) engine)))
+                                   (line-number-at-pos b) engine))))
         (overlay-put ov 'modification-hooks
                      (list #'latex-to-svg-frontend--on-modify))
         ov))))
@@ -2642,10 +2678,13 @@ it up to date after an option changes.")
 
 (defun latex-to-svg-frontend--needs-render-p (el)
   "Non-nil when math element EL has to be rendered to be up to date.
-That is when it has no preview, or a preview made for another engine or
+That is when it has no preview, a preview made for another engine or
 fallback than the options now give it (see `--engine-for' and
-`--fallback-for').  The element containing point is never rendered, as
-`--render-on-leave' never renders it."
+`--fallback-for'), or the overlay of a failed request (see
+`--set-unrendered-overlay'): after a change of a backend option in the
+cache key, such as the preamble, the backend compiles it again, else it
+answers from its record of the failure.  The element containing point is
+never rendered, as `--render-on-leave' never renders it."
   (let ((b (latex-to-svg-frontend--math-begin el))
         (e (latex-to-svg-frontend--math-end el)))
     (unless (<= b (point) e)
@@ -2659,7 +2698,8 @@ fallback than the options now give it (see `--engine-for' and
                            ovs)))
             (let ((engine (latex-to-svg-frontend--engine-for
                            (latex-to-svg-frontend--math-value el))))
-              (or (not (equal engine
+              (or (overlay-get ov 'latex-to-svg-frontend-failure)
+                  (not (equal engine
                               (overlay-get ov 'latex-to-svg-frontend-engine)))
                   (not (eq (latex-to-svg-frontend--fallback-for engine)
                            (overlay-get ov 'latex-to-svg-frontend-fallback)))))))))))

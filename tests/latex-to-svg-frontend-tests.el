@@ -3023,6 +3023,55 @@ callback recorded for LATEX.  Issue #5."
         (should (overlay-get ov 'latex-to-svg-frontend-unrendered))
         (should-not (overlay-get ov 'display))))))
 
+;;;; Failed equations
+
+(defconst l2sf-tests--failure
+  '(:kind formula :engine latex :message "Undefined control sequence."
+    :line 1 :column 13 :log "/cache/key.log" :program nil)
+  "The plist the backend gives for `$\\notacommand$'.")
+
+(ert-deftest l2sf-failed-overlay-keeps-the-source ()
+  ;; A failed overlay shows nothing, keeps the engine and fallback the
+  ;; request was sent with, and does not warn: the backend does.  An
+  ;; update renders it again, so a change of the preamble retries it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "Before $\\notacommand$ after\n"
+      (let ((warnings nil))
+        (cl-letf (((symbol-function 'display-warning)
+                   (lambda (_type message &rest _) (push message warnings))))
+          (latex-to-svg-frontend--set-unrendered-overlay
+           8 22 "$\\notacommand$" nil 'latex nil l2sf-tests--failure))
+        (should-not warnings))
+      (let ((ov (car (l2sf-tests--overlays))))
+        (should (overlay-get ov 'latex-to-svg-frontend-unrendered))
+        (should (equal (overlay-get ov 'latex-to-svg-frontend-failure)
+                       l2sf-tests--failure))
+        (should (eq (overlay-get ov 'latex-to-svg-frontend-engine) 'latex))
+        (should-not (overlay-get ov 'display))
+        (should (eq (latex-to-svg-frontend--revealable-overlay-at 10) ov))
+        (latex-to-svg-frontend--close-overlay ov)
+        (should-not (overlay-get ov 'display))
+        (goto-char (point-max))
+        (should (latex-to-svg-frontend--needs-render-p
+                 (latex-to-svg-frontend--element-at 10)))))))
+
+(ert-deftest l2sf-failed-overlay-help-echo ()
+  ;; `help-echo' names the engine and gives the message and the log, as
+  ;; written: Emacs runs it through `substitute-command-keys'.
+  (dolist (case
+           `((,l2sf-tests--failure
+              . "LaTeX could not typeset it: Undefined control sequence.\nLog: /cache/key.log")
+             ((:kind formula :engine ratex :message "Unknown command `\\x'")
+              . "RaTeX could not parse it: Unknown command `\\x'")
+             ((:kind formula :engine texres)
+              . "texres could not typeset it")
+             ((:kind setup :engine texres :program "pdftocairo"
+               :message "The texres engine could not run `pdftocairo': program not found.")
+              . "The texres engine could not run `pdftocairo': program not found.")))
+    (should (equal (substitute-command-keys
+                    (latex-to-svg-frontend--failure-help-echo (car case)))
+                   (cdr case)))))
+
 (ert-deftest l2sf-cookie-unknown-value-warns ()
   ;; An unknown value warns, sends nothing to the backend, and does not fall
   ;; back to the default engine.
