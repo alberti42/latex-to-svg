@@ -54,9 +54,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - In `markdown-ts-mode` with `markdown-ts-hide-markup` on, the delimiters
   of math are visible: the `$` of `$...$` when point is on the equation,
   and the backslash of `\(` and `\[`, which showed as `(x^2)` with no
-  preview. The mode removes the `invisible` property from math source
-  wherever the markup's font-lock sets it (`invisible` is in
-  `font-lock-extra-managed-props`).
+  preview. The Markdown adaptor removes the `invisible` property from
+  math source while `markdown-ts-hide-markup` or `markdown-hide-markup`
+  is on; `markdown-mode` hides the same backslashes.
 - In LaTeX buffers, inline `$` pairs as TeX does: the first `$`
   after an opening one ends the span, whatever surrounds it. Before, the
   pandoc guards of Markdown applied there too, so `{$\lambda $}, x
