@@ -2462,12 +2462,16 @@ with the failure plist FAILURE.  Issue #5."
         (should-not (overlay-get (car (l2sf-tests--overlays)) 'display))
         (latex-to-svg-frontend-mode -1)))))
 
-(ert-deftest l2sf-request-the-backend-did-not-keep-is-collected ()
-  ;; The backend keeps no callback for an equation that failed before.
+(ert-deftest l2sf-request-the-backend-does-not-call-is-collected ()
+  ;; The backend calls no callback for an equation it has compiled,
+  ;; requested with no `:x-height' (no window shows the buffer).
   (l2sf-tests--with-stub
     (l2sf-tests--md "Before $x$ after\n"
       (cl-letf (((symbol-function 'latex-to-svg-backend)
-                 (lambda (_latex &rest _) nil)))
+                 (lambda (_latex &rest args)
+                   (when (plist-get args :x-height)
+                     (error "Unexpected :x-height"))
+                   nil)))
         (latex-to-svg-frontend--render-region (point-min) (point-max)))
       (garbage-collect)
       (should (zerop (hash-table-count latex-to-svg-frontend--requests))))))

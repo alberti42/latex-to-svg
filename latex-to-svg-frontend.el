@@ -1360,9 +1360,10 @@ list (BEG END) of the markers of the span it is for.  A request's
 callback installs its picture only while the request is in this table.
 `latex-to-svg-frontend--drop-requests' removes it when a newer request
 or a preview replaces it, or the preview is cleared.  Only the callback
-refers to its request, so a request whose callback the backend did not
-keep (the equation failed before, for instance) is removed by the
-garbage collector, with its markers.")
+refers to its request, so a request whose callback the backend does not
+call is removed by the garbage collector, with its markers.  The backend
+calls every callback but that of an equation it has compiled, requested
+with no `:x-height': while no window shows the buffer.")
 
 (defun latex-to-svg-frontend--requests ()
   "Return the table `latex-to-svg-frontend--requests', made if needed."
