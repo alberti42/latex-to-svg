@@ -86,10 +86,17 @@
   (message "  newest dated CHANGELOG.md section: %s" changelog)
   (unless stable
     (push "MELPA Stable lists no latex-to-svg-backend" problems))
-  (when (and stable (not (equal floor stable)))
+  (cond
+   ((or (null stable) (version= floor stable)))
+   ((version< floor stable)
     (push (format "latex-to-svg-frontend.el requires latex-to-svg-backend %s, \
 but MELPA Stable has %s: raise the floor" floor stable)
           problems))
+   (t
+    (push (format "latex-to-svg-frontend.el requires latex-to-svg-backend %s, \
+but MELPA Stable has %s: release the backend %s, or wait until MELPA \
+Stable has built it" floor stable floor)
+          problems)))
   (unless (equal changelog version)
     (push (format "CHANGELOG.md's newest dated section is %s, the headers say %s"
                   changelog version)
