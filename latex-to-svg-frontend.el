@@ -2610,8 +2610,11 @@ cache key changed \(`latex-to-svg-backend-preamble',
 `latex-to-svg-backend-preamble-not-precompiled') or the entry was
 collected, the backend compiles it and this runs again when the compile
 is done.  OV keeps its old image until then; an OV
-deleted in the meantime (edited, renumbered) is left alone.  Nothing is
-fetched while `latex-to-svg-frontend--graphical-p' is nil."
+deleted in the meantime (edited, renumbered) is left alone.  When the
+compile fails, OV is replaced by `--set-unrendered-overlay' with the
+failure, unless OV was edited in the meantime: leaving it renders the
+edit.  Nothing is fetched while `latex-to-svg-frontend--graphical-p' is
+nil."
   (when-let* ((buffer (overlay-buffer ov))
               (value (overlay-get ov 'latex-to-svg-frontend-value)))
     (with-current-buffer buffer
@@ -2637,11 +2640,33 @@ fetched while `latex-to-svg-frontend--graphical-p' is nil."
                               :quiet latex-to-svg-frontend-quiet
                               :callback
                               (lambda (outcome)
-                                (when (and (null outcome) (overlay-buffer ov))
-                                  (latex-to-svg-frontend--refresh-overlay ov))))))
+                                (when (overlay-buffer ov)
+                                  (if outcome
+                                      (latex-to-svg-frontend--refresh-failed
+                                       ov outcome)
+                                    (latex-to-svg-frontend--refresh-overlay
+                                     ov)))))))
             (overlay-put ov 'latex-to-svg-frontend-image image)
             (when (overlay-get ov 'display)
               (latex-to-svg-frontend--show-image ov image))))))))
+
+(defun latex-to-svg-frontend--refresh-failed (ov failure)
+  "Replace preview overlay OV, whose compile ended in FAILURE.
+See `latex-to-svg-frontend--refresh-overlay'.  The failed overlay keeps
+OV's source, number range, engine and fallback.  Nothing is done when
+OV was edited since it was drawn."
+  (with-current-buffer (overlay-buffer ov)
+    (let ((source (overlay-get ov 'latex-to-svg-frontend-source)))
+      (when (and (not (overlay-get ov 'latex-to-svg-frontend-modified))
+                 (equal (buffer-substring-no-properties
+                         (overlay-start ov) (overlay-end ov))
+                        source))
+        (latex-to-svg-frontend--set-unrendered-overlay
+         (overlay-start ov) (overlay-end ov) source
+         (overlay-get ov 'latex-to-svg-frontend-enums)
+         (overlay-get ov 'latex-to-svg-frontend-engine)
+         (overlay-get ov 'latex-to-svg-frontend-fallback)
+         failure)))))
 
 (defun latex-to-svg-frontend--refresh-buffer (buffer)
   "Fetch BUFFER's previews again for the current appearance.

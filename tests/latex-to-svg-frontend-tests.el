@@ -94,6 +94,11 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar l2sf-tests--calls)
 (defvar l2sf-tests--engine-used)
 
+(defconst l2sf-tests--failure
+  '(:kind formula :engine latex :message "Undefined control sequence."
+    :line 1 :column 13 :log "/cache/key.log" :program nil)
+  "The plist the backend gives for `$\\notacommand$'.")
+
 (defun l2sf-tests--check-colors (args)
   "Signal an error unless ARGS meet `latex-to-svg-backend' 0.15.0.
 That is: `:color' and `:background' are nil or `#rrggbb' strings,
@@ -2334,6 +2339,37 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                                (l2sf-tests--overlays))
                        '(compiled)))))))
 
+(ert-deftest l2sf-refresh-whose-compile-fails ()
+  ;; After a change of the preamble, the compile of a numbered equation
+  ;; fails: its preview is replaced by a failed overlay that keeps its
+  ;; numbers, engine and fallback.  An equation edited in the meantime is
+  ;; left to the render of the edit.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\begin{equation}\nx\n\\end{equation}\n\n$a$\n"
+      (latex-to-svg-frontend--render-region (point-min) (point-max))
+      (let ((callbacks nil))
+        (cl-letf (((symbol-function 'latex-to-svg-backend)
+                   (lambda (_latex &rest args)
+                     (push (plist-get args :callback) callbacks)
+                     nil)))
+          (latex-to-svg-frontend-refresh))
+        (pcase-let ((`(,equation ,inline) (l2sf-tests--overlays)))
+          (overlay-put inline 'latex-to-svg-frontend-modified t)
+          (dolist (callback callbacks)
+            (funcall callback l2sf-tests--failure))
+          (should (eq (overlay-get inline 'display) 'fake-image))
+          (should-not (overlay-buffer equation)))
+        (let ((failed (car (l2sf-tests--overlays))))
+          (should (equal (overlay-get failed 'latex-to-svg-frontend-failure)
+                         l2sf-tests--failure))
+          (should (equal (overlay-get failed 'latex-to-svg-frontend-source)
+                         "\\begin{equation}\nx\n\\end{equation}"))
+          (should (equal (overlay-get failed 'latex-to-svg-frontend-enums)
+                         '(1 . 1)))
+          (should (eq (overlay-get failed 'latex-to-svg-frontend-engine)
+                      'latex))
+          (should-not (overlay-get failed 'display)))))))
+
 (defmacro l2sf-tests--with-pending (&rest body)
   "Run BODY with a backend whose compiles finish when the test says.
 The backend returns the image of LATEX in the alist `ready' when there
@@ -3027,11 +3063,6 @@ with the failure plist FAILURE.  Issue #5."
         (should-not (overlay-get ov 'display))))))
 
 ;;;; Failed equations
-
-(defconst l2sf-tests--failure
-  '(:kind formula :engine latex :message "Undefined control sequence."
-    :line 1 :column 13 :log "/cache/key.log" :program nil)
-  "The plist the backend gives for `$\\notacommand$'.")
 
 (ert-deftest l2sf-failed-overlay-keeps-the-source ()
   ;; A failed overlay shows nothing, keeps the engine and fallback the

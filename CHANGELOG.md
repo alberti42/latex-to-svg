@@ -60,7 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   source shown. ([#5](https://github.com/alberti42/latex-to-svg/issues/5))
 - An equation that fails to compile shows its source. Before, an
   equation edited so that it no longer compiled showed the picture it had
-  before the edit once point entered and left it again. Its `help-echo`
+  before the edit once point entered and left it again. An equation
+  compiled again after a change of the preamble, and failing, shows its
+  source too, where it kept its old picture before. Its `help-echo`
   names the engine and gives the error message and the log. A numbered
   equation that failed keeps its numbers, so the equations below it keep
   theirs. ([#6](https://github.com/alberti42/latex-to-svg/issues/6))
