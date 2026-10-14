@@ -3031,12 +3031,6 @@ own mode, such as `markdown-toggle-url-hiding'.")
 ;;;###autoload
 ;;;; Emphasis suppression (font-lock)
 
-(defun latex-to-svg-frontend--pos-in-span-p (pos spans)
-  "Non-nil when POS is strictly inside one of SPANS (each a (BEG . END) cons).
-Strict (BEG < POS < END) so a marker *inside* math matches while the span's
-own delimiters do not."
-  (seq-some (lambda (s) (and (< (car s) pos) (< pos (cdr s)))) spans))
-
 (defun latex-to-svg-frontend--without-emphasis (face)
   "Return the value of the `face' property FACE without emphasis faces.
 The emphasis faces are `latex-to-svg-frontend-emphasis-faces'.  FACE is
@@ -3086,21 +3080,30 @@ not colour -- matters.)"
                                  (latex-to-svg-frontend--math-end el)))
                          (latex-to-svg-frontend--scan (point) limit))))
       (when spans
-        (let ((p (point)))
-          (while (< p limit)
-            (let ((q (or (next-single-property-change p 'face nil limit)
-                         limit)))
-              (when-let* ((face (get-text-property p 'face))
-                          ((or (latex-to-svg-frontend--pos-in-span-p p spans)
-                               (latex-to-svg-frontend--pos-in-span-p
-                                (1- q) spans)))
-                          (kept (latex-to-svg-frontend--without-emphasis
-                                 face))
-                          ((not (eq kept face))))
-                (if (eq kept 'none)
-                    (remove-text-properties p q '(face nil))
-                  (put-text-property p q 'face kept)))
-              (setq p q)))))))
+        (let ((p (point))
+              (rest spans))
+          ;; Non-nil when POS is strictly inside a span (BEG < POS < END):
+          ;; a run that starts on an opening delimiter does not count.
+          ;; SPANS are sorted and the positions asked about only grow (P,
+          ;; then the last character of its run, then the next run's P),
+          ;; so REST drops the spans that end at or before POS and is never
+          ;; walked again: the pass costs runs + spans, not runs * spans.
+          (cl-flet ((inside-p (pos)
+                      (while (and rest (<= (cdar rest) pos))
+                        (setq rest (cdr rest)))
+                      (and rest (< (caar rest) pos))))
+            (while (< p limit)
+              (let ((q (or (next-single-property-change p 'face nil limit)
+                           limit)))
+                (when-let* ((face (get-text-property p 'face))
+                            ((or (inside-p p) (inside-p (1- q))))
+                            (kept (latex-to-svg-frontend--without-emphasis
+                                   face))
+                            ((not (eq kept face))))
+                  (if (eq kept 'none)
+                      (remove-text-properties p q '(face nil))
+                    (put-text-property p q 'face kept)))
+                (setq p q))))))))
   (goto-char limit)
   nil)
 

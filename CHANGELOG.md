@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Fontifying a large region at once is faster with the mode on, as
+  `font-lock-ensure` does on the whole buffer: 0.33 s instead of 3.9 s for
+  a Markdown buffer of 118,000 characters with 1,500 equations. The time
+  of the font-lock keyword that removes emphasis from math grew with the
+  number of face runs times the number of equations in the region; it
+  now grows with their sum.
 - Point right after the closing delimiter of an equation reveals its
   source, so `DEL` there deletes a character you can see. This is the
   position at which newly typed math was already not rendered yet. Where
