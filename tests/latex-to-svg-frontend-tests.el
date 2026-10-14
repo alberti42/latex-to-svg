@@ -76,6 +76,9 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar markdown-ts-mode-hook)
 ;; A test binds it dynamically before Org is loaded.
 (defvar org-emphasis-alist)
+;; Buffer-local in their modes; tests set them without loading them.
+(defvar markdown-hide-markup)
+(defvar markdown-ts-hide-markup)
 (declare-function markdown-ts-mode "markdown-ts-mode")
 
 ;; --- Stub the backend: synchronous, deterministic, no TeX / no display -------
@@ -1203,54 +1206,58 @@ AUCTeX's `font-latex-math-face' and `font-latex-script-char-face' stay."
     (while (search-forward s nil t)
       (put-text-property (match-beginning 0) (match-end 0) 'invisible t))))
 
-(ert-deftest l2sf-unhide-math-removes-managed-invisible ()
-  "When font-lock manages `invisible', math delimiters become visible;
-an escape outside math stays hidden."
+(ert-deftest l2sf-unhide-markup-in-math-removes-invisible ()
+  "With markup hidden, the markup inside math becomes visible: the
+delimiters, and the backslash of `\\{' inside `\\(...\\)'; an escape
+outside math stays hidden."
   (l2sf-tests--with-stub
-    (l2sf-tests--md "a $x$ and \\(y\\) and \\*z\n"
-      (setq-local font-lock-extra-managed-props '(invisible))
+    (l2sf-tests--md "a $x$ and \\(\\{y\\) and \\*z\n"
+      (setq-local markdown-hide-markup t)
       (l2sf-tests--hide "$" "\\")
       (goto-char (point-min))
-      (latex-to-svg-frontend--unhide-math (point-max))
+      (latex-to-svg-for-markdown--unhide-markup-in-math (point-max))
       (should (equal (l2sf-tests--invisible-chars) "\\")))))
 
-(ert-deftest l2sf-unhide-math-needs-managed-invisible ()
-  "When font-lock does not manage `invisible', the property is kept."
+(ert-deftest l2sf-unhide-markup-in-math-needs-hidden-markup ()
+  "With markup hiding off, the keyword leaves `invisible' alone."
   (l2sf-tests--with-stub
     (l2sf-tests--md "a $x$ b\n"
       (l2sf-tests--hide "$")
       (goto-char (point-min))
-      (latex-to-svg-frontend--unhide-math (point-max))
+      (latex-to-svg-for-markdown--unhide-markup-in-math (point-max))
       (should (equal (l2sf-tests--invisible-chars) "$$")))))
 
-(ert-deftest l2sf-unhide-math-chunk-inside-equation ()
+(ert-deftest l2sf-unhide-markup-in-math-chunk-inside-equation ()
   "A chunk that starts inside an equation of several lines unhides both
 of its delimiters."
   (l2sf-tests--with-stub
     (l2sf-tests--md "$$\nx\n$$\n"
-      (setq-local font-lock-extra-managed-props '(invisible))
+      (setq-local markdown-ts-hide-markup t)
       (l2sf-tests--hide "$$")
       (goto-char (point-min))
       (forward-line 1)
-      (latex-to-svg-frontend--unhide-math (line-end-position))
+      (put-text-property (point) (1+ (point)) 'invisible t)
+      (latex-to-svg-for-markdown--unhide-markup-in-math (line-end-position))
       (should (equal (l2sf-tests--invisible-chars) "")))))
 
-(ert-deftest l2sf-unhide-math-markdown-ts-hide-markup ()
-  "In `markdown-ts-mode' with `markdown-ts-hide-markup' on, the mode keeps
-the delimiters of math visible and an escape outside math hidden."
+(ert-deftest l2sf-unhide-markup-in-math-markdown-ts-hide-markup ()
+  "In `markdown-ts-mode' with `markdown-ts-hide-markup' on, the adaptor
+keeps the delimiters of math visible and an escape outside math hidden;
+turned off, the markup hides them again."
   (skip-unless (and (require 'markdown-ts-mode nil t)
                     (treesit-language-available-p 'markdown)
                     (treesit-language-available-p 'markdown-inline)))
   (l2sf-tests--with-stub
     (l2sf-tests--md "a $x$ and \\(y\\) and \\*z\n"
-      (markdown-ts-mode)
+      (let ((markdown-ts-mode-hook nil))
+        (markdown-ts-mode))
       (setq-local markdown-ts-hide-markup t)
       (font-lock-ensure)
       (should (equal (l2sf-tests--invisible-chars) "$$\\\\\\"))
-      (latex-to-svg-frontend-mode 1)
+      (latex-to-svg-for-markdown-mode 1)
       (font-lock-ensure)
       (should (equal (l2sf-tests--invisible-chars) "\\"))
-      (latex-to-svg-frontend-mode -1)
+      (latex-to-svg-for-markdown-mode -1)
       (font-lock-ensure)
       (should (equal (l2sf-tests--invisible-chars) "$$\\\\\\")))))
 

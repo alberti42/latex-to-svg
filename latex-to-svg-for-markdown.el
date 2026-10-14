@@ -45,6 +45,9 @@
 (require 'latex-to-svg-frontend)
 (require 'treesit nil t)
 
+(defvar markdown-hide-markup)
+(defvar markdown-ts-hide-markup)
+
 (defvar-local latex-to-svg-for-markdown--treesit-warned nil
   "Non-nil once a tree-sitter failure has been reported in this buffer.")
 
@@ -218,6 +221,38 @@ nothing."
   "Non-nil in a Markdown buffer this adaptor supports."
   (derived-mode-p 'markdown-ts-mode 'markdown-mode 'gfm-mode))
 
+(defun latex-to-svg-for-markdown--unhide-markup-in-math (limit)
+  "Font-lock keyword: remove the `invisible' property from math source.
+With `markdown-ts-hide-markup' or `markdown-hide-markup' on, the
+markup hides what it reads as Markdown markup: the `$' of `$...$', and
+in `\\(...\\)' and `\\[...\\]' every backslash it reads as an escape,
+those of the delimiters and those of `\\{' and `\\}' inside.  These
+characters are part of the LaTeX source, so they stay visible when the
+source is shown: with no preview, or with point on the equation.
+
+Both modes put `invisible' in `font-lock-extra-managed-props' when they
+hide markup, so font-lock sets the property again once this keyword is
+removed.  The equations come from `latex-to-svg-frontend-spans', which
+looks in the blank-line blocks around POINT..LIMIT: font-lock may
+fontify part of an equation that spans several lines, and the markup
+hides its delimiters outside that part.  With hiding off, or nothing
+hidden in POINT..LIMIT, it does nothing.  Returns nil (own
+fontification, one call per chunk)."
+  (when (and (or (bound-and-true-p markdown-ts-hide-markup)
+                 (bound-and-true-p markdown-hide-markup))
+             (< (point) limit)
+             (text-property-not-all (point) limit 'invisible nil))
+    (dolist (span (latex-to-svg-frontend-spans (point) limit))
+      (remove-text-properties (nth 1 span) (nth 2 span) '(invisible nil))))
+  (goto-char limit)
+  nil)
+
+(defconst latex-to-svg-for-markdown--font-lock-keywords
+  '((latex-to-svg-for-markdown--unhide-markup-in-math))
+  "Font-lock keywords added while the mode is on (appended, so they run last).
+Turning `latex-to-svg-frontend-mode' on or off fontifies the buffer
+again, so they apply at once.")
+
 (defconst latex-to-svg-for-markdown--emphasis-faces
   '(markdown-italic-face markdown-bold-face markdown-strike-through-face
     markdown-highlighting-face
@@ -240,9 +275,13 @@ Installs the Markdown code/verbatim exclusions and turns on
                         #'latex-to-svg-for-markdown--exclusions)
             (setq-local latex-to-svg-frontend-emphasis-faces
                         latex-to-svg-for-markdown--emphasis-faces)
+            (font-lock-add-keywords
+             nil latex-to-svg-for-markdown--font-lock-keywords 'append)
             (latex-to-svg-frontend-mode 1))
         (setq latex-to-svg-for-markdown-mode nil)
         (user-error "`latex-to-svg-for-markdown-mode' only works in Markdown buffers"))
+    (font-lock-remove-keywords
+     nil latex-to-svg-for-markdown--font-lock-keywords)
     (latex-to-svg-frontend-mode -1)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
     (kill-local-variable 'latex-to-svg-frontend-emphasis-faces)))

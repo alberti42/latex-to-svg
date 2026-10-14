@@ -36,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of the font-lock keyword that removes emphasis from math grew with the
   number of face runs times the number of equations in the region; it
   now grows with their sum.
+- The Markdown adaptor, not the core, shows the markup that
+  `markdown-ts-hide-markup` or `markdown-hide-markup` hides inside math.
+  With both off, its font-lock keyword returns at once: font-lock of the
+  same buffer in jit-lock's chunks takes 290 ms instead of 350 ms, against
+  180 ms without the mode.
 - Point right after the closing delimiter of an equation reveals its
   source, so `DEL` there deletes a character you can see. This is the
   position at which newly typed math was already not rendered yet. Where
