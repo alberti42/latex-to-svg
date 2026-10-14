@@ -50,6 +50,7 @@
 (require 'latex-to-svg-frontend)
 
 (defvar org-verbatim-re)
+(defvar org-emphasis-alist)
 
 (defconst latex-to-svg-for-org--verbatim-fallback-re
   (concat "\\([-[:space:]('\"{]\\|^\\)"                   ; 1: pre char
@@ -141,6 +142,13 @@ It only remaps `org-latex-preview' (see
 `latex-to-svg-for-org-preview-disabled'), and is active only in Org
 buffers where the mode is on.")
 
+(defun latex-to-svg-for-org--emphasis-faces ()
+  "Return the faces of Org's emphasis markers, from `org-emphasis-alist'.
+The value of `latex-to-svg-frontend-emphasis-faces' in Org buffers:
+`bold', `italic', `underline', `org-verbatim', `org-code' and
+`(:strike-through t)' by default, and the faces a user put there."
+  (delete-dups (mapcar #'cadr (bound-and-true-p org-emphasis-alist))))
+
 ;;;###autoload
 (define-minor-mode latex-to-svg-for-org-mode
   "Preview Org LaTeX math as SVG images (a `latex-to-svg-frontend' adaptor).
@@ -161,12 +169,15 @@ the rendering.  Enable it from `org-mode-hook'.  While it is on,
                         (lambda ()
                           (when (fboundp 'org-fold-show-context)
                             (org-fold-show-context 'link-search))))
+            (setq-local latex-to-svg-frontend-emphasis-faces
+                        (latex-to-svg-for-org--emphasis-faces))
             (latex-to-svg-frontend-mode 1))
         (setq latex-to-svg-for-org-mode nil)
         (user-error "`latex-to-svg-for-org-mode' only works in Org buffers"))
     (latex-to-svg-frontend-mode -1)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
-    (kill-local-variable 'latex-to-svg-frontend-reveal-function)))
+    (kill-local-variable 'latex-to-svg-frontend-reveal-function)
+    (kill-local-variable 'latex-to-svg-frontend-emphasis-faces)))
 
 (provide 'latex-to-svg-for-org)
 

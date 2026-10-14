@@ -218,6 +218,13 @@ nothing."
   "Non-nil in a Markdown buffer this adaptor supports."
   (derived-mode-p 'markdown-ts-mode 'markdown-mode 'gfm-mode))
 
+(defconst latex-to-svg-for-markdown--emphasis-faces
+  '(markdown-italic-face markdown-bold-face markdown-strike-through-face
+    markdown-highlighting-face
+    markdown-ts-emphasis markdown-ts-bold markdown-ts-strikethrough)
+  "The emphasis faces of `markdown-mode' and `markdown-ts-mode'.
+The value of `latex-to-svg-frontend-emphasis-faces' in Markdown buffers.")
+
 ;;;###autoload
 (define-minor-mode latex-to-svg-for-markdown-mode
   "Preview Markdown LaTeX math as SVG images (a `latex-to-svg-frontend' adaptor).
@@ -231,11 +238,14 @@ Installs the Markdown code/verbatim exclusions and turns on
           (progn
             (setq-local latex-to-svg-frontend-exclude-function
                         #'latex-to-svg-for-markdown--exclusions)
+            (setq-local latex-to-svg-frontend-emphasis-faces
+                        latex-to-svg-for-markdown--emphasis-faces)
             (latex-to-svg-frontend-mode 1))
         (setq latex-to-svg-for-markdown-mode nil)
         (user-error "`latex-to-svg-for-markdown-mode' only works in Markdown buffers"))
     (latex-to-svg-frontend-mode -1)
-    (kill-local-variable 'latex-to-svg-frontend-exclude-function)))
+    (kill-local-variable 'latex-to-svg-frontend-exclude-function)
+    (kill-local-variable 'latex-to-svg-frontend-emphasis-faces)))
 
 (provide 'latex-to-svg-for-markdown)
 

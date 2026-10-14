@@ -510,8 +510,10 @@ Markup font-lock (Org's `+…+' / `_…_' / `/…/', Markdown's `*…*', ...) ha
 LaTeX awareness and paints `:strike-through' / `:underline' onto math that
 merely resembles emphasis (`(+)', `_i', `/x/', ...).  A live preview overlay
 already masks this, but freshly typed or currently-edited math has none.  When
-non-nil, a font-lock pass neutralizes that decoration over every detected math
-span (see `latex-to-svg-frontend--suppress-emphasis')."
+non-nil, a font-lock pass removes the markup's emphasis faces
+\(`latex-to-svg-frontend-emphasis-faces') where a marker inside math put
+them (see `latex-to-svg-frontend--suppress-emphasis').  Other faces on math,
+such as `markdown-ts-latex', stay."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
@@ -554,6 +556,14 @@ the first `$' after an opening one ends the span, whatever surrounds
 it, so `$\\lambda $' is math.  The LaTeX adaptor sets this to nil;
 the Markdown, Org and Gnus adaptors keep the guards.")
 (put 'latex-to-svg-frontend-dollar-guards 'safe-local-variable #'booleanp)
+
+(defvar-local latex-to-svg-frontend-emphasis-faces nil
+  "The markup's emphasis faces, which a marker inside math can put on text.
+A list of faces: symbols, or anonymous faces such as `(:strike-through
+t)'.  `latex-to-svg-frontend--suppress-emphasis' removes them from a
+face run that starts or ends inside math, and keeps every other face.
+nil, the default, removes nothing: the LaTeX adaptor sets no list, as
+LaTeX has no emphasis markup inside math.")
 
 (defvar-local latex-to-svg-frontend-detect-function nil
   "Escape hatch: function (BEG END) -> list of math records.
@@ -3022,6 +3032,19 @@ Strict (BEG < POS < END) so a marker *inside* math matches while the span's
 own delimiters do not."
   (seq-some (lambda (s) (and (< (car s) pos) (< pos (cdr s)))) spans))
 
+(defun latex-to-svg-frontend--without-emphasis (face)
+  "Return the value of the `face' property FACE without emphasis faces.
+The emphasis faces are `latex-to-svg-frontend-emphasis-faces'.  FACE is
+a face, an anonymous face (a plist), or a list of them.  Return FACE
+itself when it has none, and `none' when it has nothing else."
+  (let ((emphasis latex-to-svg-frontend-emphasis-faces))
+    (cond
+     ((or (symbolp face) (keywordp (car-safe face)))
+      (if (member face emphasis) 'none face))
+     ((seq-some (lambda (f) (member f emphasis)) face)
+      (or (seq-remove (lambda (f) (member f emphasis)) face) 'none))
+     (t face))))
+
 (defun latex-to-svg-frontend--suppress-emphasis (limit)
   "Font-lock keyword: neutralize markup emphasis decoration over math.
 Runs after the markup's own emphasis fontifier (added with `append').
@@ -3037,16 +3060,22 @@ Such a face is entirely spurious (the markers are LaTeX syntax, not prose
 markup), so rather than blanket-covering each math span we walk the `face'
 runs in POINT..LIMIT and, for any run whose first or last character falls
 strictly inside a detected math span (i.e. a run anchored to a marker that
-lives in math), *remove* the `face' over the whole run.  Removing rather than
-masking clears the run's colour too, so bridged prose (`org-verbatim' tint and
-all) is fully restored, not merely un-struck.  A legitimate prose emphasis that
-merely *contains* inline math (its markers in prose, endpoints outside every
-span) is left untouched.  Returns nil (own fontification, one call per chunk).
+lives in math), *remove* the emphasis faces from the whole run: the faces in
+`latex-to-svg-frontend-emphasis-faces', which the adaptor sets.  Removing
+rather than masking clears the run's colour too, so bridged prose
+\(`org-verbatim' tint and all) is fully restored, not merely un-struck.  The
+other faces of the run stay: a face the markup gives math itself, such as
+`markdown-ts-latex' or `org-latex-and-related', whose colour also tints the
+preview (see `latex-to-svg-frontend--foreground-for'), and the faces of
+LaTeX font-lock.  A legitimate prose emphasis that merely *contains* inline
+math (its markers in prose, endpoints outside every span) is left untouched.
+Returns nil (own fontification, one call per chunk).
 
 \(The masking `latex-to-svg-frontend--neutralize-face' is still used on preview
 overlays, where an image covers the text and only drawn-over decoration --
 not colour -- matters.)"
-  (when latex-to-svg-frontend-suppress-emphasis
+  (when (and latex-to-svg-frontend-suppress-emphasis
+             latex-to-svg-frontend-emphasis-faces)
     (let ((spans (mapcar (lambda (el)
                            (cons (latex-to-svg-frontend--math-begin el)
                                  (latex-to-svg-frontend--math-end el)))
@@ -3056,10 +3085,16 @@ not colour -- matters.)"
           (while (< p limit)
             (let ((q (or (next-single-property-change p 'face nil limit)
                          limit)))
-              (when (and (get-text-property p 'face)
-                         (or (latex-to-svg-frontend--pos-in-span-p p spans)
-                             (latex-to-svg-frontend--pos-in-span-p (1- q) spans)))
-                (remove-text-properties p q '(face nil)))
+              (when-let* ((face (get-text-property p 'face))
+                          ((or (latex-to-svg-frontend--pos-in-span-p p spans)
+                               (latex-to-svg-frontend--pos-in-span-p
+                                (1- q) spans)))
+                          (kept (latex-to-svg-frontend--without-emphasis
+                                 face))
+                          ((not (eq kept face))))
+                (if (eq kept 'none)
+                    (remove-text-properties p q '(face nil))
+                  (put-text-property p q 'face kept)))
               (setq p q)))))))
   (goto-char limit)
   nil)

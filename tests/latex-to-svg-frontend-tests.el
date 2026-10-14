@@ -74,6 +74,8 @@ them again: `latex main.tex' twice in that directory, keeping only the
 ;; Declared for an Emacs without it, on which that test skips itself: the
 ;; test binds the hook dynamically and calls the mode.
 (defvar markdown-ts-mode-hook)
+;; A test binds it dynamically before Org is loaded.
+(defvar org-emphasis-alist)
 (declare-function markdown-ts-mode "markdown-ts-mode")
 
 ;; --- Stub the backend: synchronous, deterministic, no TeX / no display -------
@@ -1042,6 +1044,8 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
 (no overlay), colour and all."
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\[a^{(+)} + b^{(+)}\\]\n"
+      (setq-local latex-to-svg-frontend-emphasis-faces
+                  '((:strike-through t) org-verbatim bold))
       ;; Simulate a markup emphasis fontifier having struck part of the math.
       (put-text-property (+ (point-min) 3) (- (point-max) 3)
                          'face '(:strike-through t))
@@ -1055,6 +1059,8 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
 inside the next paints the prose in between; the whole run is neutralized."
   (l2sf-tests--with-stub
     (l2sf-tests--md "XX \\(\\Delta{=}0\\)\nIso \\(\\Delta{=}1\\)\n"
+      (setq-local latex-to-svg-frontend-emphasis-faces
+                  '((:strike-through t) org-verbatim bold))
       ;; Emulate org: verbatim face from the `=' in line 1 to the `=' in line 2,
       ;; spanning the prose "Iso " between the two equations.
       (let* ((eq1= (1+ (string-match "{=}" (buffer-string))))
@@ -1072,6 +1078,8 @@ inside the next paints the prose in between; the whole run is neutralized."
 merely *contains* inline math) is left untouched."
   (l2sf-tests--with-stub
     (l2sf-tests--md "a *bold with \\(x\\) inside* b\n"
+      (setq-local latex-to-svg-frontend-emphasis-faces
+                  '((:strike-through t) org-verbatim bold))
       ;; Emphasis run spans the whole `*...*', markers in prose, math nested in.
       (let ((beg (string-match "\\*" (buffer-string))))
         (put-text-property (1+ beg)
@@ -1087,6 +1095,8 @@ merely *contains* inline math) is left untouched."
 (ert-deftest l2sf-suppress-emphasis-respects-toggle ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "\\[a^{(+)} + b^{(+)}\\]\n"
+      (setq-local latex-to-svg-frontend-emphasis-faces
+                  '((:strike-through t) org-verbatim bold))
       (let ((latex-to-svg-frontend-suppress-emphasis nil))
         (put-text-property (+ (point-min) 3) (- (point-max) 3)
                            'face '(:strike-through t))
@@ -1094,6 +1104,63 @@ merely *contains* inline math) is left untouched."
         (latex-to-svg-frontend--suppress-emphasis (point-max))
         (should (equal (get-text-property (+ (point-min) 5) 'face)
                        '(:strike-through t)))))))
+
+(ert-deftest l2sf-suppress-emphasis-keeps-other-faces ()
+  "Only the emphasis faces are removed from a run with an edge inside math.
+The face a markup gives math (`markdown-ts-latex' on the whole equation,
+`org-latex-and-related' from the space before `$') stays, also under an
+emphasis face from a marker inside the equation.  Issue #8."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "Text $x^2+1$ and $a_i b_j$.\n"
+      (setq-local latex-to-svg-frontend-emphasis-faces '(italic))
+      (let* ((text (buffer-string))
+             (x (1+ (string-match "\\$x" text)))
+             (a (1+ (string-match "\\$a" text)))
+             (i (1+ (string-match "_i" text))))
+        (put-text-property x (+ x 7) 'face 'markdown-ts-latex)
+        (put-text-property (1- a) (+ a 9) 'face '(org-latex-and-related))
+        (put-text-property i (+ i 5) 'face '(italic org-latex-and-related))
+        (goto-char (point-min))
+        (latex-to-svg-frontend--suppress-emphasis (point-max))
+        (should (eq (get-text-property x 'face) 'markdown-ts-latex))
+        (should (eq (get-text-property (+ x 6) 'face) 'markdown-ts-latex))
+        (should (equal (get-text-property a 'face) '(org-latex-and-related)))
+        (should (equal (get-text-property i 'face) '(org-latex-and-related)))
+        (should (equal (get-text-property (+ a 8) 'face)
+                       '(org-latex-and-related)))))))
+
+(ert-deftest l2sf-suppress-emphasis-without-emphasis-faces ()
+  "With no emphasis faces, as in LaTeX buffers, no face is removed:
+AUCTeX's `font-latex-math-face' and `font-latex-script-char-face' stay."
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "Text $x^2$.\n"
+      (put-text-property 6 11 'face 'font-latex-math-face)
+      (put-text-property 8 9 'face '(font-latex-script-char-face
+                                     font-latex-math-face))
+      (latex-to-svg-frontend--suppress-emphasis (point-max))
+      (should (eq (get-text-property 6 'face) 'font-latex-math-face))
+      (should (equal (get-text-property 8 'face)
+                     '(font-latex-script-char-face font-latex-math-face))))))
+
+(ert-deftest l2sf-adaptors-set-the-emphasis-faces ()
+  ;; Org's come from `org-emphasis-alist'; turning the adaptor off removes
+  ;; the buffer-local list.
+  (l2sf-tests--with-stub
+    (with-temp-buffer
+      (org-mode)
+      (let ((org-emphasis-alist '(("*" bold) ("+" (:strike-through t))
+                                  ("=" org-verbatim verbatim))))
+        (latex-to-svg-for-org-mode 1))
+      (should (equal latex-to-svg-frontend-emphasis-faces
+                     '(bold (:strike-through t) org-verbatim)))
+      (latex-to-svg-for-org-mode -1)
+      (should-not (local-variable-p 'latex-to-svg-frontend-emphasis-faces)))
+    (l2sf-tests--md "$a$\n"
+      (setq major-mode 'markdown-mode)
+      (latex-to-svg-for-markdown-mode 1)
+      (should (memq 'markdown-ts-emphasis latex-to-svg-frontend-emphasis-faces))
+      (should (memq 'markdown-italic-face latex-to-svg-frontend-emphasis-faces))
+      (latex-to-svg-for-markdown-mode -1))))
 
 (defun l2sf-tests--invisible-chars ()
   "Return the characters of the buffer with a non-nil `invisible' property."

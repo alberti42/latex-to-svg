@@ -66,6 +66,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   names the engine and gives the error message and the log. A numbered
   equation that failed keeps its numbers, so the equations below it keep
   theirs. ([#6](https://github.com/alberti42/latex-to-svg/issues/6))
+- Math keeps the faces its markup gives it, and its preview is tinted
+  with their colour: `markdown-ts-latex` in `markdown-ts-mode`,
+  `org-latex-and-related` in Org with `org-highlight-latex-and-related`
+  set, and AUCTeX's `font-latex-math-face` in LaTeX buffers. Before,
+  `latex-to-svg-frontend-suppress-emphasis` removed every face whose run
+  ended inside an equation, so the source and the preview took the
+  default foreground. It now removes only the markup's emphasis faces:
+  those of `org-emphasis-alist` in Org, the emphasis faces of
+  `markdown-mode` and `markdown-ts-mode` in Markdown, none in LaTeX. The
+  buffer-local variable `latex-to-svg-frontend-emphasis-faces` holds the
+  list, which each adaptor sets.
+  ([#8](https://github.com/alberti42/latex-to-svg/issues/8))
 
 ## [0.21.0] - 2026-10-11
 
