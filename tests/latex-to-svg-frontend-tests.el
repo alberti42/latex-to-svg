@@ -2339,7 +2339,8 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
 The backend returns the image of LATEX in the alist `ready' when there
 is one, else records LATEX and its callback in the alist `pending' and
 returns nil.  `(finish LATEX IMAGE)' makes IMAGE ready and runs the
-callback recorded for LATEX.  Issue #5."
+callback recorded for LATEX.  `(fail LATEX FAILURE)' runs that callback
+with the failure plist FAILURE.  Issue #5."
   (declare (indent 0) (debug t))
   `(let ((ready nil) (pending nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
@@ -2351,7 +2352,9 @@ callback recorded for LATEX.  Issue #5."
                              nil)))))
        (cl-flet ((finish (latex image)
                    (push (cons latex image) ready)
-                   (funcall (cdr (assoc latex pending)) nil)))
+                   (funcall (cdr (assoc latex pending)) nil))
+                 (fail (latex failure)
+                   (funcall (cdr (assoc latex pending)) failure)))
          ,@body))))
 
 (ert-deftest l2sf-late-picture-does-not-replace-newer-one ()
@@ -3071,6 +3074,172 @@ callback recorded for LATEX.  Issue #5."
     (should (equal (substitute-command-keys
                     (latex-to-svg-frontend--failure-help-echo (car case)))
                    (cdr case)))))
+
+;; The backend stub of `l2sf-tests--with-stub', but failing every
+;; LATEX that matches the regexp `l2sf-tests--failing': it returns nil
+;; and calls the callback with `l2sf-tests--failure' from a timer, as the
+;; backend does for a failure it recorded before.
+(defvar l2sf-tests--failing)
+
+(defmacro l2sf-tests--with-failing (regexp &rest body)
+  "Run BODY with the backend failing every LATEX that matches REGEXP."
+  (declare (indent 1) (debug t))
+  `(let ((l2sf-tests--failing ,regexp)
+         (stub (symbol-function 'latex-to-svg-backend)))
+     (cl-letf (((symbol-function 'latex-to-svg-backend)
+                (lambda (latex &rest args)
+                  (if (string-match-p l2sf-tests--failing latex)
+                      (progn
+                        (l2sf-tests--check-colors args)
+                        (push (cons latex (plist-get args :engine))
+                              l2sf-tests--calls)
+                        (run-at-time 0 nil (plist-get args :callback)
+                                     l2sf-tests--failure)
+                        nil)
+                    (apply stub latex args)))))
+       ,@body)))
+
+(ert-deftest l2sf-failed-rerender-keeps-the-source ()
+  ;; Issue #6: `$x$' is rendered, edited to `$\notacommand$' and left; the
+  ;; compile fails.  The picture of `$x$' is not shown, after the failure
+  ;; or after entering and leaving the equation again.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend-mode 1)
+        (finish "$x$" 'old-image)
+        (goto-char (point-max))
+        (latex-to-svg-frontend--handle-cursor)
+        (goto-char 9)
+        (latex-to-svg-frontend--handle-cursor)
+        (delete-char 1)
+        (insert "\\notacommand")
+        (goto-char (point-max))
+        (latex-to-svg-frontend--handle-cursor)
+        (fail "$\\notacommand$" l2sf-tests--failure)
+        (let ((ov (car (l2sf-tests--overlays))))
+          (should (= (length (l2sf-tests--overlays)) 1))
+          (should (equal (overlay-get ov 'latex-to-svg-frontend-source)
+                         "$\\notacommand$"))
+          (should (equal (overlay-get ov 'latex-to-svg-frontend-failure)
+                         l2sf-tests--failure))
+          (should-not (overlay-get ov 'latex-to-svg-frontend-image))
+          (should-not (overlay-get ov 'display))
+          (goto-char 9)
+          (latex-to-svg-frontend--handle-cursor)
+          (goto-char (point-max))
+          (latex-to-svg-frontend--handle-cursor)
+          (should-not (overlay-get ov 'display))
+          (should (string-match-p "Undefined control sequence"
+                                  (overlay-get ov 'help-echo))))
+        (latex-to-svg-frontend-mode -1)))))
+
+(ert-deftest l2sf-failed-rerender-edited-again-renders ()
+  ;; A failed equation edited and left is rendered again.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $\\notacommand$ after\n"
+        (latex-to-svg-frontend-mode 1)
+        (fail "$\\notacommand$" l2sf-tests--failure)
+        (goto-char 9)
+        (latex-to-svg-frontend--handle-cursor)
+        (delete-char 12)
+        (insert "y")
+        (goto-char (point-max))
+        (latex-to-svg-frontend--handle-cursor)
+        (finish "$y$" 'image)
+        (should (equal (mapcar (lambda (ov)
+                                 (list (overlay-get ov 'latex-to-svg-frontend-source)
+                                       (overlay-get ov 'display)))
+                               (l2sf-tests--overlays))
+                       '(("$y$" image))))
+        (latex-to-svg-frontend-mode -1)))))
+
+(ert-deftest l2sf-recorded-failure-from-a-timer ()
+  ;; A failure the backend recorded before comes back from a timer, after
+  ;; `latex-to-svg-backend' returned nil.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-failing "notacommand"
+      (l2sf-tests--md "Before $\\notacommand$ and $x$ after\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (should (equal (mapcar (lambda (ov) (overlay-get ov 'display))
+                               (l2sf-tests--overlays))
+                       '(fake-image)))
+        (sit-for 0.01)
+        (should (equal (mapcar (lambda (ov)
+                                 (list (overlay-get ov 'latex-to-svg-frontend-source)
+                                       (overlay-get ov 'latex-to-svg-frontend-unrendered)
+                                       (overlay-get ov 'display)))
+                               (l2sf-tests--overlays))
+                       '(("$\\notacommand$" t nil) ("$x$" nil fake-image))))
+        (should (zerop (hash-table-count latex-to-svg-frontend--requests)))))))
+
+(ert-deftest l2sf-refresh-renders-a-failed-equation-again ()
+  ;; A refresh, as after a change of the preamble, renders a failed
+  ;; equation again; it now compiles.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-failing "notacommand"
+      (l2sf-tests--md "Before $\\notacommand$ after\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (sit-for 0.01)
+        (should (overlay-get (car (l2sf-tests--overlays))
+                             'latex-to-svg-frontend-failure))
+        (setq l2sf-tests--failing "\\`never\\'")
+        (latex-to-svg-frontend-refresh)
+        (should (equal (mapcar (lambda (ov) (overlay-get ov 'display))
+                               (l2sf-tests--overlays))
+                       '(fake-image)))))))
+
+(ert-deftest l2sf-stale-failure-installs-nothing ()
+  ;; `$x$' is edited to `$y$' and rendered again; the compile of `$x$'
+  ;; fails last.  Its failure is not installed over the picture of `$y$'.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--md "Before $x$ after\n"
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (goto-char 10) (delete-char -1) (insert "y")
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (finish "$y$" 'new-image)
+        (fail "$x$" l2sf-tests--failure)
+        (should (equal (mapcar (lambda (ov)
+                                 (list (overlay-get ov 'latex-to-svg-frontend-source)
+                                       (overlay-get ov 'latex-to-svg-frontend-failure)
+                                       (overlay-get ov 'display)))
+                               (l2sf-tests--overlays))
+                       '(("$y$" nil new-image))))))))
+
+(ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
+  ;; A failed `align' still takes its two numbers: the equation below it is
+  ;; numbered 3, on a full reconcile and on the incremental path.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-failing "notacommand"
+      (l2sf-tests--md
+          (concat "\\begin{equation}\na\n\\end{equation}\n\n"
+                  "\\begin{align}\n\\notacommand \\\\\nb\n\\end{align}\n\n"
+                  "\\begin{equation}\nc\n\\end{equation}\n")
+        (setq-local latex-to-svg-frontend-mode t)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (sit-for 0.01)
+        (let ((ovs (l2sf-tests--overlays)))
+          (should (overlay-get (nth 1 ovs) 'latex-to-svg-frontend-failure))
+          (should (equal (overlay-get (nth 1 ovs) 'latex-to-svg-frontend-enums)
+                         '(2 . 3)))
+          (should (= (latex-to-svg-frontend--counter-before
+                      (overlay-start (nth 2 ovs)))
+                     3)))
+        ;; The first equation loses its number: the failed one takes 1..2,
+        ;; and the last one 3.
+        (goto-char (point-min))
+        (search-forward "\\begin{equation}") (backward-char 1) (insert "*")
+        (search-forward "\\end{equation}") (backward-char 1) (insert "*")
+        (latex-to-svg-frontend--reconcile)
+        (sit-for 0.01)
+        (let ((ovs (l2sf-tests--overlays)))
+          (should (equal (overlay-get (nth 1 ovs) 'latex-to-svg-frontend-enums)
+                         '(1 . 2)))
+          (should (string-prefix-p "\\setcounter{equation}{2}%"
+                                   (overlay-get (nth 2 ovs)
+                                                'latex-to-svg-frontend-value))))))))
 
 (ert-deftest l2sf-cookie-unknown-value-warns ()
   ;; An unknown value warns, sends nothing to the backend, and does not fall

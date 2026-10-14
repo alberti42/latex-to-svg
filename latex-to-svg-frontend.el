@@ -2183,7 +2183,10 @@ That, or no graphical window showing BUFFER, sets
 A request replaces the pending ones for spans intersecting BEG..END
 \(see `latex-to-svg-frontend--requests').  When the backend finishes
 it, its picture is installed only if no newer request, preview or
-clearing replaced it, and BEG..END still holds SOURCE."
+clearing replaced it, and BEG..END still holds SOURCE.  On the same
+terms, a request that ends without a picture installs
+`--set-unrendered-overlay' with the failure, so the source stays
+visible."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (cond
@@ -2214,10 +2217,9 @@ clearing replaced it, and BEG..END still holds SOURCE."
                    :quiet latex-to-svg-frontend-quiet
                    :callback
                    (lambda (outcome)
-                     (unless outcome
-                       (latex-to-svg-frontend--place-when-current
-                        request buffer value source enums-fallback display-p
-                        engine)))))))
+                     (latex-to-svg-frontend--place-when-current
+                      request buffer value source enums-fallback display-p
+                      engine fallback outcome))))))
           (unless frame
             (setq latex-to-svg-frontend--undrawn t))
           (when image
@@ -2226,12 +2228,15 @@ clearing replaced it, and BEG..END still holds SOURCE."
              beg end value image source enums-fallback display-p engine
              fallback))))))))
 
-(defun latex-to-svg-frontend--place-when-current (request buffer value source enums-fallback display-p engine)
+(defun latex-to-svg-frontend--place-when-current (request buffer value source enums-fallback display-p engine fallback outcome)
   "Place VALUE on the span of REQUEST in BUFFER, if REQUEST is still current.
 The callback of the backend request REQUEST, a list (BEG END) of markers
 \(see `latex-to-svg-frontend--requests').  REQUEST is current while it is
-in `latex-to-svg-frontend--requests' and BEG..END holds SOURCE.  The
-other arguments are those of `latex-to-svg-frontend--place'."
+in `latex-to-svg-frontend--requests' and BEG..END holds SOURCE.  OUTCOME
+is the backend's: nil when the picture is in the cache, else the
+failure plist, for which the span gets `--set-unrendered-overlay' with
+ENGINE, FALLBACK and the failure.  FALLBACK is the one VALUE was sent
+with.  The other arguments are those of `latex-to-svg-frontend--place'."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (when (gethash request (latex-to-svg-frontend--requests))
@@ -2241,9 +2246,13 @@ other arguments are those of `latex-to-svg-frontend--place'."
           (when (and b e (<= (point-min) b) (< b e) (<= e (point-max))
                      (or (null source)
                          (equal (buffer-substring-no-properties b e) source)))
-            (latex-to-svg-frontend--place
-             buffer (car request) (cadr request) value source enums-fallback
-             display-p engine)))))))
+            (if outcome
+                (latex-to-svg-frontend--set-unrendered-overlay
+                 (car request) (cadr request) (or source value) enums-fallback
+                 engine fallback outcome)
+              (latex-to-svg-frontend--place
+               buffer (car request) (cadr request) value source enums-fallback
+               display-p engine))))))))
 
 (defun latex-to-svg-frontend--render-numbered (el k)
   "Render numbered environment EL starting at counter K."
