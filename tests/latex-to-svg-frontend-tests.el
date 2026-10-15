@@ -336,6 +336,36 @@ prefers the span that starts at POS."
                              (latex-to-svg-frontend--elements (point-min) (point-max)))
                      '("$a$" "$b$"))))))
 
+(ert-deftest l2sf-markdown-code-block-query ()
+  ;; The query is compiled once, and finds the code blocks the list query
+  ;; finds.  A grammar that does not know its nodes signals at first use:
+  ;; the exclusions warn once and fall back to the regexps.
+  (skip-unless (and (fboundp 'treesit-available-p) (treesit-available-p)
+                    (treesit-language-available-p 'markdown)))
+  (should (treesit-compiled-query-p latex-to-svg-for-markdown--code-block-query))
+  (l2sf-tests--md "a $a$\n\n```\n$x$\n```\n\n    $y$\n\nb $b$\n"
+    (let ((root (treesit-parser-root-node (treesit-parser-create 'markdown))))
+      (should (equal (treesit-query-capture
+                      root latex-to-svg-for-markdown--code-block-query)
+                     (treesit-query-capture
+                      root '((fenced_code_block) @c (indented_code_block) @c)))))
+    (setq-local latex-to-svg-frontend-exclude-function
+                #'latex-to-svg-for-markdown--exclusions)
+    (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                           (latex-to-svg-frontend--elements (point-min) (point-max)))
+                   '("$a$" "$b$")))
+    (let ((latex-to-svg-for-markdown--code-block-query
+           (treesit-query-compile 'markdown '((not_a_node) @c)))
+          (warnings 0))
+      (cl-letf (((symbol-function 'display-warning)
+                 (lambda (&rest _) (cl-incf warnings))))
+        (dotimes (_ 2)
+          (should (equal (mapcar #'latex-to-svg-frontend--math-value
+                                 (latex-to-svg-frontend--elements
+                                  (point-min) (point-max)))
+                         '("$a$" "$b$")))))
+      (should (= warnings 1)))))
+
 (defmacro l2sf-tests--no-treesit (&rest body)
   "Run BODY with tree-sitter reported unavailable (exercise the fallback)."
   (declare (indent 0) (debug t))

@@ -48,6 +48,17 @@
 (defvar markdown-hide-markup)
 (defvar markdown-ts-hide-markup)
 
+(defconst latex-to-svg-for-markdown--code-block-query
+  (when (fboundp 'treesit-query-compile)
+    (treesit-query-compile
+     'markdown '((fenced_code_block) @c (indented_code_block) @c)))
+  "The tree-sitter query for Markdown's code blocks, or nil.
+Compiled when it is first used, so loading this file needs no grammar.
+A query passed as a list is compiled again on every call: 0.5 ms, against
+a few microseconds for this one, and `--exclusions' runs at every
+keystroke and every command that moves point.  nil in an Emacs built
+without tree-sitter.")
+
 (defvar-local latex-to-svg-for-markdown--treesit-warned nil
   "Non-nil once a tree-sitter failure has been reported in this buffer.")
 
@@ -174,8 +185,7 @@ nothing."
               (setq parsed t)
               (dolist (cap (treesit-query-capture
                             (treesit-parser-root-node parser)
-                            '((fenced_code_block) @c
-                              (indented_code_block) @c)
+                            latex-to-svg-for-markdown--code-block-query
                             beg end))
                 (let ((n (cdr cap)))
                   (push (cons (treesit-node-start n) (treesit-node-end n))

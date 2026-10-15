@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- In Markdown buffers, a keystroke or a command that moves point costs
+  about 0.5 ms less. The Markdown adaptor finds code blocks with a
+  tree-sitter query, which it passed as a list, so Emacs compiled it again
+  on every call. The query is now compiled once, at first use. Font-lock
+  of one line with the mode on takes 185 µs instead of 683 µs, against
+  111 µs without the mode.
+
 ## [0.22.0] - 2026-10-14
 
 ### Added
