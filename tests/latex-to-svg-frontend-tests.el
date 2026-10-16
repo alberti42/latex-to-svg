@@ -2857,6 +2857,174 @@ with the failure plist FAILURE.  Issue #5."
       (should-not (memq 'latex-to-svg-frontend--maybe-refresh
                         (default-value 'window-buffer-change-functions))))))
 
+;;;; Buffers that share the text
+
+(defmacro l2sf-tests--with-clone (text &rest body)
+  "Run BODY with a buffer holding TEXT, the mode on, and an indirect clone.
+BODY sees them as `base' and `clone'.  Point is at the end of both, and
+`--handle-cursor' has run once in each."
+  (declare (indent 1) (debug t))
+  `(let ((base (generate-new-buffer " *l2sf-base*"))
+         (clone nil))
+     (unwind-protect
+         (progn
+           (with-current-buffer base
+             (insert ,text)
+             (latex-to-svg-frontend-mode 1)
+             (goto-char (point-max))
+             (latex-to-svg-frontend--handle-cursor)
+             (setq clone (clone-indirect-buffer " *l2sf-clone*" nil)))
+           (with-current-buffer clone
+             (goto-char (point-max))
+             (latex-to-svg-frontend--handle-cursor))
+           ,@body)
+       ;; Killing the base buffer kills its indirect buffers.
+       (when (buffer-live-p base)
+         (kill-buffer base)))))
+
+(defun l2sf-tests--shared (buffer)
+  "Return the buffers that share BUFFER's text with the mode on."
+  (buffer-local-value 'latex-to-svg-frontend--shared-buffers buffer))
+
+(ert-deftest l2sf-clone-renders-its-own-previews ()
+  ;; A clone starts with copies of the base buffer's local variables and
+  ;; overlays.  It takes its own marker and renders its own previews and
+  ;; line breaks.  Each copied preview records the base buffer's
+  ;; line-break overlays, which stay.
+  (l2sf-tests--with-stub
+    (let ((latex-to-svg-frontend-number-equations nil))
+      (l2sf-tests--with-clone "a $x=\\mathrm\n{Tr}$ predicts $y$ c\n"
+        (let ((base-ovs (with-current-buffer base (l2sf-tests--overlays))))
+          (with-current-buffer clone
+            (let ((ovs (l2sf-tests--overlays)))
+              (should (equal (l2sf-tests--values ovs)
+                             '("$x=\\mathrm\n{Tr}$" "$y$")))
+              (dolist (ov ovs)
+                (should (eq (overlay-buffer ov) clone))
+                (should (eq (overlay-get ov 'display) l2sf-tests--image)))
+              (should (equal (mapcar #'caddr (l2sf-tests--line-breaks (car ovs)))
+                             '(" ")))
+              (should (= 1 (seq-count
+                            (lambda (o)
+                              (overlay-get o 'latex-to-svg-frontend-line-break))
+                            (overlays-in (point-min) (point-max)))))
+              (should (eq (marker-buffer latex-to-svg-frontend--last-point)
+                          clone))))
+          (with-current-buffer base
+            (should (equal (l2sf-tests--overlays) base-ovs))
+            (should (equal (mapcar #'caddr
+                                   (l2sf-tests--line-breaks (car base-ovs)))
+                           '(" ")))
+            (should (eq (marker-buffer latex-to-svg-frontend--last-point)
+                        base)))
+          (should (equal (l2sf-tests--shared base) (list clone base))))))))
+
+(ert-deftest l2sf-clone-mode-off-leaves-base-alone ()
+  ;; The clone started with the base buffer's own request table, timer
+  ;; and marker.  Turning the mode off in the clone used to empty that
+  ;; table, so a picture the base buffer was waiting for was never shown,
+  ;; and to cancel the base buffer's reconcile.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (l2sf-tests--with-clone "$x$ and $y$\n"
+        (with-current-buffer base
+          (insert "z"))
+        (with-current-buffer clone
+          (latex-to-svg-frontend-mode -1))
+        (with-current-buffer base
+          (should (eq (marker-buffer latex-to-svg-frontend--last-point) base))
+          (should (memq latex-to-svg-frontend--reconcile-timer timer-idle-list))
+          (should (= 2 (hash-table-count latex-to-svg-frontend--requests))))
+        (should (equal (l2sf-tests--shared base) (list base)))
+        ;; The base buffer and the clone each requested `$y$'.
+        (push (cons "$y$" 'y-image) ready)
+        (dolist (request pending)
+          (when (equal (car request) "$y$")
+            (funcall (cdr request) nil)))
+        (with-current-buffer base
+          (should (equal (mapcar (lambda (ov)
+                                   (list (overlay-get ov 'latex-to-svg-frontend-value)
+                                         (overlay-get ov 'display)))
+                                 (l2sf-tests--overlays))
+                         '(("$y$" y-image)))))))))
+
+(defun l2sf-tests--edit-x-to-w (editor other)
+  "In EDITOR, edit `$x$' to `$w$' and leave it; check OTHER follows.
+While point is in the equation, OTHER shows its source and nothing is
+compiled.  Once point leaves it, both show the new picture."
+  (with-current-buffer editor
+    (goto-char 9)
+    (latex-to-svg-frontend--handle-cursor)
+    (delete-char 1)
+    (insert "w")
+    (latex-to-svg-frontend--handle-cursor))
+  (with-current-buffer other
+    (let ((ov (car (l2sf-tests--overlays))))
+      (should-not (overlay-get ov 'display))
+      (should (overlay-get ov 'latex-to-svg-frontend-modified))))
+  (should-not (assoc "$w$" l2sf-tests--calls))
+  (with-current-buffer editor
+    (goto-char (point-max))
+    (latex-to-svg-frontend--handle-cursor))
+  (dolist (buffer (list editor other))
+    (with-current-buffer buffer
+      (should (equal (l2sf-tests--values) '("$w$")))
+      (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
+                  l2sf-tests--image)))))
+
+(ert-deftest l2sf-edit-in-clone-reaches-base ()
+  ;; Emacs runs the modification hooks of overlays only in the buffer
+  ;; where the text changed, so the base buffer kept the picture of `$x$'
+  ;; over the text `$w$'.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-clone "Before $x$ after\n"
+      (l2sf-tests--edit-x-to-w clone base))))
+
+(ert-deftest l2sf-edit-in-base-reaches-clone ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-clone "Before $x$ after\n"
+      (l2sf-tests--edit-x-to-w base clone))))
+
+(ert-deftest l2sf-paste-in-clone-reaches-base ()
+  ;; A paste has no clean leave: the debounced pass of the buffer it
+  ;; happened in renders the new math in the other buffer too.  The
+  ;; equation that contains point in the clone is not compiled in the
+  ;; base buffer, whose own point is elsewhere.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-clone "Before $x$ after\n\n\n"
+      (with-current-buffer clone
+        (goto-char (point-max))
+        (insert "$p$ and $q$")
+        (backward-char 1)
+        (latex-to-svg-frontend--debounced-pass clone))
+      (should-not (assoc "$q$" l2sf-tests--calls))
+      (dolist (buffer (list clone base))
+        (with-current-buffer buffer
+          (should (equal (l2sf-tests--values) '("$x$" "$p$"))))))))
+
+(ert-deftest l2sf-shared-buffers-follow-the-mode ()
+  ;; A buffer joins its base buffer's list when the mode turns on there,
+  ;; and leaves it when the mode turns off or the buffer is killed.  An
+  ;; indirect buffer made without CLONE starts with the mode off.  The
+  ;; list survives a change of the base buffer's major mode.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-clone "$x$\n"
+      (let ((plain (make-indirect-buffer base " *l2sf-plain*")))
+        (with-current-buffer plain
+          (should-not latex-to-svg-frontend-mode))
+        (should (equal (l2sf-tests--shared base) (list clone base)))
+        (with-current-buffer plain
+          (latex-to-svg-frontend-mode 1))
+        (should (equal (l2sf-tests--shared base) (list plain clone base)))
+        (with-current-buffer base
+          (text-mode))
+        (should (equal (l2sf-tests--shared base) (list plain clone)))
+        (kill-buffer clone)
+        (should (equal (l2sf-tests--shared base) (list plain)))
+        (with-current-buffer plain
+          (latex-to-svg-frontend-mode -1))
+        (should-not (l2sf-tests--shared base))))))
+
 ;;;; Numbering
 
 (ert-deftest l2sf-counts-single-environments ()

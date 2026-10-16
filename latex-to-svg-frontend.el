@@ -1311,12 +1311,15 @@ line, and, for display math, at the spaces before it."
 Each span gets an overlay with `display' \"\\n\", recorded on OV, which
 owns it: it is deleted with OV's image.  These overlays do not carry
 the `latex-to-svg-frontend' property, so code looking for previews
-does not see them."
+does not see them.  They carry `latex-to-svg-frontend-line-break', by
+which `latex-to-svg-frontend--after-clone' finds the copies an
+indirect clone gets."
   (latex-to-svg-frontend--delete-line-breaks ov)
   (overlay-put ov 'latex-to-svg-frontend-line-breaks
                (mapcar (lambda (span)
                          (let ((o (make-overlay (car span) (cdr span))))
                            (overlay-put o 'display "\n")
+                           (overlay-put o 'latex-to-svg-frontend-line-break t)
                            (overlay-put o 'evaporate t)
                            o))
                        (latex-to-svg-frontend--line-breaks ov))))
@@ -1572,13 +1575,96 @@ an edit re-renders it."
 (defvar-local latex-to-svg-frontend--last-reveal nil
   "Value of `latex-to-svg-frontend--reveal-p' after the previous command.")
 
+;;;; Buffers that share the text
+
+(defvar-local latex-to-svg-frontend--shared-buffers nil
+  "In a base buffer, the buffers that share its text with the mode on.
+The base buffer itself is one of them when the mode is on there; the
+others are its indirect buffers (see `make-indirect-buffer').  Emacs
+runs `after-change-functions' and the modification hooks of overlays
+only in the buffer where the text changed, so that buffer brings the
+previews of the others up to date (see
+`latex-to-svg-frontend--other-buffers').  Only the base buffer's value
+is used.  Permanent: a change of the base buffer's major mode keeps the
+list of its indirect buffers.")
+(put 'latex-to-svg-frontend--shared-buffers 'permanent-local t)
+
+(defvar latex-to-svg-frontend--following nil
+  "Non-nil while this buffer acts for another buffer that shares the text.
+The previews it renders then are not passed on again.")
+
+(defun latex-to-svg-frontend--share (on)
+  "Add the current buffer to its base buffer's list if ON, else remove it.
+See `latex-to-svg-frontend--shared-buffers'.  The list is never changed
+in place: an indirect clone starts with the same list object."
+  (let ((buffer (current-buffer)))
+    (with-current-buffer (or (buffer-base-buffer) buffer)
+      (setq latex-to-svg-frontend--shared-buffers
+            (let ((others (remq buffer latex-to-svg-frontend--shared-buffers)))
+              (if on (cons buffer others) others))))))
+
+(defun latex-to-svg-frontend--unshare ()
+  "Remove the current buffer from its base buffer's list.
+On `kill-buffer-hook' while the mode is on.  Killing a base buffer
+kills its indirect buffers first, so the base buffer is still live."
+  (latex-to-svg-frontend--share nil))
+
+(defun latex-to-svg-frontend--other-buffers ()
+  "Return the other live buffers that share the current buffer's text.
+Those with `latex-to-svg-frontend-mode' on, from the base buffer's
+`latex-to-svg-frontend--shared-buffers'."
+  (let ((buffer (current-buffer)))
+    (seq-filter (lambda (b)
+                  (and (not (eq b buffer))
+                       (buffer-live-p b)
+                       (buffer-local-value 'latex-to-svg-frontend-mode b)))
+                (buffer-local-value 'latex-to-svg-frontend--shared-buffers
+                                    (or (buffer-base-buffer) buffer)))))
+
+(defun latex-to-svg-frontend--modify-in-other-buffers (beg end)
+  "Flag the previews over BEG..END in the other buffers as edited.
+The text there changed in this buffer.  Each shows its source, as
+`latex-to-svg-frontend--on-modify' shows it here; one left empty is
+deleted.  They are rendered when point leaves the equation here
+\(`latex-to-svg-frontend--leave-in-other-buffers'), or by this
+buffer's debounced pass (`latex-to-svg-frontend--debounced-pass')."
+  (dolist (buffer (latex-to-svg-frontend--other-buffers))
+    (with-current-buffer buffer
+      (dolist (ov (latex-to-svg-frontend--overlays-in beg end))
+        (if (= (overlay-start ov) (overlay-end ov))
+            (latex-to-svg-frontend--delete-overlay ov)
+          (overlay-put ov 'latex-to-svg-frontend-modified t)
+          (latex-to-svg-frontend--hide-image ov))))))
+
+(defun latex-to-svg-frontend--leave-in-other-buffers (beg end)
+  "Render the equation at BEG..END in the other buffers that share the text.
+Point left it in this buffer, which rendered it.  In each other buffer,
+its preview is rendered again if it was edited, or rendered if it has
+none, and the numbers below it are brought up to date, as here (see
+`latex-to-svg-frontend--render-on-leave-element')."
+  (unless latex-to-svg-frontend--following
+    (let ((latex-to-svg-frontend--following t))
+      (dolist (buffer (latex-to-svg-frontend--other-buffers))
+        (with-current-buffer buffer
+          (when (and (<= (point-min) beg) (<= end (point-max)))
+            (if-let* ((ovs (latex-to-svg-frontend--overlays-in beg end)))
+                (dolist (ov ovs)
+                  (when (overlay-get ov 'latex-to-svg-frontend-modified)
+                    (overlay-put ov 'latex-to-svg-frontend-modified nil)
+                    (latex-to-svg-frontend--rerender-overlay ov)))
+              (when-let* ((el (latex-to-svg-frontend--element-at beg)))
+                (latex-to-svg-frontend--render-on-leave-element el)))))))))
+
 (defun latex-to-svg-frontend--on-modify (ov after &rest _)
   "Modification hook for preview overlay OV.
 AFTER is non-nil after the change; reveal OV's source and flag it for
-re-render."
+re-render, here and in the other buffers that share the text (see
+`latex-to-svg-frontend--modify-in-other-buffers')."
   (when after
     (overlay-put ov 'latex-to-svg-frontend-modified t)
-    (latex-to-svg-frontend--hide-image ov)))
+    (latex-to-svg-frontend--hide-image ov)
+    (when-let* ((beg (overlay-start ov)))
+      (latex-to-svg-frontend--modify-in-other-buffers beg (overlay-end ov)))))
 
 (defun latex-to-svg-frontend--revealable-overlay-at (pos)
   "Return this package's preview overlay that POS is on, or nil.
@@ -1662,23 +1748,25 @@ in `post-command-hook' would remove `--handle-cursor' from it."
 Cursor-leave is a discrete event, so we reconcile now, not on the
 debounced backstop.  When `latex-to-svg-frontend-incremental-reconcile'
 is on, EL is numbered from the preceding overlay and only the equations
-below it are re-threaded (`--reconcile-from'); otherwise a full scan."
-  (if latex-to-svg-frontend-incremental-reconcile
-      (progn
-        (latex-to-svg-frontend--render-element
-         el (latex-to-svg-frontend--local-table el))
-        (latex-to-svg-frontend--reconcile-from
-         (latex-to-svg-frontend--math-begin el))
-        ;; This incremental pass covered the left equation and everything
-        ;; below it.  If no text changed outside its span, the pending
-        ;; whole-buffer catch-up is redundant, so drop it.
-        (latex-to-svg-frontend--maybe-cancel-reconcile
-         (latex-to-svg-frontend--math-begin el)
-         (latex-to-svg-frontend--math-end el)))
-    ;; The full reconcile is comprehensive and already cancelled the pending
-    ;; pass; nothing more to do.
-    (latex-to-svg-frontend--render-element el)
-    (latex-to-svg-frontend--reconcile)))
+below it are re-threaded (`--reconcile-from'); otherwise a full scan.
+Then the other buffers that share the text do the same
+\(`--leave-in-other-buffers')."
+  (let ((beg (latex-to-svg-frontend--math-begin el))
+        (end (latex-to-svg-frontend--math-end el)))
+    (if latex-to-svg-frontend-incremental-reconcile
+        (progn
+          (latex-to-svg-frontend--render-element
+           el (latex-to-svg-frontend--local-table el))
+          (latex-to-svg-frontend--reconcile-from beg)
+          ;; This incremental pass covered the left equation and everything
+          ;; below it.  If no text changed outside its span, the pending
+          ;; whole-buffer catch-up is redundant, so drop it.
+          (latex-to-svg-frontend--maybe-cancel-reconcile beg end))
+      ;; The full reconcile is comprehensive and already cancelled the
+      ;; pending pass; nothing more to do.
+      (latex-to-svg-frontend--render-element el)
+      (latex-to-svg-frontend--reconcile))
+    (latex-to-svg-frontend--leave-in-other-buffers beg end)))
 
 (defun latex-to-svg-frontend--rerender-overlay (ov)
   "Re-render the math element under OV after an edit; else drop OV."
@@ -1773,12 +1861,15 @@ On `post-command-hook' while the mode is on."
         (setq latex-to-svg-frontend--last-point (make-marker)))
       (set-marker latex-to-svg-frontend--last-point (point))))))
 
-(defun latex-to-svg-frontend--heal-modified ()
-  "Re-render previews that were edited and then left by point."
+(defun latex-to-svg-frontend--heal-modified (&optional pos)
+  "Re-render previews that were edited and then left by point.
+POS, when given, is where point is instead: in the buffer that runs
+this pass for another buffer that shares the text, the position of
+point there."
   (dolist (ov (latex-to-svg-frontend--overlays-in (point-min) (point-max)))
     (when (and (overlay-get ov 'latex-to-svg-frontend-modified)
-               (or (< (point) (overlay-start ov))
-                   (> (point) (overlay-end ov))))
+               (or (< (or pos (point)) (overlay-start ov))
+                   (> (or pos (point)) (overlay-end ov))))
       (overlay-put ov 'latex-to-svg-frontend-modified nil)
       (latex-to-svg-frontend--rerender-overlay ov))))
 
@@ -2588,19 +2679,32 @@ that has no preview, then reconcile numbers and references."
     (with-current-buffer buffer
       (setq latex-to-svg-frontend--reconcile-timer nil)
       ;; `--reconcile' clears the range, so take it first.
-      (let ((dirty latex-to-svg-frontend--dirty))
+      (let ((dirty latex-to-svg-frontend--dirty)
+            (pos (point)))
         (when (bound-and-true-p latex-to-svg-frontend-mode)
           (latex-to-svg-frontend--heal-modified)
           (when dirty
-            (latex-to-svg-frontend--render-undrawn (car dirty) (cdr dirty)))))
-      (latex-to-svg-frontend--reconcile buffer))))
+            (latex-to-svg-frontend--render-undrawn (car dirty) (cdr dirty))))
+        (latex-to-svg-frontend--reconcile buffer)
+        ;; The other buffers that share the text saw neither the change
+        ;; nor point; the equation containing point here is skipped there.
+        (when (bound-and-true-p latex-to-svg-frontend-mode)
+          (let ((latex-to-svg-frontend--following t))
+            (dolist (other (latex-to-svg-frontend--other-buffers))
+              (with-current-buffer other
+                (latex-to-svg-frontend--heal-modified pos)
+                (when dirty
+                  (latex-to-svg-frontend--render-undrawn
+                   (car dirty) (cdr dirty) pos))
+                (latex-to-svg-frontend--reconcile)))))))))
 
-(defun latex-to-svg-frontend--render-undrawn (beg end)
+(defun latex-to-svg-frontend--render-undrawn (beg end &optional pos)
   "Render the math overlapping BEG..END that has no preview.
 Math pasted, yanked or restored by an undo arrives with no preview, and
 `--render-on-leave' renders only math that point entered and left.  The
 equation containing point is skipped, as `--render-on-leave' skips it,
-so math still being typed is never compiled."
+so math still being typed is never compiled.  POS, when given, is where
+point is instead (see `latex-to-svg-frontend--heal-modified')."
   (let ((beg (max (point-min) beg))
         (end (min (point-max) end))
         (table nil))
@@ -2608,7 +2712,7 @@ so math still being typed is never compiled."
       (dolist (el (latex-to-svg-frontend--elements beg end))
         (let ((b (latex-to-svg-frontend--math-begin el))
               (e (latex-to-svg-frontend--math-end el)))
-          (unless (or (<= b (point) e)
+          (unless (or (<= b (or pos (point)) e)
                       (latex-to-svg-frontend--overlays-in b e))
             (latex-to-svg-frontend--render-element
              el (or table (setq table (latex-to-svg-frontend--maybe-table))))))))))
@@ -3165,6 +3269,37 @@ would stay for good.  Turning the mode off clears them; the new major
 mode's hook, from which the mode is usually turned on, renders again."
   (latex-to-svg-frontend-mode -1))
 
+(defun latex-to-svg-frontend--after-clone ()
+  "Give an indirect clone its own state and its own previews.
+Run in the clone from `clone-indirect-buffer-hook', which Emacs runs
+after it copied the base buffer's local variables and overlays, as
+`clone-indirect-buffer' and Org's `org-tree-to-indirect-buffer' do.
+The copied variables hold the base buffer's own request table, timers
+and marker, so the clone takes new ones.  The copied previews and line
+breaks are deleted with `delete-overlay': each copy of a preview
+records the base buffer's line-break overlays, which
+`latex-to-svg-frontend--delete-overlay' would delete.  The clone then
+renders its math, from the cache, and joins the buffers that share the
+text (see `latex-to-svg-frontend--shared-buffers')."
+  (when latex-to-svg-frontend-mode
+    (setq latex-to-svg-frontend--requests nil
+          latex-to-svg-frontend--last-point nil
+          latex-to-svg-frontend--last-reveal nil
+          latex-to-svg-frontend--reconcile-timer nil
+          latex-to-svg-frontend--initial-render-timer nil
+          latex-to-svg-frontend--dirty nil
+          latex-to-svg-frontend--undrawn nil
+          latex-to-svg-frontend--rendered-appearance nil
+          latex-to-svg-frontend--shared-buffers nil)
+    (save-restriction
+      (widen)
+      (dolist (ov (overlays-in (point-min) (point-max)))
+        (when (or (overlay-get ov 'latex-to-svg-frontend)
+                  (overlay-get ov 'latex-to-svg-frontend-line-break))
+          (delete-overlay ov))))
+    (latex-to-svg-frontend--share t)
+    (latex-to-svg-frontend--render-region (point-min) (point-max))))
+
 (define-minor-mode latex-to-svg-frontend-mode
   "Minor mode previewing LaTeX math as SVG images via `latex-to-svg-backend'.
 
@@ -3194,6 +3329,10 @@ an option of this package updates the previews on its own (see
                   #'latex-to-svg-frontend--handle-cursor nil t)
         (add-hook 'change-major-mode-hook
                   #'latex-to-svg-frontend--before-major-mode-change nil t)
+        (add-hook 'clone-indirect-buffer-hook
+                  #'latex-to-svg-frontend--after-clone nil t)
+        (add-hook 'kill-buffer-hook #'latex-to-svg-frontend--unshare nil t)
+        (latex-to-svg-frontend--share t)
         (latex-to-svg-frontend--add-font-lock-keywords)
         (if buffer-file-name
             (unless (timerp latex-to-svg-frontend--initial-render-timer)
@@ -3210,6 +3349,10 @@ an option of this package updates the previews on its own (see
     (remove-hook 'post-command-hook #'latex-to-svg-frontend--handle-cursor t)
     (remove-hook 'change-major-mode-hook
                  #'latex-to-svg-frontend--before-major-mode-change t)
+    (remove-hook 'clone-indirect-buffer-hook
+                 #'latex-to-svg-frontend--after-clone t)
+    (remove-hook 'kill-buffer-hook #'latex-to-svg-frontend--unshare t)
+    (latex-to-svg-frontend--share nil)
     (latex-to-svg-frontend--remove-font-lock-keywords)
     (when (markerp latex-to-svg-frontend--last-point)
       (set-marker latex-to-svg-frontend--last-point nil))

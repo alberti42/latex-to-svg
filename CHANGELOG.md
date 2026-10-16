@@ -21,6 +21,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of one line with the mode on takes 185 µs instead of 683 µs, against
   111 µs without the mode.
 
+### Fixed
+
+- Previews in indirect buffers follow edits made in the other buffers
+  that share the text. An indirect buffer shares its text with its base
+  buffer: `C-x 4 c` (`clone-indirect-buffer`) makes one, and so does
+  `C-c C-x b` (`org-tree-to-indirect-buffer`) in Org. Before, an
+  equation edited in one of the two buffers kept its old picture in the
+  other. Now, while point is in the edited equation, every other buffer
+  with the mode on shows its source; when point leaves it, it is
+  rendered in all of them. A paste or an undo reaches them too, from
+  the debounced pass of the buffer where it happened.
+- Turning the mode off in a clone no longer affects the base buffer. A clone
+  started with the base buffer's own table of pending requests, timer
+  and marker, so turning the mode off there dropped the pictures the
+  base buffer was waiting for, which then showed their source, and
+  cancelled its pending pass. A clone now starts with its own state and
+  renders its own previews, from the cache.
+
 ## [0.22.0] - 2026-10-14
 
 ### Added
