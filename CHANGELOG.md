@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.22.1] - 2026-10-16
+
 ### Changed
 
 - In Markdown buffers, a keystroke or a command that moves point costs
@@ -908,7 +910,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.22.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.22.1...HEAD
+[0.22.1]: https://github.com/alberti42/latex-to-svg/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/alberti42/latex-to-svg/compare/v0.21.0...v0.22.0
 [0.21.0]: https://github.com/alberti42/latex-to-svg/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/alberti42/latex-to-svg/compare/v0.19.1...v0.20.0
