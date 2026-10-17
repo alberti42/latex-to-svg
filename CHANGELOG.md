@@ -12,6 +12,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A package that turns the mode off in a new clone, as
+  markdown-ts-appear does, no longer empties the base buffer's table of
+  pending requests. When the mode was turned on before that package,
+  the package's function on `clone-indirect-buffer-hook` ran before
+  ours, and turned the mode off while the clone still held the base
+  buffer's table. The equations the base buffer was waiting for then
+  showed their source. Our function now runs before every other
+  function on `clone-indirect-buffer-hook`, so the clone has its own
+  table by then.
+
 ## [0.22.1] - 2026-10-16
 
 ### Changed

@@ -2948,6 +2948,27 @@ BODY sees them as `base' and `clone'.  Point is at the end of both, and
                                  (l2sf-tests--overlays))
                          '(("$y$" y-image)))))))))
 
+(ert-deftest l2sf-clone-hook-of-another-package-runs-after-ours ()
+  ;; markdown-ts-appear turns the mode off in a clone from its own
+  ;; `clone-indirect-buffer-hook'.  A function added to the hook after
+  ;; the mode was turned on runs first at the default depth; it then
+  ;; turned the mode off while the clone still held the base buffer's
+  ;; request table, and emptied it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-pending
+      (let ((base (generate-new-buffer " *l2sf-base*")))
+        (unwind-protect
+            (with-current-buffer base
+              (insert "$x$ and $y$\n")
+              (latex-to-svg-frontend-mode 1)
+              (add-hook 'clone-indirect-buffer-hook
+                        (lambda () (latex-to-svg-frontend-mode -1)) nil t)
+              (with-current-buffer (clone-indirect-buffer " *l2sf-clone*" nil)
+                (should-not latex-to-svg-frontend-mode))
+              (should (= 2 (hash-table-count latex-to-svg-frontend--requests)))
+              (should (equal (l2sf-tests--shared base) (list base))))
+          (kill-buffer base))))))
+
 (defun l2sf-tests--edit-x-to-w (editor other)
   "In EDITOR, edit `$x$' to `$w$' and leave it; check OTHER follows.
 While point is in the equation, OTHER shows its source and nothing is

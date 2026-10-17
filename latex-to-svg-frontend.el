@@ -3329,8 +3329,28 @@ an option of this package updates the previews on its own (see
                   #'latex-to-svg-frontend--handle-cursor nil t)
         (add-hook 'change-major-mode-hook
                   #'latex-to-svg-frontend--before-major-mode-change nil t)
+        ;; Another package may have a function on this hook that turns our
+        ;; mode off in the clone (markdown-ts-appear does).  Turning our
+        ;; mode off empties the clone's `--requests' table.  Cloning copies
+        ;; the value of each local variable, and the value of `--requests'
+        ;; is a reference to a table: until `--after-clone' runs, the clone
+        ;; holds the base buffer's table itself, not a copy.  A callback
+        ;; installs its picture only while its request is in the table, so
+        ;; emptying the base buffer's table leaves the equations it is
+        ;; waiting for showing their source.
+        ;; At the default depth, the function added last runs first:
+        ;; - the other package turned on first: it adds its function, then
+        ;;   our mode is turned on, which adds `--after-clone'.  Added last,
+        ;;   `--after-clone' runs first and gives the clone a new, separate
+        ;;   table.  The other package's function then empties that table,
+        ;;   which belongs to the clone alone.  This works.
+        ;; - our mode turned on first: it adds `--after-clone', then the
+        ;;   other package adds its function.  Added last, the other
+        ;;   package's function runs first and empties the base buffer's
+        ;;   table.
+        ;; Depth -90 makes `--after-clone' run first in both cases.
         (add-hook 'clone-indirect-buffer-hook
-                  #'latex-to-svg-frontend--after-clone nil t)
+                  #'latex-to-svg-frontend--after-clone -90 t)
         (add-hook 'kill-buffer-hook #'latex-to-svg-frontend--unshare nil t)
         (latex-to-svg-frontend--share t)
         (latex-to-svg-frontend--add-font-lock-keywords)
