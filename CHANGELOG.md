@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `latex-to-svg-for-org-mode` warns when Org's own preview ran as the
+  file opened, because `org-startup-with-latex-preview` is non-nil: set
+  by the file's `#+startup: latexpreview` (warned each time), or in the
+  user's config (warned once per session). The warning links to the new
+  Troubleshooting section of the README, which explains how to turn
+  Org's preview off. The Org adaptor's page links there too. Refs #9.
+
 ## [0.22.2] - 2026-10-17
 
 ### Fixed

@@ -224,8 +224,7 @@ adaptors are on MELPA, with `melpa` in `package-archives`:
   :hook (org-mode . latex-to-svg-for-org-mode)
   :init
   ;; Ignore `#+startup: latexpreview': it would run Org's own preview
-  ;; before this mode turns on (see Troubleshooting in
-  ;; docs/latex-to-svg-for-org.md).
+  ;; before this mode turns on (see Troubleshooting).
   (with-eval-after-load 'org
     (setq org-startup-options
           (assoc-delete-all "latexpreview" org-startup-options))))
@@ -775,6 +774,57 @@ references are, so it leaves them alone:
 
 Call them in a buffer where `latex-to-svg-frontend-mode` is on, since the
 excluded regions come from the adaptor.
+
+## Troubleshooting
+
+### Org previews the math too
+
+`org-mode` runs Org's own preview, `org-latex-preview`, while it sets up the
+buffer, before `org-mode-hook` turns `latex-to-svg-for-org-mode` on, when
+`org-startup-with-latex-preview` is non-nil. Two things set it:
+
+- the file's `#+startup: latexpreview`, for that file;
+- a value t in your config, for every Org file.
+
+Org's preview then compiles every equation as the file opens, which can take
+long, and its images cover the same math as this package's.
+`latex-to-svg-for-org-mode` does not stop it: it shows a warning that names
+the cause and links here.
+
+The mode renders all math when the buffer opens, so Org's preview is not
+needed. If your config sets `org-startup-with-latex-preview` to t, set it to
+nil. For `#+startup: latexpreview`, delete the word from the file, or have Org
+ignore it in every file, without editing them, with the `:init` lines in
+[Installation](#installation):
+
+```elisp
+(with-eval-after-load 'org
+  (setq org-startup-options
+        (assoc-delete-all "latexpreview" org-startup-options)))
+```
+
+`org-startup-options` lists the words Org accepts after `#+STARTUP:`. The
+snippet removes `latexpreview` from that list, and Org ignores a word that is
+not in it, so a file that still has `#+startup: latexpreview` no longer runs
+Org's preview. `org-startup-options` is a `defconst`: loading Org sets it
+again, which would undo a `setq` made before, hence `with-eval-after-load`.
+Remove these lines to use Org's own preview again.
+
+Then close the file and open it again.
+
+If Org's own preview is not properly configured on your system, it fails with
+an error such as
+
+```
+File "/tmp/orgtexeQT6GZ.dvi" wasn't produced  Please adjust 'dvisvgm' part of 'org-preview-latex-process-alist'.
+```
+
+and the error stops `org-mode`'s setup, so `latex-to-svg-for-org-mode` is
+never turned on and shows no warning. The fix is the same.
+
+Packages that run Org's preview on their own, such as `org-fragtog`, draw over
+this package's previews too; turn them off in buffers where
+`latex-to-svg-for-org-mode` is on.
 
 ## Limitations
 

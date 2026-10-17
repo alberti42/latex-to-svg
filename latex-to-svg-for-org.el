@@ -142,6 +142,44 @@ It only remaps `org-latex-preview' (see
 `latex-to-svg-for-org-preview-disabled'), and is active only in Org
 buffers where the mode is on.")
 
+(defvar org-startup-with-latex-preview)
+
+(defconst latex-to-svg-for-org--troubleshooting-url
+  "https://github.com/alberti42/latex-to-svg#org-previews-the-math-too"
+  "The README section that explains how to turn Org's own preview off.")
+
+(defvar latex-to-svg-for-org--warned-config nil
+  "Non-nil once the mode warned about `org-startup-with-latex-preview'.
+A value set in the user's config applies to every Org file, so the
+mode warns about it once per session.")
+
+(defun latex-to-svg-for-org--warn-org-preview ()
+  "Warn when Org's own LaTeX preview ran when this buffer opened.
+Org runs its preview while `org-mode' sets up the buffer, before
+`org-mode-hook' turns `latex-to-svg-for-org-mode' on, when
+`org-startup-with-latex-preview' is non-nil: set buffer-locally by
+the file's `#+startup: latexpreview', or globally in the user's
+config.  Its images cover the same math as this package's.  The
+mode does not stop Org's preview; the warning says which setting
+to change, and points to the README's Troubleshooting section."
+  (when-let* ((message
+               (cond
+                ((local-variable-p 'org-startup-with-latex-preview)
+                 (when org-startup-with-latex-preview
+                   "Org's own LaTeX preview ran when this file opened, \
+because of its `#+startup: latexpreview'.  Delete that word from the \
+file, then close the file and open it again."))
+                ((bound-and-true-p org-startup-with-latex-preview)
+                 (unless latex-to-svg-for-org--warned-config
+                   (setq latex-to-svg-for-org--warned-config t)
+                   "Org's own LaTeX preview runs whenever an Org file opens, \
+because `org-startup-with-latex-preview' is non-nil in your config.  Set it \
+to nil, then close the Org files and open them again.")))))
+    (display-warning
+     'latex-to-svg-for-org
+     (format "%s: %s  See %s"
+             (buffer-name) message latex-to-svg-for-org--troubleshooting-url))))
+
 (defun latex-to-svg-for-org--emphasis-faces ()
   "Return the faces of Org's emphasis markers, from `org-emphasis-alist'.
 The value of `latex-to-svg-frontend-emphasis-faces' in Org buffers:
@@ -157,7 +195,9 @@ Installs the Org code/comment exclusions and `org-fold-show-context' as
 the jump-reveal, then turns on `latex-to-svg-frontend-mode', which does
 the rendering.  Enable it from `org-mode-hook'.  While it is on,
 `org-latex-preview' only says that it is off (see
-`latex-to-svg-for-org-preview-disabled')."
+`latex-to-svg-for-org-preview-disabled').  When Org's own preview ran
+as the buffer opened, the mode warns (see
+`latex-to-svg-for-org--warn-org-preview')."
   :lighter nil
   :keymap latex-to-svg-for-org-mode-map
   (if latex-to-svg-for-org-mode
@@ -171,6 +211,7 @@ the rendering.  Enable it from `org-mode-hook'.  While it is on,
                             (org-fold-show-context 'link-search))))
             (setq-local latex-to-svg-frontend-emphasis-faces
                         (latex-to-svg-for-org--emphasis-faces))
+            (latex-to-svg-for-org--warn-org-preview)
             (latex-to-svg-frontend-mode 1))
         (setq latex-to-svg-for-org-mode nil)
         (user-error "`latex-to-svg-for-org-mode' only works in Org buffers"))

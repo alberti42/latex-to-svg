@@ -76,6 +76,7 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar markdown-ts-mode-hook)
 ;; A test binds it dynamically before Org is loaded.
 (defvar org-emphasis-alist)
+(defvar org-startup-with-latex-preview)
 ;; Buffer-local in their modes; tests set them without loading them.
 (defvar markdown-hide-markup)
 (defvar markdown-ts-hide-markup)
@@ -1786,6 +1787,34 @@ can reveal equations and leave references as text."
       (latex-to-svg-for-org-mode -1)
       (should-not (command-remapping 'org-latex-preview))))
   (should-not (assq 'latex-to-svg-for-markdown-mode minor-mode-map-alist)))
+
+(ert-deftest l2sf-org-mode-warns-about-org-preview ()
+  ;; The mode warns when Org's own preview ran as the buffer opened,
+  ;; because of the file's `#+startup: latexpreview' (every time) or the
+  ;; user's config (once per session).  With neither, and with
+  ;; `#+startup: nolatexpreview' over a config value t, it says nothing.
+  (let ((warnings '())
+        (latex-to-svg-for-org--warned-config nil))
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (_type message &rest _) (push message warnings)))
+              ((symbol-function 'org-latex-preview) #'ignore))
+      (cl-flet ((open (text)
+                  (setq warnings '())
+                  (with-temp-buffer
+                    (insert text)
+                    (org-mode)
+                    (latex-to-svg-for-org-mode 1)
+                    warnings)))
+        (l2sf-tests--with-stub
+          (should-not (open "$a$\n"))
+          (let ((ws (open "#+startup: latexpreview\n$a$\n")))
+            (should (= (length ws) 1))
+            (should (string-match-p "#\\+startup: latexpreview" (car ws)))
+            (should (string-match-p "#org-previews-the-math-too" (car ws))))
+          (let ((org-startup-with-latex-preview t))
+            (should (string-match-p "in your config" (car (open "$a$\n"))))
+            (should-not (open "$a$\n"))
+            (should-not (open "#+startup: nolatexpreview\n$a$\n"))))))))
 
 (ert-deftest l2sf-latex-exclusions ()
   ;; The LaTeX adaptor skips the preamble, comments (not an escaped `\%'),
