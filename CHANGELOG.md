@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`latex-to-svg-frontend-failure`).
 - `latex-to-svg-frontend-show-error-log` opens the log of the failed
   equation at point, or shows the error in the echo area when there is no
-  log. Clicking the warning icon runs it for that equation.
+  log. The tooltip of the warning icon names it.
 
 - `latex-to-svg-for-org-mode` warns when Org's own preview ran as the
   file opened, because `org-startup-with-latex-preview` is non-nil: set
@@ -47,8 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The tooltip of an equation that no engine could typeset no longer
-  names its log file. Clicking the warning icon, or
-  `latex-to-svg-frontend-show-error-log`, opens the log.
+  names its log file. `latex-to-svg-frontend-show-error-log` opens the
+  log.
 - A color option (`latex-to-svg-frontend-foreground-color`,
   `latex-to-svg-frontend-background-color`) whose value is not a color is
   reported when `latex-to-svg-frontend-mode` turns on and when an option

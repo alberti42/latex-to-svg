@@ -501,11 +501,12 @@ the log. A warning icon stands before the source: ⚠️, ⚠ or `[!]`, the firs
 one Emacs can show. Hovering over the source or the icon shows the engine and
 the error: "LaTeX could not typeset it: Undefined control sequence.". The icon
 is hidden while point is in the equation, and shown again when point leaves it
-unchanged. Clicking the icon, or `M-x latex-to-svg-frontend-show-error-log`
-with point in the equation, opens the log; when there is none (RaTeX's errors,
-a program that could not run), it shows the error in the echo area. To remove
-the icon, set `latex-to-svg-frontend-failure-mark` to nil; to change it, `M-x
-customize-icon RET latex-to-svg-frontend-failure`. The failure is recorded, so the equation is not compiled again:
+unchanged. `M-x latex-to-svg-frontend-show-error-log` with point in the
+equation opens the log; when there is none (RaTeX's errors, a program that
+could not run), it shows the error in the echo area. To remove the icon, set
+`latex-to-svg-frontend-failure-mark` to nil; to change it, `M-x customize-icon
+RET latex-to-svg-frontend-failure`. The failure is recorded, so the equation is
+not compiled again:
 editing it, or changing the preamble or `latex-to-svg-backend-ratex-macros`,
 tries again. After a fix outside those (installing a missing TeX package,
 upgrading RaTeX), recompile with `C-u M-x latex-to-svg-frontend-refresh`.

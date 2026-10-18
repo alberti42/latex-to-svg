@@ -3747,9 +3747,9 @@ compiled.  Once point leaves it, both show the new picture."
                         (get-text-property 0 'help-echo mark))
                        (concat "LaTeX could not typeset it: "
                                "Undefined control sequence.\n"
-                               "Click here, or call "
+                               "Call "
                                "M-x latex-to-svg-frontend-show-error-log "
-                               "with point in the equation, to open the log.")))
+                               "with point in the equation to open the log.")))
         (latex-to-svg-frontend--open-overlay ov)
         (should-not (overlay-get ov 'before-string))
         (latex-to-svg-frontend--close-overlay ov)
@@ -3776,8 +3776,7 @@ compiled.  Once point leaves it, both show the new picture."
 (ert-deftest l2sf-show-error-log ()
   ;; The command opens the log of the failed equation at point.  With no
   ;; log, or a log file that is gone, it shows the error.  Elsewhere it is
-  ;; an error.  A click on the mark acts on the equation after the mark
-  ;; and leaves point where it is.
+  ;; an error.
   (l2sf-tests--with-stub
     (l2sf-tests--md "Before $\\notacommand$ after\n"
       (let* ((log (make-temp-file "l2sf-log"))
@@ -3806,23 +3805,7 @@ compiled.  Once point leaves it, both show the new picture."
               (should (= (length opened) 1))
               (goto-char 2)
               (should-error (latex-to-svg-frontend-show-error-log)
-                            :type 'user-error)
-              ;; A click on the mark.
-              (funcall failure log)
-              ;; Pressing the button does nothing, so point stays out of
-              ;; the equation and the mark is still there on release.
-              (let ((map (get-text-property
-                          0 'keymap
-                          (overlay-get (car (l2sf-tests--overlays)) 'before-string))))
-                (should (eq (lookup-key map [down-mouse-1]) #'ignore))
-                (dolist (click '([mouse-1] [mouse-2]))
-                  (should (eq (lookup-key map click)
-                              #'latex-to-svg-frontend-show-error-log))))
-              (set-window-buffer (selected-window) (current-buffer))
-              (latex-to-svg-frontend-show-error-log
-               `(mouse-2 (,(selected-window) 8 (0 . 0) 0 nil 8 nil nil nil nil)))
-              (should (equal opened (list log log)))
-              (should (= (point) 2)))
+                            :type 'user-error))
           (delete-file log))))))
 
 (ert-deftest l2sf-failure-mark-option-updates-buffers ()

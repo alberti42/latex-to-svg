@@ -169,10 +169,11 @@ in a mode hook or in `.dir-locals.el', to silence one kind of document."
 
 When non-nil (the default), the icon `latex-to-svg-frontend-failure'
 is shown before the source of a failed equation, with the same tooltip
-as the source: the engine and the error.  Clicking it opens the log
-\(see `latex-to-svg-frontend-show-error-log').  It is hidden while
-point is in the equation, and shown again when point leaves it
-unchanged; an edited equation is typeset again when point leaves it.
+as the source: the engine and the error.  The tooltip of the icon
+names `latex-to-svg-frontend-show-error-log', which opens the log.
+The icon is hidden while point is in the equation, and shown again
+when point leaves it unchanged; an edited equation is typeset again
+when point leaves it.
 When nil, a failed equation looks like an equation not typeset yet.
 Change the icon with `customize-icon'.  Setting the option with
 `setq', `setq-local' or Customize updates the previews on its own."
@@ -1564,25 +1565,13 @@ not named: `latex-to-svg-frontend-show-error-log' opens it."
                          (and message (concat ": " message))))))
     (latex-to-svg-frontend--help-echo-text text)))
 
-(defvar latex-to-svg-frontend--failure-mark-keymap
-  (let ((map (make-sparse-keymap)))
-    ;; The press must not move point.  By default `down-mouse-1' runs
-    ;; `mouse-drag-region', which puts point at the start of the
-    ;; equation; point entering the equation hides the mark, so the
-    ;; release lands on no mark and never reaches this keymap.
-    (define-key map [down-mouse-1] #'ignore)
-    (define-key map [mouse-1] #'latex-to-svg-frontend-show-error-log)
-    (define-key map [mouse-2] #'latex-to-svg-frontend-show-error-log)
-    map)
-  "Keymap of the failure mark.
-A click runs `latex-to-svg-frontend-show-error-log'.")
-
 (defun latex-to-svg-frontend--show-failure-mark (ov)
   "Show the failure mark before the failed equation OV, if it is on.
 See `latex-to-svg-frontend-failure-mark'.  The mark is OV's
 `before-string', so `--hide-image' hides it when point enters OV.
-Clicking it runs `latex-to-svg-frontend-show-error-log'.  Its tooltip
-is the source's, and says so when there is a log to open."
+Its tooltip is the source's, and says how to open the log when there
+is one: a click cannot, as the press puts point in the equation, which
+hides the mark before the release."
   (when-let* ((failure (overlay-get ov 'latex-to-svg-frontend-failure))
               ((buffer-local-value 'latex-to-svg-frontend-failure-mark
                                    (overlay-buffer ov))))
@@ -1593,28 +1582,17 @@ is the source's, and says so when there is a log to open."
                                       (latex-to-svg-frontend--failure-help-echo
                                        failure)
                                       (and (plist-get failure :log)
-                                           "\nClick here, or call \\[latex-to-svg-frontend-show-error-log] \
-with point in the equation, to open the log."))
-                                     'mouse-face 'highlight
-                                     'keymap
-                                     latex-to-svg-frontend--failure-mark-keymap)
+                                           "\nCall \\[latex-to-svg-frontend-show-error-log] \
+with point in the equation to open the log.")))
                          " "))))
 
-(defun latex-to-svg-frontend-show-error-log (&optional event)
+(defun latex-to-svg-frontend-show-error-log ()
   "Open the log of the equation at point that no engine could typeset.
 When the failure has no log (a RaTeX parse error, or a program that
 could not run) or the log file is gone, show the error in the echo
-area instead.  EVENT is the triggering input event: a click on the
-failure mark (see `latex-to-svg-frontend-failure-mark') acts on the
-equation after the mark, and leaves point where it is."
-  (interactive (list last-command-event))
-  (let* ((posn (and (consp event) (eventp event) (event-start event)))
-         (pos (if (and posn (numberp (posn-point posn))) (posn-point posn) (point)))
-         (buffer (if (and posn (windowp (posn-window posn)))
-                     (window-buffer (posn-window posn))
-                   (current-buffer)))
-         (ov (with-current-buffer buffer
-               (latex-to-svg-frontend--revealable-overlay-at pos)))
+area instead."
+  (interactive)
+  (let* ((ov (latex-to-svg-frontend--revealable-overlay-at (point)))
          (failure (and ov (overlay-get ov 'latex-to-svg-frontend-failure)))
          (log (plist-get failure :log)))
     (cond
