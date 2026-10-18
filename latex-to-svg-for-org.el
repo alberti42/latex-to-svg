@@ -144,9 +144,13 @@ buffers where the mode is on.")
 
 (defvar org-startup-with-latex-preview)
 
-(defconst latex-to-svg-for-org--troubleshooting-url
-  "https://github.com/alberti42/latex-to-svg#org-previews-the-math-too"
-  "The README section that explains how to turn Org's own preview off.")
+(defconst latex-to-svg-for-org--startup-url
+  "https://github.com/alberti42/latex-to-svg/blob/main/docs/latex-to-svg-for-org.md#opening-a-file-with-startup-latexpreview-fails"
+  "The Troubleshooting section about Org's preview as a file opens.")
+
+(defconst latex-to-svg-for-org--preview-mode-url
+  "https://github.com/alberti42/latex-to-svg/blob/main/docs/latex-to-svg-for-org.md#org-latex-preview-mode-previews-the-math-too"
+  "The Troubleshooting section about `org-latex-preview-mode'.")
 
 (defun latex-to-svg-for-org--warn-org-preview ()
   "Warn when Org's own LaTeX preview ran when this buffer opened.
@@ -156,20 +160,24 @@ Org runs its preview while `org-mode' sets up the buffer, before
 the file's `#+startup: latexpreview', or globally in the user's
 config.  Its images cover the same math as this package's.  The
 mode does not stop Org's preview; the warning says which setting
-to change, and points to the README's Troubleshooting section."
+to change, and links to the adaptor's Troubleshooting section."
   (when-let* ((message
                (cond
                 ((local-variable-p 'org-startup-with-latex-preview)
                  (when org-startup-with-latex-preview
-                   "Org's own LaTeX preview ran when this file opened, \
-because of its `#+startup: latexpreview'.  Delete that word from the \
-file, then close the file and open it again."))
+                   "Org's own LaTeX preview typeset every equation in this \
+file as it opened, because the file has `#+startup: latexpreview'.  Its \
+images cover this package's previews.  To stop it, delete `latexpreview' \
+from the `#+startup' line, or have Org ignore that word in every file: the \
+section linked below gives the lines for your config.  Then open the file \
+again, to remove Org's images."))
                 ((bound-and-true-p org-startup-with-latex-preview)
-                 "Org's own LaTeX preview runs whenever an Org file opens, \
-because `org-startup-with-latex-preview' is non-nil in your config.  Set it \
-to nil, then close the Org files and open them again."))))
+                 "Org's own LaTeX preview typeset every equation in this \
+file as it opened, because `org-startup-with-latex-preview' is t in your \
+config.  Its images cover this package's previews.  To stop it, set that \
+option to nil, then open the file again, to remove Org's images."))))
     (latex-to-svg-frontend--warn-other-preview
-     'latex-to-svg-for-org message latex-to-svg-for-org--troubleshooting-url)))
+     'latex-to-svg-for-org message latex-to-svg-for-org--startup-url)))
 
 (defvar latex-to-svg-for-org-mode)
 
@@ -184,7 +192,7 @@ mode does not turn Org's mode off."
   (when latex-to-svg-for-org-mode
     (latex-to-svg-frontend--warn-other-modes
      'latex-to-svg-for-org '(org-latex-preview-mode)
-     latex-to-svg-for-org--troubleshooting-url)))
+     latex-to-svg-for-org--preview-mode-url)))
 
 (defun latex-to-svg-for-org--emphasis-faces ()
   "Return the faces of Org's emphasis markers, from `org-emphasis-alist'.

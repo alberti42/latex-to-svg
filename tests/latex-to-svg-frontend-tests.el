@@ -1833,7 +1833,9 @@ can reveal equations and leave references as text."
           (let ((ws (open "#+startup: latexpreview\n$a$\n")))
             (should (= (length ws) 1))
             (should (string-match-p "#\\+startup: latexpreview" (car ws)))
-            (should (string-match-p "#org-previews-the-math-too" (car ws))))
+            (should (string-match-p
+                     "#opening-a-file-with-startup-latexpreview-fails"
+                     (car ws))))
           (let ((org-startup-with-latex-preview t))
             (should (string-match-p "in your config" (car (open "$a$\n"))))
             (should (string-match-p "in your config" (car (open "$a$\n"))))
@@ -1868,7 +1870,9 @@ can reveal equations and leave references as text."
           (latex-to-svg-for-org-mode 1)
           (should (= (length warnings) 1))
           (should (string-match-p "M-x org-latex-preview-mode" (car warnings)))
-          (should (string-match-p "#org-previews-the-math-too" (car warnings)))
+          (should (string-match-p
+                   "#org-latex-preview-mode-previews-the-math-too"
+                   (car warnings)))
           (should org-latex-preview-mode)
           ;; Again when Org's mode turns on again.
           (org-latex-preview-mode -1)
@@ -1927,7 +1931,7 @@ can reveal equations and leave references as text."
           (latex-to-svg-for-latex-mode 1)
           (should (= (length warnings) 1))
           (should (string-match-p "M-x preview-auto-mode" (car warnings)))
-          (should (string-match-p "#auctex-previews-the-math-too"
+          (should (string-match-p "#preview-auto-mode-previews-the-math-too"
                                   (car warnings)))
           (preview-auto-mode -1)
           (preview-auto-mode 1)

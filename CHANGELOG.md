@@ -17,20 +17,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `latex-to-svg-for-org-mode` warns when Org's own preview ran as the
   file opened, because `org-startup-with-latex-preview` is non-nil: set
   by the file's `#+startup: latexpreview`, or in the user's config. The
-  warning links to the new Troubleshooting section of the README, which
-  explains how to turn Org's preview off. The Org adaptor's page links
-  there too. Refs #9.
+  warning says how to turn Org's preview off and links to the Org
+  adaptor's Troubleshooting section, which now covers the config case
+  and the slow opening too. Refs #9.
 - `latex-to-svg-for-org-mode` warns when `org-latex-preview-mode`, which
   Org's next release brings, is on in the same buffer, each time one of
   the two turns on while the other is on. If it is on `org-mode-hook`,
   the warning says to remove it from the hook; otherwise, to turn it off
   with `M-x org-latex-preview-mode`. The adaptor does not turn Org's
-  mode off.
+  mode off. The Org adaptor's page documents it under Troubleshooting.
 - `latex-to-svg-for-latex-mode` warns when `preview-auto-mode`, from the
   `preview-auto` package, is on in the same buffer, each time one of the
   two turns on while the other is on: `preview-auto-mode` calls
   preview-latex's functions directly, so the remap of its commands does
-  not stop it. The warning links to the README's Troubleshooting section.
+  not stop it. The warning links to the new Troubleshooting section of
+  the LaTeX adaptor's page.
 
 ### Changed
 

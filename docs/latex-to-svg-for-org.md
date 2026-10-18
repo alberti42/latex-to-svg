@@ -32,7 +32,7 @@ The adaptor is on MELPA; installing it pulls in the frontend and the backend
   :hook (org-mode . latex-to-svg-for-org-mode)
   :init
   ;; Ignore `#+startup: latexpreview': it would run Org's own preview
-  ;; before this mode turns on (see Troubleshooting in the README).
+  ;; before this mode turns on (see Troubleshooting).
   (with-eval-after-load 'org
     (setq org-startup-options
           (assoc-delete-all "latexpreview" org-startup-options))))
@@ -74,6 +74,56 @@ Math inside these is left as text:
 
 ## Troubleshooting
 
-See the README's [Troubleshooting](../README.md#troubleshooting): it
-explains what to do when Org's own preview runs as a file opens, slowly or with
-an error.
+### Opening a file with `#+startup: latexpreview` fails
+
+`#+startup: latexpreview` (or `org-startup-with-latex-preview`) makes
+`org-mode` run Org's own preview, `org-latex-preview`, while it sets up the
+buffer, before `org-mode-hook` turns `latex-to-svg-for-org-mode` on. If Org's
+own preview is not properly configured on your system, it fails with an error
+such as
+
+```
+File "/tmp/orgtexeQT6GZ.dvi" wasn't produced  Please adjust 'dvisvgm' part of 'org-preview-latex-process-alist'.
+```
+
+and the error stops `org-mode`'s setup, so the mode is never turned on. When
+Org's pipeline works, it typesets every equation as the file opens, which can
+take long, and the overlays produced by Org and by this mode cover the same
+math. The mode then warns, names the cause, and links here.
+
+`org-startup-with-latex-preview` set to t in your config does the same in
+every Org file; set it to nil.
+
+The mode renders all math when the buffer opens, so the option `latexpreview`
+is not needed. Delete it from the file, or have Org ignore it in every file,
+without editing them, with the `:init` lines in [Installation](#installation):
+
+```elisp
+(with-eval-after-load 'org
+  (setq org-startup-options
+        (assoc-delete-all "latexpreview" org-startup-options)))
+```
+
+`org-startup-options` lists the words Org accepts after `#+STARTUP:`. The
+snippet removes `latexpreview` from that list, and Org ignores a word that is
+not in it, so a file that still has `#+startup: latexpreview` no longer runs
+Org's preview. `org-startup-options` is a `defconst`: loading Org sets it
+again, which would undo a `setq` made before, hence `with-eval-after-load`.
+Remove these lines to use Org's own preview again.
+
+Then open the file again, to remove Org's images.
+
+### `org-latex-preview-mode` previews the math too
+
+Org's next release brings `org-latex-preview-mode`, a minor mode that previews
+the math as you type. With it and `latex-to-svg-for-org-mode` both on in a
+buffer, both draw images over the same math. `latex-to-svg-for-org-mode` warns,
+each time one of the two turns on while the other is on, and does not turn
+Org's mode off:
+
+- If `org-latex-preview-mode` is on `org-mode-hook`, remove it from the hook.
+- Otherwise, turn it off with `M-x org-latex-preview-mode`.
+
+Packages that run Org's preview on their own, such as `org-fragtog`, draw over
+this package's previews too; turn them off in buffers where
+`latex-to-svg-for-org-mode` is on.

@@ -453,8 +453,8 @@ It only remaps the preview-latex commands (see
 ;;;; preview-auto
 
 (defconst latex-to-svg-for-latex--troubleshooting-url
-  "https://github.com/alberti42/latex-to-svg#auctex-previews-the-math-too"
-  "The README section about AUCTeX's previews over this package's.")
+  "https://github.com/alberti42/latex-to-svg/blob/main/docs/latex-to-svg-for-latex.md#preview-auto-mode-previews-the-math-too"
+  "The Troubleshooting section about `preview-auto-mode'.")
 
 (defvar latex-to-svg-for-latex-mode)
 

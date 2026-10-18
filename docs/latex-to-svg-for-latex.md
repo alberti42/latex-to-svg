@@ -58,8 +58,8 @@ While the mode is on, AUCTeX's preview-latex commands (`preview-at-point`,
 `preview-environment`, `preview-section`) only say that they are off:
 preview-latex would draw its own images over these. To use preview-latex,
 turn the mode off.
-The `preview-auto` package previews without a command; see the README's
-[AUCTeX previews the math too](../README.md#auctex-previews-the-math-too).
+The `preview-auto` package previews without a command; see
+[Troubleshooting](#troubleshooting).
 
 In LaTeX buffers the engine is `latex` by default, overriding a global value
 `ratex` of `latex-to-svg-frontend-engine`; a global value `texres` stays, since
@@ -176,3 +176,21 @@ from 1994, and preview-latex has used it since its release 0.7.4, in 2002.
   count starts at 1, and for a `\setcounter{equation}` in the text. References
   are right in all three cases, because they come from the `.aux` file.
 - **`\cref`, `\autoref` and `\pageref`** stay as source text.
+
+## Troubleshooting
+
+### `preview-auto-mode` previews the math too
+
+While `latex-to-svg-for-latex-mode` is on, AUCTeX's preview-latex commands only
+say that they are off. AUCTeX itself runs no preview without a command, but
+the `preview-auto` package does: its `preview-auto-mode` previews the visible
+part of the buffer as you read and edit it, calling preview-latex's functions
+directly. With it and `latex-to-svg-for-latex-mode` both on in a buffer, both
+draw images over the same math. `latex-to-svg-for-latex-mode` warns, each time
+one of the two turns on while the other is on, and does not turn
+`preview-auto-mode` off:
+
+- If `preview-auto-mode` is on a major-mode hook, such as `LaTeX-mode-hook`,
+  remove it from the hook. When a function of yours turns it on from the hook,
+  the warning cannot tell, and says what the next item says.
+- Otherwise, turn it off with `M-x preview-auto-mode`.

@@ -116,8 +116,9 @@ gives the recipe, the hook and the details.
 For `markdown-ts-mode` (Emacs 31.1+) or classic `markdown-mode` / `gfm-mode`.
 Skips inline code spans, fenced code blocks and indented code blocks. The
 `markdown` tree-sitter grammar is optional: it makes code-block exclusion
-exact; without it a regexp fallback handles fenced and indented blocks. See
-[its page](docs/latex-to-svg-for-markdown.md).
+exact; without it a regexp fallback handles fenced and indented blocks.
+
+See [its page](docs/latex-to-svg-for-markdown.md) for the adaptor's documentation.
 
 ### `latex-to-svg-for-org`
 
@@ -128,7 +129,9 @@ For `org-mode`. Skips `#+begin_src` / `example` / `export` / `comment` blocks,
 comment lines, table formulas (`#+TBLFM:`), fixed-width lines (`: …`) and
 inline `~code~` / `=verbatim=` spans. While it is on,
 `org-latex-preview` only says that it is off: Org's preview would draw its own
-images over these. See [its page](docs/latex-to-svg-for-org.md).
+images over these.
+
+See [its page](docs/latex-to-svg-for-org.md) for the adaptor's documentation.
 
 ### `latex-to-svg-for-latex`
 
@@ -140,7 +143,9 @@ For AUCTeX's `LaTeX-mode` or the built-in `latex-mode`. Skips comments,
 and the preamble. `\ref` and `\eqref` show the numbers LaTeX printed, read from
 the document's `.aux` file, so references to sections, figures and other files
 resolve too. While it is on, AUCTeX's preview-latex commands only say that they
-are off. See [its page](docs/latex-to-svg-for-latex.md).
+are off.
+
+See [its page](docs/latex-to-svg-for-latex.md) for the adaptor's documentation.
 
 ### `latex-to-svg-for-gnus`
 
@@ -149,7 +154,9 @@ Not on MELPA yet.
 For Gnus's `gnus-article-mode`, such as the abstracts of the arXiv feeds on
 gwene.org. Skips nothing. Draws the previews again for each article Gnus
 shows, turns equation numbering off in the article buffer, and removes Gnus's
-emphasis from inside math. See [its page](docs/latex-to-svg-for-gnus.md).
+emphasis from inside math.
+
+See [its page](docs/latex-to-svg-for-gnus.md) for the adaptor's documentation.
 
 To add an adaptor for another markup, see
 [Writing an adaptor for another markup](#writing-an-adaptor-for-another-markup).
@@ -224,7 +231,8 @@ adaptors are on MELPA, with `melpa` in `package-archives`:
   :hook (org-mode . latex-to-svg-for-org-mode)
   :init
   ;; Ignore `#+startup: latexpreview': it would run Org's own preview
-  ;; before this mode turns on (see Troubleshooting).
+  ;; before this mode turns on (see Troubleshooting in
+  ;; docs/latex-to-svg-for-org.md).
   (with-eval-after-load 'org
     (setq org-startup-options
           (assoc-delete-all "latexpreview" org-startup-options))))
@@ -773,82 +781,6 @@ references are, so it leaves them alone:
 
 Call them in a buffer where `latex-to-svg-frontend-mode` is on, since the
 excluded regions come from the adaptor.
-
-## Troubleshooting
-
-### Org previews the math too
-
-`org-mode` runs Org's own preview, `org-latex-preview`, while it sets up the
-buffer, before `org-mode-hook` turns `latex-to-svg-for-org-mode` on, when
-`org-startup-with-latex-preview` is non-nil. Two things set it:
-
-- the file's `#+startup: latexpreview`, for that file;
-- a value t in your config, for every Org file.
-
-Org's preview then compiles every equation as the file opens, which can take
-long, and its images cover the same math as this package's.
-`latex-to-svg-for-org-mode` does not stop it: it shows a warning that names
-the cause and links here.
-
-The mode renders all math when the buffer opens, so Org's preview is not
-needed. If your config sets `org-startup-with-latex-preview` to t, set it to
-nil. For `#+startup: latexpreview`, delete the word from the file, or have Org
-ignore it in every file, without editing them, with the `:init` lines in
-[Installation](#installation):
-
-```elisp
-(with-eval-after-load 'org
-  (setq org-startup-options
-        (assoc-delete-all "latexpreview" org-startup-options)))
-```
-
-`org-startup-options` lists the words Org accepts after `#+STARTUP:`. The
-snippet removes `latexpreview` from that list, and Org ignores a word that is
-not in it, so a file that still has `#+startup: latexpreview` no longer runs
-Org's preview. `org-startup-options` is a `defconst`: loading Org sets it
-again, which would undo a `setq` made before, hence `with-eval-after-load`.
-Remove these lines to use Org's own preview again.
-
-Then close the file and open it again.
-
-If Org's own preview is not properly configured on your system, it fails with
-an error such as
-
-```
-File "/tmp/orgtexeQT6GZ.dvi" wasn't produced  Please adjust 'dvisvgm' part of 'org-preview-latex-process-alist'.
-```
-
-and the error stops `org-mode`'s setup, so `latex-to-svg-for-org-mode` is
-never turned on and shows no warning. The fix is the same.
-
-Org's next release brings `org-latex-preview-mode`, a minor mode that previews
-the math as you type. With it and `latex-to-svg-for-org-mode` both on in a
-buffer, both draw images over the same math. `latex-to-svg-for-org-mode` warns,
-each time one of the two turns on while the other is on, and does not turn
-Org's mode off:
-
-- If `org-latex-preview-mode` is on `org-mode-hook`, remove it from the hook.
-- Otherwise, turn it off with `M-x org-latex-preview-mode`.
-
-Packages that run Org's preview on their own, such as `org-fragtog`, draw over
-this package's previews too; turn them off in buffers where
-`latex-to-svg-for-org-mode` is on.
-
-### AUCTeX previews the math too
-
-While `latex-to-svg-for-latex-mode` is on, AUCTeX's preview-latex commands only
-say that they are off. AUCTeX itself runs no preview without a command, but
-the `preview-auto` package does: its `preview-auto-mode` previews the visible
-part of the buffer as you read and edit it, calling preview-latex's functions
-directly. With it and `latex-to-svg-for-latex-mode` both on in a buffer, both
-draw images over the same math. `latex-to-svg-for-latex-mode` warns, each time
-one of the two turns on while the other is on, and does not turn
-`preview-auto-mode` off:
-
-- If `preview-auto-mode` is on a major-mode hook, such as `LaTeX-mode-hook`,
-  remove it from the hook. When a function of yours turns it on from the hook,
-  the warning cannot tell, and says what the next item says.
-- Otherwise, turn it off with `M-x preview-auto-mode`.
 
 ## Limitations
 

@@ -3035,9 +3035,9 @@ and nothing is recompiled \=-- previews are re-fetched from the cache."
 
 (defun latex-to-svg-frontend--warn-other-preview (type message url)
   "Show MESSAGE, about another package's previews, as a warning of TYPE.
-Prefix it with the buffer's name, and end it with URL, the README
-section that explains the conflict.  The adaptors only warn: they
-leave the other package's modes and images as they are."
+Prefix it with the buffer's name, and end it with URL, the adaptor's
+Troubleshooting section that explains the conflict.  The adaptors only
+warn: they leave the other package's modes and images as they are."
   (display-warning
    type (format "%s: %s  See %s" (buffer-name) message url)))
 
