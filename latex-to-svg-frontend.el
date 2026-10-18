@@ -534,7 +534,13 @@ What each adaptor turns off, as of today:
 - `latex-to-svg-for-latex-mode': `preview-auto-mode' (the
   `preview-auto' package), and the images of AUCTeX's preview-latex.
 
-With nil, the adaptor changes none of this, and warns instead."
+With nil, the adaptor changes none of this, and warns instead.
+
+The adaptor reads this when its mode turns on, usually from the major
+mode's hook.  Emacs applies `.dir-locals.el' and file-local variables
+after that hook, so a value set there takes effect only when the mode
+turns on again.  Set it globally, or with `setq-local' in a function
+that runs earlier on the same hook."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)

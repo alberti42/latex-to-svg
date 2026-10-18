@@ -879,6 +879,12 @@ their images again. What each adaptor turns off, as of today:
 
 A mode turned on after the adaptor's stays on, with a warning.
 
+The adaptor reads the option when its mode turns on, from the major mode's
+hook. Emacs applies `.dir-locals.el` and file-local variables after that hook,
+so a value set there takes effect only when the mode turns on again. Set it
+globally, or with `setq-local` in a function that runs earlier on the same
+hook.
+
 ## Limitations
 
 - **`\tag`-based references and `subequations` sub-lettering** aren't modelled
