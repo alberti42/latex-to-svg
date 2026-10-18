@@ -58,6 +58,8 @@ While the mode is on, AUCTeX's preview-latex commands (`preview-at-point`,
 `preview-environment`, `preview-section`) only say that they are off:
 preview-latex would draw its own images over these. To use preview-latex,
 turn the mode off.
+The `preview-auto` package previews without a command; see the README's
+[AUCTeX previews the math too](../README.md#auctex-previews-the-math-too).
 
 In LaTeX buffers the engine is `latex` by default, overriding a global value
 `ratex` of `latex-to-svg-frontend-engine`; a global value `texres` stays, since

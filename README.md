@@ -831,23 +831,53 @@ Org's mode off:
 - If `org-latex-preview-mode` is on `org-mode-hook`, remove it from the hook.
 - Otherwise, turn it off with `M-x org-latex-preview-mode`.
 
-Instead of changing these settings, you can have `latex-to-svg-for-org-mode`
-turn Org's preview off itself:
-
-```elisp
-(setq latex-to-svg-for-org-turn-off-org-preview t)
-```
-
-When the mode turns on, it then turns `org-latex-preview-mode` off if it is
-on, and removes the images of Org's preview from the buffer. When the mode
-turns off, it turns `org-latex-preview-mode` on again if it turned it off; it
-does not draw Org's images again. `org-startup-with-latex-preview` still runs
-Org's preview as the file opens, before the mode removes its images.
-`org-latex-preview-mode` turned on after the mode stays on, with a warning.
-
 Packages that run Org's preview on their own, such as `org-fragtog`, draw over
 this package's previews too; turn them off in buffers where
 `latex-to-svg-for-org-mode` is on.
+
+Instead of changing these settings, you can have the mode turn Org's preview
+off itself: see [Turning the other previews off](#turning-the-other-previews-off).
+
+### AUCTeX previews the math too
+
+While `latex-to-svg-for-latex-mode` is on, AUCTeX's preview-latex commands only
+say that they are off. AUCTeX itself runs no preview without a command, but
+the `preview-auto` package does: its `preview-auto-mode` previews the visible
+part of the buffer as you read and edit it, calling preview-latex's functions
+directly. With it and `latex-to-svg-for-latex-mode` both on in a buffer, both
+draw images over the same math. `latex-to-svg-for-latex-mode` warns, each time
+one of the two turns on while the other is on, and does not turn
+`preview-auto-mode` off:
+
+- If `preview-auto-mode` is on a major-mode hook, such as `LaTeX-mode-hook`,
+  remove it from the hook. When a function of yours turns it on from the hook,
+  the warning cannot tell, and says what the next item says.
+- Otherwise, turn it off with `M-x preview-auto-mode`.
+
+Instead, you can have the mode turn `preview-auto-mode` off itself: see
+[Turning the other previews off](#turning-the-other-previews-off).
+
+### Turning the other previews off
+
+Instead of changing the settings above, you can have the adaptors turn the
+other packages' previews off themselves:
+
+```elisp
+(setq latex-to-svg-frontend-turn-off-other-previews t)
+```
+
+When an adaptor's mode turns on, it then turns off the modes of other packages
+that draw images over the same math, and removes the images they drew. When it
+turns off, it turns those modes on again, as it found them; it does not draw
+their images again. What each adaptor turns off, as of today:
+
+- `latex-to-svg-for-org-mode`: `org-latex-preview-mode`, and the images of
+  Org's own preview. `org-startup-with-latex-preview` still runs Org's preview
+  as the file opens, before the mode removes its images.
+- `latex-to-svg-for-latex-mode`: `preview-auto-mode`, and the images of
+  AUCTeX's preview-latex.
+
+A mode turned on after the adaptor's stays on, with a warning.
 
 ## Limitations
 
