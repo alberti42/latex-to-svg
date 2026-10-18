@@ -1528,23 +1528,27 @@ can reveal equations and leave references as text."
         (should (= calls 0))))))
 
 (ert-deftest l2sf-reveal-function-that-fails-counts-as-nil ()
-  "A reveal function that signals counts as nil and is reported once."
+  "A reveal function that signals counts as nil and is reported each time."
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ after\n"
       (setq-local latex-to-svg-frontend-mode t)
       (setq-local latex-to-svg-frontend-reveal
                   (lambda (_kind) (error "Not loaded")))
       (latex-to-svg-frontend--render-region (point-min) (point-max))
-      (let ((latex-to-svg-frontend--warned-reveal-functions nil)
-            (warnings 0))
+      (let ((warnings '()))
         (cl-letf (((symbol-function 'display-warning)
-                   (lambda (&rest _) (setq warnings (1+ warnings)))))
+                   (lambda (_type message &rest _) (push message warnings))))
           (goto-char (+ (point-min) 1))
           (latex-to-svg-frontend--handle-cursor)
-          (latex-to-svg-frontend--handle-cursor)
+          (let ((after-one (length warnings)))
+            (should (> after-one 0))
+            (latex-to-svg-frontend--handle-cursor)
+            (should (= (length warnings) (* 2 after-one))))
           (should (eq (overlay-get (car (l2sf-tests--overlays)) 'display)
                       'fake-image))
-          (should (= warnings 1)))))))
+          (should (string-match-p "Not loaded" (car warnings)))
+          (should (string-match-p "`always', `writable' or nil"
+                                  (car warnings))))))))
 
 (ert-deftest l2sf-cursor-jump-between-previews ()
   (l2sf-tests--with-stub

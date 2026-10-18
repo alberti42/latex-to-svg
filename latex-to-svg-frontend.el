@@ -1726,9 +1726,6 @@ and unrendered math (see `--set-unrendered-overlay') qualify."
                                         (funcall revealable o)))
                        (overlays-at (1- pos)))))))
 
-(defvar latex-to-svg-frontend--warned-reveal-functions nil
-  "The values of `latex-to-svg-frontend-reveal' reported as failing.")
-
 (defun latex-to-svg-frontend--overlay-kind (ov)
   "Return the kind of the span under preview OV (see `--source-kind')."
   (if (overlay-get ov 'latex-to-svg-frontend-ref)
@@ -1749,8 +1746,9 @@ and unrendered math (see `--set-unrendered-overlay') qualify."
 That is when `latex-to-svg-frontend-reveal' says so, or during an
 Isearch.  KIND is nil when point is on no span; a function is then not
 called, and the value is nil.  A function that signals an error counts
-as nil, and the error is reported once with `display-warning': an error
-in `post-command-hook' would remove `--handle-cursor' from it."
+as nil, and the error is reported with `display-warning' each time,
+with the values that need no function: an error in
+`post-command-hook' would remove `--handle-cursor' from it."
   (or isearch-mode
       (pcase latex-to-svg-frontend-reveal
         ('always t)
@@ -1759,13 +1757,13 @@ in `post-command-hook' would remove `--handle-cursor' from it."
         (fn (condition-case err
                 (and kind (funcall fn kind))
               (error
-               (unless (member fn latex-to-svg-frontend--warned-reveal-functions)
-                 (push fn latex-to-svg-frontend--warned-reveal-functions)
-                 (display-warning
-                  'latex-to-svg-frontend
-                  (format "`latex-to-svg-frontend-reveal' (%S) failed: %s"
-                          fn (error-message-string err))
-                  :warning))
+               (display-warning
+                'latex-to-svg-frontend
+                (format "%s: `latex-to-svg-frontend-reveal' (%S) failed: %s
+Fix the function, or set `latex-to-svg-frontend-reveal' to `always', \
+`writable' or nil, which need no function."
+                        (buffer-name) fn (error-message-string err))
+                :warning)
                nil))))))
 
 (defun latex-to-svg-frontend--open-overlay (ov)

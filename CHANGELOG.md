@@ -48,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   once for the life of the Emacs process, when an equation was first
   drawn. Drawing an equation ignores such a value with no warning, as it
   ignored it before after the first warning.
+- A function in `latex-to-svg-frontend-reveal` that signals an error
+  is reported each time it fails, naming the buffer, instead of once for
+  the life of the Emacs process. The warning suggests fixing the
+  function, or setting the option to `always`, `writable` or nil, which
+  need no function. The failure still counts as nil.
 
 ## [0.22.2] - 2026-10-17
 
