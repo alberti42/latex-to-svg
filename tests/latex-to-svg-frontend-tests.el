@@ -1312,6 +1312,39 @@ turned off, the markup hides them again."
       (font-lock-ensure)
       (should (equal (l2sf-tests--invisible-chars) "$$\\\\\\")))))
 
+(ert-deftest l2sf-markdown-ts-math-face ()
+  "In `markdown-ts-mode', every equation gets the face of `$$...$$':
+between `\\[' and `\\]', and with a line holding only `=' inside, which
+the grammar reads as a setext underline (issue #10).  A real setext
+heading keeps its face, and so does the math in it."
+  (skip-unless (and (require 'markdown-ts-mode nil t)
+                    (treesit-language-available-p 'markdown)
+                    (treesit-language-available-p 'markdown-inline)))
+  (l2sf-tests--with-stub
+    (l2sf-tests--md
+        "\\[\na = b\n\\]\n\n$$\na\n=\nb\n$$\n\nText \\(x\\).\n\nE \\(F\\)\n===\n"
+      (let ((markdown-ts-mode-hook nil))
+        (markdown-ts-mode))
+      (setq-local markdown-ts-hide-markup t)
+      (latex-to-svg-for-markdown-mode 1)
+      (font-lock-ensure)
+      (cl-flet ((face-at (text)
+                  (goto-char (point-min))
+                  (search-forward text)
+                  (get-text-property (match-beginning 0) 'face)))
+        (dolist (text '("\\[" "a = b" "\\]" "$$" "a\n=" "b\n$$" "\\(x"))
+          (should (equal (face-at text) '(markdown-ts-latex))))
+        (should (equal (face-at "=\nb") '(markdown-ts-latex)))
+        (should-not (get-text-property (match-beginning 0) 'line-height))
+        (should (equal (face-at "E ") '(markdown-ts-setext-heading)))
+        (should (equal (face-at "\\(F")
+                       '(markdown-ts-setext-heading markdown-ts-latex))))
+      (latex-to-svg-for-markdown-mode -1)
+      (font-lock-ensure)
+      (goto-char (point-min))
+      (should (equal (get-text-property (point) 'face)
+                     '(markdown-ts-delimiter))))))
+
 (ert-deftest l2sf-clears-overlays ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ $b$\n"

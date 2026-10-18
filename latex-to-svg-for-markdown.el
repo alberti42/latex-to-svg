@@ -257,8 +257,90 @@ fontification, one call per chunk)."
   (goto-char limit)
   nil)
 
+(defconst latex-to-svg-for-markdown--setext-underline-query
+  (when (fboundp 'treesit-query-compile)
+    (treesit-query-compile
+     'markdown '((setext_h1_underline) @u (setext_h2_underline) @u)))
+  "The tree-sitter query for the underlines of setext headings, or nil.
+Compiled when it is first used, so loading this file needs no grammar.
+nil in an Emacs built without tree-sitter.")
+
+(defun latex-to-svg-for-markdown--put-math-face (beg end)
+  "Give BEG..END the face `markdown-ts-mode' gives `$...$' math.
+In each face run, remove `markdown-ts-delimiter' and append
+`markdown-ts-latex' when it is missing; keep the other faces, such as
+the face of a heading the equation is in."
+  (let ((p beg))
+    (while (< p end)
+      (let* ((q (next-single-property-change p 'face nil end))
+             (face (get-text-property p 'face))
+             (faces (cond ((null face) nil)
+                          ((or (symbolp face) (keywordp (car-safe face)))
+                           (list face))
+                          (t face)))
+             (kept (remq 'markdown-ts-delimiter faces)))
+        (put-text-property p q 'face
+                           (if (memq 'markdown-ts-latex kept)
+                               kept
+                             (append kept '(markdown-ts-latex))))
+        (setq p q)))))
+
+(defun latex-to-svg-for-markdown--math-face (limit)
+  "Font-lock keyword: give all math the face of `$...$' math.
+In `markdown-ts-mode', only `$...$' and `$$...$$' are math, and get the
+face `markdown-ts-latex'.  The grammar reads `\\(' and `\\[' as escaped
+parentheses and brackets, which get `markdown-ts-delimiter' on their
+backslash, and the text inside them gets no face.  The color of the
+text at the opening delimiter tints the preview (see
+`latex-to-svg-frontend-foreground-color'), so the same equation was
+drawn in the color of `shadow' between `\\[' and `\\]', and in the color
+of `markdown-ts-latex' between `$$' and `$$'.
+
+A line holding only `=' or `-' inside an equation is the underline of a
+setext heading to the grammar, as CommonMark says: the lines above it,
+the opening delimiter included, get `markdown-ts-setext-heading', and
+the preview took the color of the heading.  When the underline is
+inside an equation, this keyword removes that face from the heading,
+and the `line-height' 0 by which `markdown-ts-hide-markup' hides the
+underline.  A heading whose underline is outside every equation is a
+heading: it keeps its face, and so does the math in it.
+
+Each equation found by `latex-to-svg-frontend-spans' gets the face of
+`$...$' (`latex-to-svg-for-markdown--put-math-face'), within POINT..LIMIT.
+References drawn as text are left alone.  In other modes it does
+nothing.  Returns nil (own fontification, one call per chunk)."
+  (when (and (derived-mode-p 'markdown-ts-mode)
+             (< (point) limit))
+    (let ((start (point)))
+      (dolist (span (latex-to-svg-frontend-spans start limit))
+        (unless (eq (car span) 'reference)
+          (let ((beg (nth 1 span))
+                (end (nth 2 span)))
+            (dolist (cap (ignore-error treesit-error
+                           (treesit-query-capture
+                            'markdown
+                            latex-to-svg-for-markdown--setext-underline-query
+                            beg end)))
+              (let* ((underline (cdr cap))
+                     (heading (treesit-node-parent underline)))
+                (when (and (< beg (treesit-node-start underline))
+                           (<= (treesit-node-end underline) end))
+                  (let ((b (max start (treesit-node-start heading)))
+                        (e (min limit (treesit-node-end heading))))
+                    (when (< b e)
+                      (font-lock--remove-face-from-text-property
+                       b e 'face 'markdown-ts-setext-heading)
+                      (remove-text-properties b e '(line-height nil)))))))
+            (let ((b (max start beg))
+                  (e (min limit end)))
+              (when (< b e)
+                (latex-to-svg-for-markdown--put-math-face b e))))))))
+  (goto-char limit)
+  nil)
+
 (defconst latex-to-svg-for-markdown--font-lock-keywords
-  '((latex-to-svg-for-markdown--unhide-markup-in-math))
+  '((latex-to-svg-for-markdown--unhide-markup-in-math)
+    (latex-to-svg-for-markdown--math-face))
   "Font-lock keywords added while the mode is on (appended, so they run last).
 Turning `latex-to-svg-frontend-mode' on or off fontifies the buffer
 again, so they apply at once.")
