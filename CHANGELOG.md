@@ -26,6 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   remove it from the hook (once per session); otherwise, to turn it off
   with `M-x org-latex-preview-mode` (once per buffer). The adaptor does
   not turn Org's mode off.
+- `latex-to-svg-for-org-turn-off-org-preview` (default nil): when
+  `latex-to-svg-for-org-mode` turns on, it turns `org-latex-preview-mode`
+  off if it is on, and removes the images of Org's preview from the
+  buffer; when it turns off, it turns `org-latex-preview-mode` on again if
+  it turned it off. With the option on, the mode shows none of the
+  warnings above when it turns on; with it off, each warning names it.
 
 ## [0.22.2] - 2026-10-17
 

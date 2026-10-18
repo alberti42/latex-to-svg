@@ -832,6 +832,20 @@ whichever of the two turned on first, and does not turn Org's mode off:
 - Otherwise, turn it off with `M-x org-latex-preview-mode`. This warning comes
   once per buffer.
 
+Instead of changing these settings, you can have `latex-to-svg-for-org-mode`
+turn Org's preview off itself:
+
+```elisp
+(setq latex-to-svg-for-org-turn-off-org-preview t)
+```
+
+When the mode turns on, it then turns `org-latex-preview-mode` off if it is
+on, and removes the images of Org's preview from the buffer. When the mode
+turns off, it turns `org-latex-preview-mode` on again if it turned it off; it
+does not draw Org's images again. `org-startup-with-latex-preview` still runs
+Org's preview as the file opens, before the mode removes its images.
+`org-latex-preview-mode` turned on after the mode stays on, with a warning.
+
 Packages that run Org's preview on their own, such as `org-fragtog`, draw over
 this package's previews too; turn them off in buffers where
 `latex-to-svg-for-org-mode` is on.
