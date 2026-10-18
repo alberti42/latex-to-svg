@@ -196,8 +196,11 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 - Emacs 29.1+ with SVG image support. Each adaptor's page lists the major
   modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.14.0+ (the backend) — the floor is set by 0.14.0, which reads no faces
-  and no frames: the front-end passes the colors and the x-height it reads
+  0.15.1+ (the backend) — the floor is set by 0.15.1: every warning is
+  shown once per buffer per cause, names the buffer, and says how to fix
+  its cause. With 0.15.0 the callback of every request receives the
+  outcome, so an equation that failed to compile shows its error. 0.14.0
+  reads no faces and no frames: the front-end passes the colors and the x-height it reads
   on the frame that shows the buffer, as `#rrggbb` strings and as
   `:x-height`, the height of the text's lowercase `x` in pixels. With 0.14.0 each image has
   `:width` in pixels, which pretty-tables reads, and an inline equation sits
