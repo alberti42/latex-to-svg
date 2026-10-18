@@ -457,7 +457,6 @@ It only remaps the preview-latex commands (see
   "The README section about AUCTeX's previews over this package's.")
 
 (defvar latex-to-svg-for-latex-mode)
-(declare-function preview-clearout-buffer "preview" (&optional buffer))
 
 (defun latex-to-svg-for-latex--warn-preview-auto-mode ()
   "Warn when `preview-auto-mode' and this mode are both on.
@@ -469,25 +468,11 @@ this package's.  The mode runs this when it turns on, and from
 `preview-auto-mode-hook' when that mode turns on after it, so it warns
 each time one of the two turns on while the other is on (see
 `latex-to-svg-frontend--warn-other-modes').  The mode does not turn
-`preview-auto-mode' off here: with
-`latex-to-svg-frontend-turn-off-other-previews' non-nil, it turned it
-off when it turned on, and this warns only when it turns on after it."
+`preview-auto-mode' off."
   (when latex-to-svg-for-latex-mode
     (latex-to-svg-frontend--warn-other-modes
      'latex-to-svg-for-latex '(preview-auto-mode)
      latex-to-svg-for-latex--troubleshooting-url)))
-
-(defun latex-to-svg-for-latex--turn-off-preview ()
-  "Turn AUCTeX's previews off in this buffer.
-Run when the mode turns on, with
-`latex-to-svg-frontend-turn-off-other-previews' non-nil.  Removes the
-images of preview-latex with `preview-clearout-buffer', and turns
-`preview-auto-mode' off if it is on (see
-`latex-to-svg-frontend--turn-off-modes')."
-  (when (featurep 'preview)
-    (preview-clearout-buffer))
-  (latex-to-svg-frontend--turn-off-modes
-   'latex-to-svg-for-latex-mode '(preview-auto-mode)))
 
 ;;;; The mode
 
@@ -519,9 +504,7 @@ project's `.dir-locals.el'.  Enable the mode from
 AUCTeX's preview-latex commands only say that they are off (see
 `latex-to-svg-for-latex-preview-disabled').  When `preview-auto-mode'
 is on in the buffer, the mode warns (see
-`latex-to-svg-for-latex--warn-preview-auto-mode'); with
-`latex-to-svg-frontend-turn-off-other-previews' non-nil, it turns
-AUCTeX's previews off instead."
+`latex-to-svg-for-latex--warn-preview-auto-mode')."
   :lighter nil
   :keymap latex-to-svg-for-latex-mode-map
   (if latex-to-svg-for-latex-mode
@@ -543,9 +526,7 @@ AUCTeX's previews off instead."
                               'texres
                             'latex))
               (setq latex-to-svg-for-latex--set-engine t))
-            (if latex-to-svg-frontend-turn-off-other-previews
-                (latex-to-svg-for-latex--turn-off-preview)
-              (latex-to-svg-for-latex--warn-preview-auto-mode))
+            (latex-to-svg-for-latex--warn-preview-auto-mode)
             (add-hook 'preview-auto-mode-hook
                       #'latex-to-svg-for-latex--warn-preview-auto-mode nil t)
             (latex-to-svg-frontend-mode 1))
@@ -554,7 +535,6 @@ AUCTeX's previews off instead."
     (latex-to-svg-frontend-mode -1)
     (remove-hook 'preview-auto-mode-hook
                  #'latex-to-svg-for-latex--warn-preview-auto-mode t)
-    (latex-to-svg-frontend--restore-modes)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
     (kill-local-variable 'latex-to-svg-frontend-dollar-guards)
     (kill-local-variable 'latex-to-svg-frontend-labels-function)

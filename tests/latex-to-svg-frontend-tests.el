@@ -1900,63 +1900,6 @@ can reveal equations and leave references as text."
         (dolist (w warnings)
           (should (string-match-p "Remove it from `org-mode-hook'" w)))))))
 
-(ert-deftest l2sf-org-mode-turns-off-org-preview ()
-  ;; With `latex-to-svg-frontend-turn-off-other-previews' on, the mode removes
-  ;; Org's images and turns `org-latex-preview-mode' off when it turns on,
-  ;; says so once, and turns Org's mode on again when it turns off.  It
-  ;; shows no warning then, also not for `#+startup: latexpreview'.  Org's
-  ;; mode turned on after ours stays on, with a warning that does not name
-  ;; the option.  With the option off, every warning names it.
-  (let ((warnings '())
-        (messages '())
-        (org-mode-hook nil)
-        (latex-to-svg-frontend-turn-off-other-previews t))
-    (cl-letf (((symbol-function 'display-warning)
-               (lambda (_type message &rest _) (push message warnings)))
-              ((symbol-function 'message)
-               (lambda (&rest args) (push (apply #'format args) messages)))
-              ((symbol-function 'org-latex-preview) #'ignore))
-      (l2sf-tests--with-stub
-        (with-temp-buffer
-          (insert "#+startup: latexpreview\n$a$ $b$\n")
-          (org-mode)
-          (overlay-put (make-overlay 25 28) 'org-overlay-type 'org-latex-overlay)
-          (org-latex-preview-mode 1)
-          (latex-to-svg-for-org-mode 1)
-          (should-not org-latex-preview-mode)
-          (should-not (seq-some (lambda (ov) (overlay-get ov 'org-overlay-type))
-                                (overlays-in (point-min) (point-max))))
-          (should (= (length messages) 1))
-          (should (string-match-p "turns it on again" (car messages)))
-          (should-not warnings)
-          (latex-to-svg-for-org-mode -1)
-          (should org-latex-preview-mode)
-          ;; Turned on again by the user later: the next turn-off of ours
-          ;; leaves it alone.
-          (org-latex-preview-mode -1)
-          (latex-to-svg-for-org-mode 1)
-          (latex-to-svg-for-org-mode -1)
-          (should-not org-latex-preview-mode))
-        ;; Org's mode turned on after ours: it stays on, with a warning.
-        (with-temp-buffer
-          (org-mode)
-          (latex-to-svg-for-org-mode 1)
-          (org-latex-preview-mode 1)
-          (should org-latex-preview-mode)
-          (should (= (length warnings) 1))
-          (should-not (string-match-p "turn-off-other-previews" (car warnings))))
-        ;; With the option off, the warning names it.
-        (setq warnings '())
-        (let ((latex-to-svg-frontend-turn-off-other-previews nil))
-          (with-temp-buffer
-            (org-mode)
-            (org-latex-preview-mode 1)
-            (latex-to-svg-for-org-mode 1)
-            (should org-latex-preview-mode)
-            (should (string-match-p
-                     "Or set `latex-to-svg-frontend-turn-off-other-previews' to t"
-                     (car warnings)))))))))
-
 ;; `preview-auto-mode' comes from the `preview-auto' package, which the
 ;; tests do not install: stand in for it when it is missing.
 (defvar preview-auto-mode)
@@ -1972,16 +1915,10 @@ can reveal equations and leave references as text."
   ;; The LaTeX adaptor warns when `preview-auto-mode' is on with it, each
   ;; time one of the two turns on while the other is on: "remove it from
   ;; `latex-mode-hook'" when that hook turned it on, else "turn it off with
-  ;; M-x".  With `latex-to-svg-frontend-turn-off-other-previews' on, it
-  ;; turns `preview-auto-mode' off when it turns on and on again when it
-  ;; turns off, with one message and no warning.
-  (let ((warnings '())
-        (messages '())
-        (latex-to-svg-frontend-turn-off-other-previews nil))
+  ;; M-x".  It turns `preview-auto-mode' off in no case.
+  (let ((warnings '()))
     (cl-letf (((symbol-function 'display-warning)
-               (lambda (_type message &rest _) (push message warnings)))
-              ((symbol-function 'message)
-               (lambda (&rest args) (push (apply #'format args) messages))))
+               (lambda (_type message &rest _) (push message warnings))))
       (l2sf-tests--with-stub
         ;; preview-auto first, then ours; then preview-auto again.
         (with-temp-buffer
@@ -1992,9 +1929,6 @@ can reveal equations and leave references as text."
           (should (string-match-p "M-x preview-auto-mode" (car warnings)))
           (should (string-match-p "#auctex-previews-the-math-too"
                                   (car warnings)))
-          (should (string-match-p
-                   "Or set `latex-to-svg-frontend-turn-off-other-previews' to t"
-                   (car warnings)))
           (preview-auto-mode -1)
           (preview-auto-mode 1)
           (should (= (length warnings) 2))
@@ -2011,20 +1945,7 @@ can reveal equations and leave references as text."
                (should preview-auto-mode)
                (latex-to-svg-for-latex-mode 1))
           (should (string-match-p "Remove it from `latex-mode-hook'"
-                                  (car warnings))))
-        ;; The opt-in.
-        (setq warnings '())
-        (let ((latex-to-svg-frontend-turn-off-other-previews t))
-          (with-temp-buffer
-            (let ((latex-mode-hook nil)) (latex-mode))
-            (preview-auto-mode 1)
-            (latex-to-svg-for-latex-mode 1)
-            (should-not preview-auto-mode)
-            (should-not warnings)
-            (should (= (length messages) 1))
-            (should (string-match-p "`preview-auto-mode' off" (car messages)))
-            (latex-to-svg-for-latex-mode -1)
-            (should preview-auto-mode)))))))
+                                  (car warnings))))))))
 
 (ert-deftest l2sf-latex-exclusions ()
   ;; The LaTeX adaptor skips the preamble, comments (not an escaped `\%'),

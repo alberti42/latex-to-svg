@@ -518,33 +518,6 @@ such as `markdown-ts-latex', stay."
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-turn-off-other-previews nil
-  "Non-nil: an adaptor turns off other packages' previews of the same math.
-When an adaptor's mode turns on, it turns off the modes of other
-packages that draw images over the same math, and removes the images
-they drew; when it turns off, it turns those modes on again, as it
-found them.  It does not draw their images again.  A mode turned on
-after the adaptor's is not turned off: the adaptor warns about it.
-
-What each adaptor turns off, as of today:
-
-- `latex-to-svg-for-org-mode': `org-latex-preview-mode' (Org 10), and
-  the images of Org's own preview, such as those drawn when the file
-  opened because of `org-startup-with-latex-preview'.
-- `latex-to-svg-for-latex-mode': `preview-auto-mode' (the
-  `preview-auto' package), and the images of AUCTeX's preview-latex.
-
-With nil, the adaptor changes none of this, and warns instead.
-
-The adaptor reads this when its mode turns on, usually from the major
-mode's hook.  Emacs applies `.dir-locals.el' and file-local variables
-after that hook, so a value set there takes effect only when the mode
-turns on again.  Set it globally, or with `setq-local' in a function
-that runs earlier on the same hook."
-  :type 'boolean
-  :safe #'booleanp
-  :group 'latex-to-svg-frontend)
-
 ;;;; Per-markup protocol (buffer-local; set by an adaptor's minor mode)
 
 (defvar-local latex-to-svg-frontend-exclude-function nil
@@ -3060,24 +3033,13 @@ and nothing is recompiled \=-- previews are re-fetched from the cache."
 
 ;;;; Other packages' previews of the same math
 
-(defvar-local latex-to-svg-frontend--turned-off-modes nil
-  "The other packages' modes an adaptor turned off in this buffer.
-`latex-to-svg-frontend--restore-modes' turns them on again.")
-
 (defun latex-to-svg-frontend--warn-other-preview (type message url)
   "Show MESSAGE, about another package's previews, as a warning of TYPE.
-Prefix it with the buffer's name.  When
-`latex-to-svg-frontend-turn-off-other-previews' is nil, add that
-setting it to t is the other fix.  End with URL, the README section
-that explains the conflict."
+Prefix it with the buffer's name, and end it with URL, the README
+section that explains the conflict.  The adaptors only warn: they
+leave the other package's modes and images as they are."
   (display-warning
-   type
-   (format "%s: %s%s  See %s"
-           (buffer-name) message
-           (if latex-to-svg-frontend-turn-off-other-previews
-               ""
-             "  Or set `latex-to-svg-frontend-turn-off-other-previews' to t.")
-           url)))
+   type (format "%s: %s  See %s" (buffer-name) message url)))
 
 (defun latex-to-svg-frontend--hook-running (fn)
   "Return the major-mode hook whose global value runs FN in this buffer.
@@ -3109,36 +3071,6 @@ package's previews in every buffer that hook runs in.  Remove it from `%s'."
          (format "`%s' is on in this buffer, and previews the math over \
 this package's previews.  Turn it off with `M-x %s'." mode mode))
        url))))
-
-(defun latex-to-svg-frontend--turn-off-modes (adaptor modes)
-  "Turn off each of MODES that is on in this buffer, for ADAPTOR's mode.
-Record each in `latex-to-svg-frontend--turned-off-modes', and say so
-once.  Run when ADAPTOR turns on with
-`latex-to-svg-frontend-turn-off-other-previews' non-nil."
-  (let ((turned-off '()))
-    (dolist (mode modes)
-      (when (and (boundp mode) (symbol-value mode))
-        (funcall mode -1)
-        (push mode turned-off)
-        (push mode latex-to-svg-frontend--turned-off-modes)))
-    (when turned-off
-      (message "`%s' turned %s off in this buffer, and turns %s on again \
-when it turns off"
-               adaptor
-               (mapconcat (lambda (mode) (format "`%s'" mode))
-                          (nreverse turned-off) " and ")
-               (if (cdr turned-off) "them" "it")))))
-
-(defun latex-to-svg-frontend--restore-modes ()
-  "Turn on again the modes an adaptor turned off in this buffer.
-Run when the adaptor's mode turns off.  A major-mode change turns
-every mode off and resets the buffer-local record, so there is nothing
-to restore then."
-  (let ((modes latex-to-svg-frontend--turned-off-modes))
-    (setq latex-to-svg-frontend--turned-off-modes nil)
-    (dolist (mode modes)
-      (when (fboundp mode)
-        (funcall mode 1)))))
 
 ;;;; Command and mode
 

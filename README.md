@@ -834,9 +834,6 @@ Packages that run Org's preview on their own, such as `org-fragtog`, draw over
 this package's previews too; turn them off in buffers where
 `latex-to-svg-for-org-mode` is on.
 
-Instead of changing these settings, you can have the mode turn Org's preview
-off itself: see [Turning the other previews off](#turning-the-other-previews-off).
-
 ### AUCTeX previews the math too
 
 While `latex-to-svg-for-latex-mode` is on, AUCTeX's preview-latex commands only
@@ -852,37 +849,6 @@ one of the two turns on while the other is on, and does not turn
   remove it from the hook. When a function of yours turns it on from the hook,
   the warning cannot tell, and says what the next item says.
 - Otherwise, turn it off with `M-x preview-auto-mode`.
-
-Instead, you can have the mode turn `preview-auto-mode` off itself: see
-[Turning the other previews off](#turning-the-other-previews-off).
-
-### Turning the other previews off
-
-Instead of changing the settings above, you can have the adaptors turn the
-other packages' previews off themselves:
-
-```elisp
-(setq latex-to-svg-frontend-turn-off-other-previews t)
-```
-
-When an adaptor's mode turns on, it then turns off the modes of other packages
-that draw images over the same math, and removes the images they drew. When it
-turns off, it turns those modes on again, as it found them; it does not draw
-their images again. What each adaptor turns off, as of today:
-
-- `latex-to-svg-for-org-mode`: `org-latex-preview-mode`, and the images of
-  Org's own preview. `org-startup-with-latex-preview` still runs Org's preview
-  as the file opens, before the mode removes its images.
-- `latex-to-svg-for-latex-mode`: `preview-auto-mode`, and the images of
-  AUCTeX's preview-latex.
-
-A mode turned on after the adaptor's stays on, with a warning.
-
-The adaptor reads the option when its mode turns on, from the major mode's
-hook. Emacs applies `.dir-locals.el` and file-local variables after that hook,
-so a value set there takes effect only when the mode turns on again. Set it
-globally, or with `setq-local` in a function that runs earlier on the same
-hook.
 
 ## Limitations
 

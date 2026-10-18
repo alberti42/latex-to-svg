@@ -31,13 +31,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   two turns on while the other is on: `preview-auto-mode` calls
   preview-latex's functions directly, so the remap of its commands does
   not stop it. The warning links to the README's Troubleshooting section.
-- `latex-to-svg-frontend-turn-off-other-previews` (default nil): when an
-  adaptor's mode turns on, it turns off the modes of other packages that
-  draw images over the same math (`org-latex-preview-mode` in Org,
-  `preview-auto-mode` in LaTeX), and removes the images of Org's preview
-  or of AUCTeX's preview-latex; when it turns off, it turns those modes
-  on again. With the option on, the adaptors show none of the warnings
-  above when they turn on; with it off, each warning names it.
 
 ### Changed
 
