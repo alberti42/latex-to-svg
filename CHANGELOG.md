@@ -78,11 +78,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `\]` (the grammar reads `\[` as an escaped bracket), in the color of
   `markdown-ts-latex` between `$$` and `$$`. A line holding only `=` or
   `-` inside an equation made the lines above it a setext heading, and
-  the equation took the heading's color; with `markdown-ts-hide-markup`
-  on, that line was hidden in the source. `latex-to-svg-for-markdown-mode`
+  the equation took the heading's color. `latex-to-svg-for-markdown-mode`
   now gives every equation the face of `$...$`, `markdown-ts-latex`, and
-  removes the heading's face and the hiding when the underline is inside
-  an equation. A heading whose underline is outside every equation keeps
+  removes the heading's face when the underline is inside an equation. A heading whose underline is outside every equation keeps
   its face. Refs #10.
 
 ## [0.22.2] - 2026-10-17

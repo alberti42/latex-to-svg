@@ -300,9 +300,8 @@ A line holding only `=' or `-' inside an equation is the underline of a
 setext heading to the grammar, as CommonMark says: the lines above it,
 the opening delimiter included, get `markdown-ts-setext-heading', and
 the preview took the color of the heading.  When the underline is
-inside an equation, this keyword removes that face from the heading,
-and the `line-height' 0 by which `markdown-ts-hide-markup' hides the
-underline.  A heading whose underline is outside every equation is a
+inside an equation, this keyword removes that face from the heading.
+A heading whose underline is outside every equation is a
 heading: it keeps its face, and so does the math in it.
 
 Each equation found by `latex-to-svg-frontend-spans' gets the face of
@@ -329,8 +328,7 @@ nothing.  Returns nil (own fontification, one call per chunk)."
                         (e (min limit (treesit-node-end heading))))
                     (when (< b e)
                       (font-lock--remove-face-from-text-property
-                       b e 'face 'markdown-ts-setext-heading)
-                      (remove-text-properties b e '(line-height nil)))))))
+                       b e 'face 'markdown-ts-setext-heading))))))
             (let ((b (max start beg))
                   (e (min limit end)))
               (when (< b e)
