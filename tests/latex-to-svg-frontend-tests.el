@@ -3793,9 +3793,15 @@ compiled.  Once point leaves it, both show the new picture."
               (should-error (latex-to-svg-frontend-show-failure) :type 'user-error)
               ;; A click on the mark.
               (funcall failure log)
-              (let ((mark (overlay-get (car (l2sf-tests--overlays)) 'before-string)))
-                (should (eq (lookup-key (get-text-property 0 'keymap mark) [mouse-2])
-                            #'latex-to-svg-frontend-show-failure)))
+              ;; Pressing the button does nothing, so point stays out of
+              ;; the equation and the mark is still there on release.
+              (let ((map (get-text-property
+                          0 'keymap
+                          (overlay-get (car (l2sf-tests--overlays)) 'before-string))))
+                (should (eq (lookup-key map [down-mouse-1]) #'ignore))
+                (dolist (click '([mouse-1] [mouse-2]))
+                  (should (eq (lookup-key map click)
+                              #'latex-to-svg-frontend-show-failure))))
               (set-window-buffer (selected-window) (current-buffer))
               (latex-to-svg-frontend-show-failure
                `(mouse-2 (,(selected-window) 8 (0 . 0) 0 nil 8 nil nil nil nil)))

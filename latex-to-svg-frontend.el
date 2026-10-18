@@ -1567,10 +1567,13 @@ follows on its own line when there is one."
 
 (defvar latex-to-svg-frontend--failure-mark-keymap
   (let ((map (make-sparse-keymap)))
+    ;; The press must not move point.  By default `down-mouse-1' runs
+    ;; `mouse-drag-region', which puts point at the start of the
+    ;; equation; point entering the equation hides the mark, so the
+    ;; release lands on no mark and never reaches this keymap.
+    (define-key map [down-mouse-1] #'ignore)
+    (define-key map [mouse-1] #'latex-to-svg-frontend-show-failure)
     (define-key map [mouse-2] #'latex-to-svg-frontend-show-failure)
-    ;; A short mouse-1 click is rewritten to mouse-2, as on a reference
-    ;; (see `latex-to-svg-frontend--reference-keymap').
-    (define-key map [follow-link] 'mouse-face)
     map)
   "Keymap of the failure mark: a click runs `latex-to-svg-frontend-show-failure'.")
 
