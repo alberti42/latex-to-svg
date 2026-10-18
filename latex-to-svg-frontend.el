@@ -1572,16 +1572,17 @@ follows on its own line when there is one."
     ;; equation; point entering the equation hides the mark, so the
     ;; release lands on no mark and never reaches this keymap.
     (define-key map [down-mouse-1] #'ignore)
-    (define-key map [mouse-1] #'latex-to-svg-frontend-show-failure)
-    (define-key map [mouse-2] #'latex-to-svg-frontend-show-failure)
+    (define-key map [mouse-1] #'latex-to-svg-frontend-show-error-log)
+    (define-key map [mouse-2] #'latex-to-svg-frontend-show-error-log)
     map)
-  "Keymap of the failure mark: a click runs `latex-to-svg-frontend-show-failure'.")
+  "Keymap of the failure mark.
+A click runs `latex-to-svg-frontend-show-error-log'.")
 
 (defun latex-to-svg-frontend--show-failure-mark (ov)
   "Show the failure mark before the failed equation OV, if it is on.
 See `latex-to-svg-frontend-failure-mark'.  The mark is OV's
 `before-string', so `--hide-image' hides it when point enters OV.
-Clicking it runs `latex-to-svg-frontend-show-failure'."
+Clicking it runs `latex-to-svg-frontend-show-error-log'."
   (when-let* ((failure (overlay-get ov 'latex-to-svg-frontend-failure))
               ((buffer-local-value 'latex-to-svg-frontend-failure-mark
                                    (overlay-buffer ov))))
@@ -1595,7 +1596,7 @@ Clicking it runs `latex-to-svg-frontend-show-failure'."
                                      latex-to-svg-frontend--failure-mark-keymap)
                          " "))))
 
-(defun latex-to-svg-frontend-show-failure (&optional event)
+(defun latex-to-svg-frontend-show-error-log (&optional event)
   "Open the log of the equation at point that no engine could typeset.
 When the failure has no log (a RaTeX parse error, or a program that
 could not run) or the log file is gone, show the error in the echo

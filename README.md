@@ -502,7 +502,7 @@ one Emacs can show. Hovering over the source or the icon shows the engine, the
 error and the log: "LaTeX could not typeset it: Undefined control sequence.".
 The icon is hidden while point is in the equation, and shown again when point
 leaves it unchanged. Clicking the icon (`mouse-1` or `mouse-2`), or `M-x
-latex-to-svg-frontend-show-failure` with point in the equation, opens the log;
+latex-to-svg-frontend-show-error-log` with point in the equation, opens the log;
 when there is none (RaTeX's errors, a program that could not run), it shows
 the error in the echo area. To remove the icon, set `latex-to-svg-frontend-failure-mark` to
 nil; to change it, `M-x customize-icon RET latex-to-svg-frontend-failure`. The failure is recorded, so the equation is not compiled again:

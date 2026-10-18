@@ -3758,7 +3758,7 @@ compiled.  Once point leaves it, both show the new picture."
          8 22 "$\\notacommand$" nil 'latex nil l2sf-tests--failure)
         (should-not (overlay-get (car (l2sf-tests--overlays)) 'before-string))))))
 
-(ert-deftest l2sf-show-failure ()
+(ert-deftest l2sf-show-error-log ()
   ;; The command opens the log of the failed equation at point.  With no
   ;; log, or a log file that is gone, it shows the error.  Elsewhere it is
   ;; an error.  A click on the mark acts on the equation after the mark
@@ -3781,16 +3781,17 @@ compiled.  Once point leaves it, both show the new picture."
                          (push (apply #'format-message format args) messages))))
               (funcall failure log)
               (goto-char 10)
-              (latex-to-svg-frontend-show-failure)
+              (latex-to-svg-frontend-show-error-log)
               (should (equal opened (list log)))
               (dolist (gone (list nil (concat log ".gone")))
                 (funcall failure gone)
-                (latex-to-svg-frontend-show-failure)
+                (latex-to-svg-frontend-show-error-log)
                 (should (string-prefix-p "LaTeX could not typeset it: Undefined"
                                          (car messages))))
               (should (= (length opened) 1))
               (goto-char 2)
-              (should-error (latex-to-svg-frontend-show-failure) :type 'user-error)
+              (should-error (latex-to-svg-frontend-show-error-log)
+                            :type 'user-error)
               ;; A click on the mark.
               (funcall failure log)
               ;; Pressing the button does nothing, so point stays out of
@@ -3801,9 +3802,9 @@ compiled.  Once point leaves it, both show the new picture."
                 (should (eq (lookup-key map [down-mouse-1]) #'ignore))
                 (dolist (click '([mouse-1] [mouse-2]))
                   (should (eq (lookup-key map click)
-                              #'latex-to-svg-frontend-show-failure))))
+                              #'latex-to-svg-frontend-show-error-log))))
               (set-window-buffer (selected-window) (current-buffer))
-              (latex-to-svg-frontend-show-failure
+              (latex-to-svg-frontend-show-error-log
                `(mouse-2 (,(selected-window) 8 (0 . 0) 0 nil 8 nil nil nil nil)))
               (should (equal opened (list log log)))
               (should (= (point) 2)))
