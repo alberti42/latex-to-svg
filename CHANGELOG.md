@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-10-18
+
 ### Added
 
 - `latex-to-svg-for-elfeed`, an adaptor for Elfeed's `elfeed-show-mode`,
@@ -51,6 +53,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The front-end requires `latex-to-svg-backend` 0.15.1, whose warnings
+  are shown once per buffer per cause and name the buffer.
 - The tooltip of an equation that no engine could typeset no longer
   names its log file. `latex-to-svg-frontend-show-error-log` opens the
   log.
@@ -1000,7 +1004,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.22.2...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/alberti42/latex-to-svg/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/alberti42/latex-to-svg/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/alberti42/latex-to-svg/compare/v0.22.0...v0.22.1
 [0.22.0]: https://github.com/alberti42/latex-to-svg/compare/v0.21.0...v0.22.0
