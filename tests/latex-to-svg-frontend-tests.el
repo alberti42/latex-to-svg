@@ -3726,6 +3726,63 @@ compiled.  Once point leaves it, both show the new picture."
                                (l2sf-tests--overlays))
                        '(("$y$" nil new-image))))))))
 
+(ert-deftest l2sf-failure-mark ()
+  ;; A failed equation gets the icon before its source, with the tooltip
+  ;; of the source.  Point entering the equation hides it; leaving it
+  ;; unchanged shows it again.  An equation unrendered by `skip' or by a
+  ;; cookie's warning gets no mark, and none shows with the option off.
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "Before $\\notacommand$ after\n\n$y$\n"
+      (latex-to-svg-frontend--set-unrendered-overlay
+       8 22 "$\\notacommand$" nil 'latex nil l2sf-tests--failure)
+      (let* ((ov (car (l2sf-tests--overlays)))
+             (mark (overlay-get ov 'before-string)))
+        (should (string-prefix-p
+                 (substring-no-properties
+                  (icon-string 'latex-to-svg-frontend-failure))
+                 mark))
+        (should (equal (get-text-property 0 'help-echo mark)
+                       (latex-to-svg-frontend--failure-help-echo
+                        l2sf-tests--failure)))
+        (latex-to-svg-frontend--open-overlay ov)
+        (should-not (overlay-get ov 'before-string))
+        (latex-to-svg-frontend--close-overlay ov)
+        (should (equal (overlay-get ov 'before-string) mark)))
+      (dolist (engine '(skip "engine=nonsense is not an engine"))
+        (cl-letf (((symbol-function 'display-warning) #'ignore))
+          (latex-to-svg-frontend--set-unrendered-overlay
+           30 33 "$y$" nil engine))
+        (should-not (overlay-get (cadr (l2sf-tests--overlays)) 'before-string)))
+      (let ((latex-to-svg-frontend-failure-mark nil))
+        (latex-to-svg-frontend--set-unrendered-overlay
+         8 22 "$\\notacommand$" nil 'latex nil l2sf-tests--failure)
+        (should-not (overlay-get (car (l2sf-tests--overlays)) 'before-string))))))
+
+(ert-deftest l2sf-failure-mark-option-updates-buffers ()
+  ;; Turning the option off in a buffer removes the marks there, through
+  ;; the variable watcher; turning it on brings them back.
+  (l2sf-tests--with-stub
+    (l2sf-tests--with-failing "notacommand"
+      (l2sf-tests--md "Before $\\notacommand$ after\n"
+        (setq-local latex-to-svg-frontend-mode t)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (sit-for 0.01)
+        (unwind-protect
+            (dolist (on '(nil t))
+              (setq-local latex-to-svg-frontend-failure-mark on)
+              (should (equal latex-to-svg-frontend--option-buffers
+                             (list (current-buffer))))
+              (latex-to-svg-frontend--update-after-option)
+              (sit-for 0.01)
+              (let ((ov (car (l2sf-tests--overlays))))
+                (should (overlay-get ov 'latex-to-svg-frontend-failure))
+                (should (eq (and (overlay-get ov 'before-string) t) on))))
+          (when (timerp latex-to-svg-frontend--option-timer)
+            (cancel-timer latex-to-svg-frontend--option-timer))
+          (setq latex-to-svg-frontend--option-timer nil
+                latex-to-svg-frontend--option-buffers nil
+                latex-to-svg-frontend--option-defaults nil))))))
+
 (ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
   ;; A failed `align' still takes its two numbers: the equation below it is
   ;; numbered 3, on a full reconcile and on the incremental path.

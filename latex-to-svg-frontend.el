@@ -83,6 +83,7 @@
 ;;; Code:
 
 (require 'latex-to-svg-backend)
+(require 'icons)
 (require 'outline)
 (require 'seq)
 (require 'cl-lib)
@@ -162,6 +163,27 @@ in a mode hook or in `.dir-locals.el', to silence one kind of document."
   :type 'boolean
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-failure-mark t
+  "Whether to mark an equation that no engine could typeset.
+
+When non-nil (the default), the icon `latex-to-svg-frontend-failure'
+is shown before the source of a failed equation, with the same tooltip
+as the source: the engine, the error and the log.  It is hidden while
+point is in the equation, and shown again when point leaves it
+unchanged; an edited equation is typeset again when point leaves it.
+When nil, a failed equation looks like an equation not typeset yet.
+Change the icon with `customize-icon'.  Setting the option with
+`setq', `setq-local' or Customize updates the previews on its own."
+  :type 'boolean
+  :safe #'booleanp
+  :group 'latex-to-svg-frontend)
+
+(define-icon latex-to-svg-frontend-failure nil
+  '((emoji "⚠️") (symbol "⚠") (text "[!]"))
+  "Mark before an equation that no engine could typeset.
+See `latex-to-svg-frontend-failure-mark'."
+  :version "29.1")
 
 (defcustom latex-to-svg-frontend-number-equations t
   "Whether to compute and bake equation numbers into display-math previews.
@@ -1543,6 +1565,20 @@ follows on its own line when there is one."
     (latex-to-svg-frontend--help-echo-text
      (if log (concat text "\nLog: " log) text))))
 
+(defun latex-to-svg-frontend--show-failure-mark (ov)
+  "Show the failure mark before the failed equation OV, if it is on.
+See `latex-to-svg-frontend-failure-mark'.  The mark is OV's
+`before-string', so `--hide-image' hides it when point enters OV."
+  (when-let* ((failure (overlay-get ov 'latex-to-svg-frontend-failure))
+              ((buffer-local-value 'latex-to-svg-frontend-failure-mark
+                                   (overlay-buffer ov))))
+    (overlay-put ov 'before-string
+                 (concat (propertize (icon-string 'latex-to-svg-frontend-failure)
+                                     'help-echo
+                                     (latex-to-svg-frontend--failure-help-echo
+                                      failure))
+                         " "))))
+
 (defun latex-to-svg-frontend--set-unrendered-overlay (beg end source enums-fallback engine &optional fallback failure)
   "Mark BEG..END as math whose cookie or failure leaves it unrendered.
 ENGINE is `skip', or a warning string (see `--engine-for'), which is
@@ -1553,7 +1589,8 @@ was sent with, so `--needs-render-p' renders it again when the options
 give it another engine or fallback.  FAILURE is recorded as
 `latex-to-svg-frontend-failure' and shown as the `help-echo' (see
 `--failure-help-echo'), with no warning: the backend warns, or not, by
-`:quiet'.  The overlay shows nothing: the source stays as text.  It
+`:quiet'.  The source stays as text, after the failure mark (see
+`--show-failure-mark'); otherwise the overlay shows nothing.  It
 keeps SOURCE and, when ENUMS-FALLBACK is non-nil, the equation's number
 range, so the incremental renumbering counts the numbers a skipped or
 failed equation takes, as the exported document does.  Leaving it after
@@ -1575,7 +1612,8 @@ an edit re-renders it."
          (failure
           (overlay-put ov 'latex-to-svg-frontend-failure failure)
           (overlay-put ov 'help-echo
-                       (latex-to-svg-frontend--failure-help-echo failure)))
+                       (latex-to-svg-frontend--failure-help-echo failure))
+          (latex-to-svg-frontend--show-failure-mark ov))
          ((stringp engine)
           (overlay-put ov 'help-echo engine)
           (display-warning 'latex-to-svg-frontend
@@ -1757,7 +1795,9 @@ Fix the function, or set `latex-to-svg-frontend-reveal' to `always', \
       (latex-to-svg-frontend--show-image
        ov (overlay-get ov 'latex-to-svg-frontend-image)))
      ((overlay-get ov 'latex-to-svg-frontend-ref)
-      (overlay-put ov 'display (overlay-get ov 'latex-to-svg-frontend-ref-display))))))
+      (overlay-put ov 'display (overlay-get ov 'latex-to-svg-frontend-ref-display)))
+     ((overlay-get ov 'latex-to-svg-frontend-failure)
+      (latex-to-svg-frontend--show-failure-mark ov)))))
 
 (defun latex-to-svg-frontend--render-on-leave-element (el)
   "Render EL on cursor-leave and renumber synchronously from it.
@@ -2900,6 +2940,7 @@ never rendered, as `--render-on-leave' never renders it."
     latex-to-svg-frontend-rescale-inline
     latex-to-svg-frontend-rescale-display
     latex-to-svg-frontend-center-display-math
+    latex-to-svg-frontend-failure-mark
     latex-to-svg-backend-preamble
     latex-to-svg-backend-appended-preamble
     latex-to-svg-backend-preamble-not-precompiled

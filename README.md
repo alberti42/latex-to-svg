@@ -497,8 +497,12 @@ LaTeX picture comes straight from the cache.
 
 When no engine can typeset an equation, its source stays as text, and the
 backend warns once per equation per buffer, naming the buffer and linking to
-the log. Hovering over the source shows the engine, the error and the log:
-"LaTeX could not typeset it: Undefined control sequence.". The failure is recorded, so the equation is not compiled again:
+the log. A warning icon stands before the source: ⚠️, ⚠ or `[!]`, the first
+one Emacs can show. Hovering over the source or the icon shows the engine, the
+error and the log: "LaTeX could not typeset it: Undefined control sequence.".
+The icon is hidden while point is in the equation, and shown again when point
+leaves it unchanged. To remove it, set `latex-to-svg-frontend-failure-mark` to
+nil; to change it, `M-x customize-icon RET latex-to-svg-frontend-failure`. The failure is recorded, so the equation is not compiled again:
 editing it, or changing the preamble or `latex-to-svg-backend-ratex-macros`,
 tries again. After a fix outside those (installing a missing TeX package,
 upgrading RaTeX), recompile with `C-u M-x latex-to-svg-frontend-refresh`.

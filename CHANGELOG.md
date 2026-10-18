@@ -14,6 +14,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An equation that no engine could typeset shows a warning icon before its
+  source, with the tooltip of the source: the engine, the error and the log
+  (issue #7). Before, it looked like an equation not typeset yet. The icon
+  is hidden while point is in the equation, and shown again when point
+  leaves it unchanged. `latex-to-svg-frontend-failure-mark` (default t)
+  turns it off; `customize-icon` changes the icon
+  (`latex-to-svg-frontend-failure`).
+
 - `latex-to-svg-for-org-mode` warns when Org's own preview ran as the
   file opened, because `org-startup-with-latex-preview` is non-nil: set
   by the file's `#+startup: latexpreview`, or in the user's config. The
