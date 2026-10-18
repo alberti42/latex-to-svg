@@ -481,8 +481,7 @@ LaTeX picture comes straight from the cache.
   back.
 - **A fallback equation compiles in about 300 ms**, a RaTeX one in about
   6 ms.
-- **The fallback needs `latex` and `dvisvgm`.** Without them the backend
-  warns once per session; install them, or set
+- **The fallback needs `latex` and `dvisvgm`.** Install them, or set
   `latex-to-svg-frontend-fallback` to nil. With the fallback off, an
   equation RaTeX rejects keeps its source as text.
 
