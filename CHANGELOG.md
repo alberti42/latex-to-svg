@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leaves it unchanged. `latex-to-svg-frontend-failure-mark` (default t)
   turns it off; `customize-icon` changes the icon
   (`latex-to-svg-frontend-failure`).
+- `latex-to-svg-frontend-show-failure` opens the log of the failed
+  equation at point, or shows the error in the echo area when there is no
+  log. Clicking the warning icon runs it for that equation.
 
 - `latex-to-svg-for-org-mode` warns when Org's own preview ran as the
   file opened, because `org-startup-with-latex-preview` is non-nil: set

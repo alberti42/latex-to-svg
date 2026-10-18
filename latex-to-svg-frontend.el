@@ -1565,10 +1565,20 @@ follows on its own line when there is one."
     (latex-to-svg-frontend--help-echo-text
      (if log (concat text "\nLog: " log) text))))
 
+(defvar latex-to-svg-frontend--failure-mark-keymap
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-2] #'latex-to-svg-frontend-show-failure)
+    ;; A short mouse-1 click is rewritten to mouse-2, as on a reference
+    ;; (see `latex-to-svg-frontend--reference-keymap').
+    (define-key map [follow-link] 'mouse-face)
+    map)
+  "Keymap of the failure mark: a click runs `latex-to-svg-frontend-show-failure'.")
+
 (defun latex-to-svg-frontend--show-failure-mark (ov)
   "Show the failure mark before the failed equation OV, if it is on.
 See `latex-to-svg-frontend-failure-mark'.  The mark is OV's
-`before-string', so `--hide-image' hides it when point enters OV."
+`before-string', so `--hide-image' hides it when point enters OV.
+Clicking it runs `latex-to-svg-frontend-show-failure'."
   (when-let* ((failure (overlay-get ov 'latex-to-svg-frontend-failure))
               ((buffer-local-value 'latex-to-svg-frontend-failure-mark
                                    (overlay-buffer ov))))
@@ -1576,8 +1586,34 @@ See `latex-to-svg-frontend-failure-mark'.  The mark is OV's
                  (concat (propertize (icon-string 'latex-to-svg-frontend-failure)
                                      'help-echo
                                      (latex-to-svg-frontend--failure-help-echo
-                                      failure))
+                                      failure)
+                                     'mouse-face 'highlight
+                                     'keymap
+                                     latex-to-svg-frontend--failure-mark-keymap)
                          " "))))
+
+(defun latex-to-svg-frontend-show-failure (&optional event)
+  "Open the log of the equation at point that no engine could typeset.
+When the failure has no log (a RaTeX parse error, or a program that
+could not run) or the log file is gone, show the error in the echo
+area instead.  EVENT is the triggering input event: a click on the
+failure mark (see `latex-to-svg-frontend-failure-mark') acts on the
+equation after the mark, and leaves point where it is."
+  (interactive (list last-command-event))
+  (let* ((posn (and (consp event) (eventp event) (event-start event)))
+         (pos (if (and posn (numberp (posn-point posn))) (posn-point posn) (point)))
+         (buffer (if (and posn (windowp (posn-window posn)))
+                     (window-buffer (posn-window posn))
+                   (current-buffer)))
+         (ov (with-current-buffer buffer
+               (latex-to-svg-frontend--revealable-overlay-at pos)))
+         (failure (and ov (overlay-get ov 'latex-to-svg-frontend-failure)))
+         (log (plist-get failure :log)))
+    (cond
+     ((null failure) (user-error "No equation here failed to typeset"))
+     ((and log (file-exists-p log)) (find-file-other-window log))
+     (t (message "%s" (substitute-command-keys
+                       (latex-to-svg-frontend--failure-help-echo failure)))))))
 
 (defun latex-to-svg-frontend--set-unrendered-overlay (beg end source enums-fallback engine &optional fallback failure)
   "Mark BEG..END as math whose cookie or failure leaves it unrendered.
