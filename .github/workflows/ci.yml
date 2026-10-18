@@ -1,9 +1,10 @@
 # Byte-compilation, checkdoc and the ERT suite, on every push to main or
 # develop and every pull request.
 #
-# The five packages in this repository (`latex-to-svg-frontend' and its
+# The six packages in this repository (`latex-to-svg-frontend' and its
 # `latex-to-svg-for-org' / `latex-to-svg-for-markdown' /
-# `latex-to-svg-for-latex' / `latex-to-svg-for-gnus' adaptors) all load
+# `latex-to-svg-for-latex' / `latex-to-svg-for-gnus' /
+# `latex-to-svg-for-elfeed' adaptors) all load
 # the backend, `latex-to-svg-backend'.  package.el installs it from MELPA,
 # which is where a user gets it too, so a backend change that breaks this
 # front-end shows up here rather than in a user's report.  On develop, and
@@ -15,10 +16,11 @@
 # The suite stubs the backend and detects math with a regexp scanner, so it
 # needs no TeX toolchain, no graphical display and no tree-sitter grammar;
 # the one test that needs a Markdown major mode skips itself without one.
-# AUCTeX is installed from GNU ELPA for the one test that runs it.
+# AUCTeX is installed from GNU ELPA for the one test that runs it, and
+# elfeed from MELPA for the Elfeed adaptor's tests.
 #
 # The matrix is the declared floor (29.1, the `Package-Requires' of all
-# four files), then the newest of each series, then master.
+# six files), then the newest of each series, then master.
 
 name: CI
 
@@ -111,6 +113,26 @@ jobs:
           done
           exit 1
 
+      # elfeed, from MELPA, for the Elfeed adaptor's tests.  Allowed to
+      # fail like AUCTeX: without elfeed, those tests skip themselves.
+      - name: Install elfeed from MELPA
+        continue-on-error: true
+        run: |
+          for attempt in 1 2 3; do
+            if emacs -Q -batch --eval '(progn
+              (require (quote package))
+              (add-to-list (quote package-archives)
+                           (cons "melpa" "https://melpa.org/packages/") t)
+              (package-initialize)
+              (package-refresh-contents)
+              (package-install (quote elfeed)))'; then
+              exit 0
+            fi
+            echo "MELPA fetch failed (attempt $attempt of 3); retrying in 15s"
+            sleep 15
+          done
+          exit 1
+
       # The test file is compiled too: a variable a test binds with `let'
       # and nothing declares compiles as a lexical binding, which loading
       # the source does not catch.
@@ -125,6 +147,7 @@ jobs:
             latex-to-svg-for-markdown.el \
             latex-to-svg-for-latex.el \
             latex-to-svg-for-gnus.el \
+            latex-to-svg-for-elfeed.el \
             tests/latex-to-svg-frontend-tests.el
 
       # Docstring conventions, exiting non-zero on any finding.  Both flags
@@ -141,7 +164,8 @@ jobs:
                                 "latex-to-svg-for-org.el"
                                 "latex-to-svg-for-markdown.el"
                                 "latex-to-svg-for-latex.el"
-                                "latex-to-svg-for-gnus.el"))
+                                "latex-to-svg-for-gnus.el"
+                                "latex-to-svg-for-elfeed.el"))
               (checkdoc-file file))
             (if (get-buffer "*Warnings*")
                 (kill-emacs 1)
