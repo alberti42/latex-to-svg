@@ -1552,9 +1552,9 @@ and gives the message: \"LaTeX could not typeset it: MESSAGE.\", or
 the message, which names the program that was not found.  The text
 ends with a full stop, unless it already ends with `.', `!' or `?'.
 With TOOLTIP, when FAILURE has a log, a sentence follows on the same
-line, so that a tooltip shown on one line reads well: \"Call M-x
-latex-to-svg-frontend-show-error-log with point in the equation to
-open the log.\"  The log file is not named."
+line, so that a tooltip shown on one line reads well: \"Call
+\\[latex-to-svg-frontend-show-error-log] with point in the equation
+to open the log.\"  The log file is not named."
   (let* ((engine (plist-get failure :engine))
          (message (plist-get failure :message))
          (text (if (eq (plist-get failure :kind) 'setup)
