@@ -131,7 +131,9 @@ the buffer has an xref backend other than etags — such as eglot running
 [texlab](https://github.com/latex-lsp/texlab) — it asks `xref-find-definitions`,
 which finds the label in any file of the document. The etags backends
 (`etags`, and `tex-etags` in Emacs 31, which AUCTeX enables) are not asked:
-without a `TAGS` file they prompt for one.
+without a `TAGS` file they prompt for one. When the label is in a section that
+`outline-minor-mode` folded, the jump shows the heading and entry that hold it,
+and the headings above them, as Org does by default (`ancestors`).
 
 ## Compared with AUCTeX's preview-latex
 

@@ -409,11 +409,15 @@ Called with point on a reference to LABEL that no equation in the
 buffer defines.  Jumps to `\\label{LABEL}' elsewhere in the buffer (a
 section's, a figure's), else asks xref, with point on the label's name
 in the reference: with eglot running texlab, that finds a label in any
-file of the document.  Signals a `user-error' when neither finds it."
+file of the document.  Signals a `user-error' when neither finds it.
+After the jump it runs `latex-to-svg-frontend-reveal-function' of the
+buffer it landed in, if any."
   (cond
    ((when-let* ((pos (latex-to-svg-for-latex--label-in-buffer label)))
       (push-mark)
       (goto-char pos)
+      (when latex-to-svg-frontend-reveal-function
+        (funcall latex-to-svg-frontend-reveal-function))
       (when (get-buffer-window (current-buffer)) (recenter))
       (message "Jumped to \\label{%s}" label)
       t))
@@ -422,6 +426,9 @@ file of the document.  Signals a `user-error' when neither finds it."
       (goto-char (overlay-start ov))
       (search-forward "{" (overlay-end ov) t)
       (xref-find-definitions (xref-backend-identifier-at-point backend))
+      ;; xref may show a list instead, whose buffer sets no function.
+      (when latex-to-svg-frontend-reveal-function
+        (funcall latex-to-svg-frontend-reveal-function))
       t))
    (t (user-error "\\label{%s} is not in this buffer" label))))
 
@@ -491,13 +498,14 @@ Installs the LaTeX comment and verbatim exclusions (see
 `latex-to-svg-for-latex--exclusions'), pairs `$' as TeX does (see
 `latex-to-svg-frontend-dollar-guards'), resolves `\\ref' and `\\eqref'
 from the document's `.aux' file (see `latex-to-svg-for-latex-aux-file';
-\"??\" for a label it lacks), and turns on `latex-to-svg-frontend-mode',
-which does the rendering.  In LaTeX buffers the engine is `latex' by
-default, overriding a global value `ratex' of
-`latex-to-svg-frontend-engine': RaTeX ignores every preamble and most
-packages, so equations that use the project's macros fail with it.  A
-global value `texres' stays, since texres reads the preamble.  To use
-RaTeX anyway, set
+\"??\" for a label it lacks), shows a jump target that outline folded
+\(see `latex-to-svg-frontend--reveal-outline'), and turns on
+`latex-to-svg-frontend-mode', which does the rendering.  In LaTeX
+buffers the engine is `latex' by default, overriding a global value
+`ratex' of `latex-to-svg-frontend-engine': RaTeX ignores every
+preamble and most packages, so equations that use the project's
+macros fail with it.  A global value `texres' stays, since texres
+reads the preamble.  To use RaTeX anyway, set
 `latex-to-svg-frontend-engine' buffer-locally, for example in the
 project's `.dir-locals.el'.  Enable the mode from
 `LaTeX-mode-hook' (AUCTeX) or `latex-mode-hook'.  While it is on,
@@ -515,6 +523,8 @@ is on in the buffer, the mode warns (see
             (setq-local latex-to-svg-frontend-dollar-guards nil)
             (setq latex-to-svg-for-latex--aux-path
                   (latex-to-svg-for-latex--aux-file))
+            (setq-local latex-to-svg-frontend-reveal-function
+                        #'latex-to-svg-frontend--reveal-outline)
             (setq-local latex-to-svg-frontend-labels-function
                         #'latex-to-svg-for-latex--labels)
             (setq-local latex-to-svg-frontend-find-label-function
@@ -537,6 +547,7 @@ is on in the buffer, the mode warns (see
                  #'latex-to-svg-for-latex--warn-preview-auto-mode t)
     (kill-local-variable 'latex-to-svg-frontend-exclude-function)
     (kill-local-variable 'latex-to-svg-frontend-dollar-guards)
+    (kill-local-variable 'latex-to-svg-frontend-reveal-function)
     (kill-local-variable 'latex-to-svg-frontend-labels-function)
     (kill-local-variable 'latex-to-svg-frontend-find-label-function)
     (kill-local-variable 'latex-to-svg-for-latex--aux-path)

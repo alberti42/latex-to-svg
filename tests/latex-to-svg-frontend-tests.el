@@ -4448,14 +4448,20 @@ Each element is (BEG END TEXT); every overlay must display a newline."
 
 ;; A jump into a folded section shows what Org's `ancestors' shows: the
 ;; heading and entry holding the equation, and the headings above them.
-;; The sibling sections stay folded.  Markdown always shows that; Org
-;; shows what `org-fold-show-context-detail' says, `ancestors' by default.
+;; The sibling sections stay folded.  Markdown and LaTeX always show that;
+;; Org shows what `org-fold-show-context-detail' says, `ancestors' by
+;; default.
 
 (declare-function org-fold-hide-subtree "org-fold")
 
 (defun l2sf-tests--outline (star)
-  "The test outline, with STAR as the heading character."
-  (let ((h (lambda (n title) (concat (make-string n star) " " title "\n"))))
+  "The test outline, with STAR as the heading character.
+STAR nil means LaTeX's sectioning commands."
+  (let ((h (lambda (n title)
+             (if star
+                 (concat (make-string n star) " " title "\n")
+               (format "\\%ssection{%s}\n"
+                       (apply #'concat (make-list (1- n) "sub")) title)))))
     (concat (funcall h 1 "Introduction") "\nSee \\eqref{eq:fit}.\n\n"
             (funcall h 1 "Results") "\nResults text.\n\n"
             (funcall h 2 "Data") "\nData text.\n\n"
@@ -4493,6 +4499,42 @@ Each element is (BEG END TEXT); every overlay must display a newline."
       (l2sf-tests--jump-into-fold #'org-fold-hide-subtree)
       (latex-to-svg-for-org-mode -1)
       (should-not (local-variable-p 'latex-to-svg-frontend-reveal-function)))))
+
+(ert-deftest l2sf-latex-jump-shows-ancestors ()
+  (l2sf-tests--with-stub
+    (with-temp-buffer
+      (insert (l2sf-tests--outline nil))
+      (let ((latex-mode-hook nil)) (latex-mode))
+      (outline-minor-mode 1)
+      (latex-to-svg-for-latex-mode 1)
+      (l2sf-tests--jump-into-fold #'outline-hide-subtree)
+      (latex-to-svg-for-latex-mode -1)
+      (should-not (local-variable-p 'latex-to-svg-frontend-reveal-function)))))
+
+(ert-deftest l2sf-latex-jump-to-label-shows-ancestors ()
+  ;; A `\ref' to a section's label goes through the adaptor's
+  ;; `find-label-function', which reveals the same way.
+  (l2sf-tests--with-stub
+    (with-temp-buffer
+      (insert "\\section{Intro}\nSee \\ref{sec:model}.\n\n"
+              "\\section{Results}\nResults text.\n\n"
+              "\\subsection{Model}\\label{sec:model}\nModel text.\n")
+      (let ((latex-mode-hook nil)) (latex-mode))
+      (outline-minor-mode 1)
+      (latex-to-svg-for-latex-mode 1)
+      (goto-char (point-min))
+      (search-forward "\\section{Results}")
+      (outline-hide-subtree)
+      (goto-char (overlay-start
+                  (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                            (l2sf-tests--overlays))))
+      (latex-to-svg-frontend-goto-reference)
+      (should (looking-at-p (regexp-quote "\\label{sec:model}")))
+      (should-not (invisible-p (point)))
+      (should (invisible-p (save-excursion (goto-char (point-min))
+                                           (search-forward "Results text")
+                                           (match-beginning 0))))
+      (latex-to-svg-for-latex-mode -1))))
 
 (ert-deftest l2sf-markdown-jump-shows-ancestors ()
   (l2sf-tests--with-stub

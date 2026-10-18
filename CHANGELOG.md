@@ -55,6 +55,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-for-markdown-mode` now shows the heading and entry that
   hold the equation, and the headings above them, as Org's default
   (`ancestors` in `org-fold-show-context-detail`) does.
+  `latex-to-svg-for-latex-mode` does the same in a section that
+  `outline-minor-mode` folded, also after a jump to a `\label` that no
+  equation defines (a section's, a figure's), in the buffer or through
+  xref.
 
 ## [0.22.2] - 2026-10-17
 

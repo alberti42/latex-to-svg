@@ -43,7 +43,6 @@
 ;;; Code:
 
 (require 'latex-to-svg-frontend)
-(require 'outline)
 (require 'treesit nil t)
 
 (defvar markdown-hide-markup)
@@ -271,32 +270,12 @@ again, so they apply at once.")
   "The emphasis faces of `markdown-mode' and `markdown-ts-mode'.
 The value of `latex-to-svg-frontend-emphasis-faces' in Markdown buffers.")
 
-(defun latex-to-svg-for-markdown--reveal ()
-  "Show the heading and entry at point, and the headings above it.
-The value of `latex-to-svg-frontend-reveal-function' in Markdown
-buffers: what Org shows by default after a jump to a link (`ancestors'
-in `org-fold-show-context-detail'), done with outline, which folds
-Markdown headings.  Markdown has no option for it.
-Nothing before the first heading can be folded, so there it does
-nothing."
-  (save-excursion
-    (when (ignore-errors (outline-back-to-heading t) t)
-      (outline-show-entry)
-      ;; Each earlier heading of a lower level than the last one shown is
-      ;; the next heading above.  `outline-up-heading' is not used: it
-      ;; stops only at level 1, and loops when no heading has level 1.
-      (let ((level (funcall outline-level)))
-        (while (outline-previous-heading)
-          (when (< (funcall outline-level) level)
-            (setq level (funcall outline-level))
-            (save-excursion (outline-show-heading))))))))
-
 ;;;###autoload
 (define-minor-mode latex-to-svg-for-markdown-mode
   "Preview Markdown LaTeX math as SVG images (a `latex-to-svg-frontend' adaptor).
 
 Installs the Markdown code/verbatim exclusions and the jump-reveal
-\(see `latex-to-svg-for-markdown--reveal'), then turns on
+\(see `latex-to-svg-frontend--reveal-outline'), then turns on
 `latex-to-svg-frontend-mode', which does the rendering.  Enable it from
 `markdown-ts-mode-hook' (or `markdown-mode' / `gfm-mode')."
   :lighter nil
@@ -306,7 +285,7 @@ Installs the Markdown code/verbatim exclusions and the jump-reveal
             (setq-local latex-to-svg-frontend-exclude-function
                         #'latex-to-svg-for-markdown--exclusions)
             (setq-local latex-to-svg-frontend-reveal-function
-                        #'latex-to-svg-for-markdown--reveal)
+                        #'latex-to-svg-frontend--reveal-outline)
             (setq-local latex-to-svg-frontend-emphasis-faces
                         latex-to-svg-for-markdown--emphasis-faces)
             (font-lock-add-keywords

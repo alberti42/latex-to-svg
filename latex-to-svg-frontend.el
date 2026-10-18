@@ -83,6 +83,7 @@
 ;;; Code:
 
 (require 'latex-to-svg-backend)
+(require 'outline)
 (require 'seq)
 (require 'cl-lib)
 
@@ -528,8 +529,8 @@ scanner skips math inside them.  nil means no exclusions.")
 (defvar-local latex-to-svg-frontend-reveal-function nil
   "Function of no args, called after a jump to unfold the target.
 E.g. Org sets it to `org-fold-show-context', which shows as much as
-`org-fold-show-context-detail' says; Markdown to
-`latex-to-svg-for-markdown--reveal'.  nil means no unfolding.")
+`org-fold-show-context-detail' says; Markdown and LaTeX to
+`latex-to-svg-frontend--reveal-outline'.  nil means no unfolding.")
 
 (defvar-local latex-to-svg-frontend-labels-function nil
   "Function of no args -> hash table from label to its printed number.
@@ -3081,6 +3082,25 @@ this package's previews.  Turn it off with `M-x %s'." mode mode))
   (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
             (overlays-in (max (point-min) (1- pos))
                          (min (point-max) (1+ pos)))))
+
+(defun latex-to-svg-frontend--reveal-outline ()
+  "Show the heading and entry at point, and the headings above it.
+A `latex-to-svg-frontend-reveal-function' for a markup folded with
+outline (Markdown, LaTeX): what Org shows by default after a jump to a
+link (`ancestors' in `org-fold-show-context-detail').  These markups
+have no option for it.  Nothing before the first heading can be
+folded, so there it does nothing."
+  (save-excursion
+    (when (ignore-errors (outline-back-to-heading t) t)
+      (outline-show-entry)
+      ;; Each earlier heading of a lower level than the last one shown is
+      ;; the next heading above.  `outline-up-heading' is not used: it
+      ;; stops only at level 1, and loops when no heading has level 1.
+      (let ((level (funcall outline-level)))
+        (while (outline-previous-heading)
+          (when (< (funcall outline-level) level)
+            (setq level (funcall outline-level))
+            (save-excursion (outline-show-heading))))))))
 
 (defun latex-to-svg-frontend-goto-reference (&optional event)
   "Jump to the equation defining the label of the reference preview at point.
