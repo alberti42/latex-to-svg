@@ -63,6 +63,7 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (require 'latex-to-svg-for-org)
 (require 'latex-to-svg-for-latex)
 (require 'latex-to-svg-for-gnus)
+(require 'latex-to-svg-for-elfeed)
 ;; Built-in; defines `gnus-article-mode' and `article-emphasize' for the Gnus
 ;; adaptor's tests.
 (require 'gnus-art)
@@ -81,6 +82,14 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar markdown-hide-markup)
 (defvar markdown-ts-hide-markup)
 (declare-function markdown-ts-mode "markdown-ts-mode")
+;; From MELPA, not built in: the Elfeed adaptor's tests skip themselves
+;; without it.  They bind these dynamically and call the mode.
+(require 'elfeed-show nil t)
+(defvar elfeed-show-mode-hook)
+(defvar elfeed-show-update-hook)
+(defvar elfeed-show-refresh-function)
+(declare-function elfeed-show-mode "elfeed-show")
+(declare-function elfeed-show-refresh "elfeed-show")
 
 ;; --- Stub the backend: synchronous, deterministic, no TeX / no display -------
 
@@ -2623,6 +2632,85 @@ Leaves point at the start of the body, then runs `gnus-article-prepare-hook'."
                                            'gnus-emphasis-italic))
                           (overlays-in (- prose 6) prose)))))))
 
+;;;; Elfeed adaptor
+
+(defvar l2sf-tests--elfeed-text ""
+  "The text `elfeed-show-refresh' inserts in `l2sf-tests--elfeed'.")
+
+(defmacro l2sf-tests--elfeed (&rest body)
+  "Run BODY in an `elfeed-show-mode' buffer, as `elfeed-show-entry' sets it up.
+The mode hook turns on `latex-to-svg-for-elfeed-mode', the global
+`elfeed-show-update-hook' is empty, and `elfeed-show-refresh' inserts
+the text of `l2sf-tests--elfeed-text' in place of an entry's."
+  (declare (indent 0) (debug t))
+  `(progn
+     (skip-unless (fboundp 'elfeed-show-mode))
+     (with-temp-buffer
+       ;; The mode makes the update hook buffer-local, which Emacs warns
+       ;; about while `let' binds it: bind its default value instead.
+       (cl-letf (((default-value 'elfeed-show-update-hook) nil))
+         (let ((elfeed-show-mode-hook (list #'latex-to-svg-for-elfeed-mode))
+               (elfeed-show-refresh-function
+                (lambda ()
+                  (let ((inhibit-read-only t))
+                    (erase-buffer)
+                    (insert l2sf-tests--elfeed-text)
+                    (goto-char (point-min))))))
+           (elfeed-show-mode)
+           ,@body)))))
+
+(defun l2sf-tests--elfeed-show (text)
+  "Show TEXT as `elfeed-show-entry' shows an entry in the current buffer.
+It runs `elfeed-show-mode' again, then `elfeed-show-refresh'."
+  (elfeed-show-mode)
+  (let ((l2sf-tests--elfeed-text text))
+    (elfeed-show-refresh)))
+
+(ert-deftest l2sf-elfeed-mode-refuses-non-entry ()
+  ;; The adaptor gates on the major mode (the core itself does not).
+  (with-temp-buffer
+    (fundamental-mode)
+    (should-error (latex-to-svg-for-elfeed-mode 1) :type 'user-error)
+    (should-not latex-to-svg-for-elfeed-mode)))
+
+(ert-deftest l2sf-elfeed-mode-draws-each-entry ()
+  ;; `elfeed-show-entry' runs `elfeed-show-mode' again for each entry,
+  ;; which turns the mode on from the mode hook, then shows the entry.
+  ;; Each entry is drawn from `elfeed-show-update-hook', the title
+  ;; included; the previous entry's previews are gone.  A revert
+  ;; (`elfeed-show-refresh' alone) draws the entry again.  Numbering is
+  ;; off in the buffer unless set there; turning the mode off restores it.
+  (l2sf-tests--with-stub
+    (l2sf-tests--elfeed
+      (should latex-to-svg-for-elfeed-mode)
+      (should latex-to-svg-frontend-mode)
+      (should-not latex-to-svg-frontend-number-equations)
+      (should latex-to-svg-frontend-dollar-guards)
+      (l2sf-tests--elfeed-show
+       "Title: on $|T\\rangle$\nLink: x\n\n$a$ and \\(b\\), $30 and $50\n")
+      (should (equal (l2sf-tests--values)
+                     '("$|T\\rangle$" "$a$" "\\(b\\)")))
+      (l2sf-tests--elfeed-show "Title: none\n\n$c$\n")
+      (should (equal (l2sf-tests--values) '("$c$")))
+      (let ((l2sf-tests--elfeed-text "Title: none\n\n$d$\n"))
+        (elfeed-show-refresh))
+      (should (equal (l2sf-tests--values) '("$d$")))
+      (latex-to-svg-for-elfeed-mode -1)
+      (should-not latex-to-svg-frontend-mode)
+      (should-not (local-variable-p 'latex-to-svg-frontend-number-equations))
+      (should-not (memq #'latex-to-svg-for-elfeed--entry-shown
+                        elfeed-show-update-hook))
+      (should (null (l2sf-tests--overlays)))))
+  ;; A buffer-local value set before the mode is kept.
+  (l2sf-tests--with-stub
+    (l2sf-tests--elfeed
+      (latex-to-svg-for-elfeed-mode -1)
+      (setq-local latex-to-svg-frontend-number-equations t)
+      (latex-to-svg-for-elfeed-mode 1)
+      (should latex-to-svg-frontend-number-equations)
+      (latex-to-svg-for-elfeed-mode -1)
+      (should latex-to-svg-frontend-number-equations))))
+
 ;;;; Refresh
 
 (ert-deftest l2sf-refresh-updates-image ()
@@ -4989,14 +5077,15 @@ STAR nil means LaTeX's sectioning commands."
          (match-string 1))))
 
 (ert-deftest l2sf-package-versions-agree ()
-  ;; Drift guard: the repository ships five packages on one version stream,
+  ;; Drift guard: the repository ships six packages on one version stream,
   ;; so their `Version:' headers are bumped together.
   (let ((versions (mapcar #'l2sf-tests--header-version
                           '("latex-to-svg-frontend.el"
                             "latex-to-svg-for-org.el"
                             "latex-to-svg-for-markdown.el"
                             "latex-to-svg-for-latex.el"
-                            "latex-to-svg-for-gnus.el"))))
+                            "latex-to-svg-for-gnus.el"
+                            "latex-to-svg-for-elfeed.el"))))
     (should (seq-every-p #'stringp versions))
     (should (equal (seq-uniq versions) (list (car versions))))))
 
@@ -5009,7 +5098,8 @@ STAR nil means LaTeX's sectioning commands."
     (dolist (file '("latex-to-svg-for-org.el"
                     "latex-to-svg-for-markdown.el"
                     "latex-to-svg-for-latex.el"
-                    "latex-to-svg-for-gnus.el"))
+                    "latex-to-svg-for-gnus.el"
+                    "latex-to-svg-for-elfeed.el"))
       (let ((requires (with-temp-buffer
                         (insert-file-contents
                          (expand-file-name file l2sf-tests--repo-root))

@@ -2,10 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
-This repository ships five packages that share one version/tag stream:
+This repository ships six packages that share one version/tag stream:
 `latex-to-svg-frontend` (the core) and its `latex-to-svg-for-markdown`,
-`latex-to-svg-for-org`, `latex-to-svg-for-latex` and `latex-to-svg-for-gnus`
-adaptors.
+`latex-to-svg-for-org`, `latex-to-svg-for-latex`, `latex-to-svg-for-gnus`
+and `latex-to-svg-for-elfeed` adaptors.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `latex-to-svg-for-elfeed`, an adaptor for Elfeed's `elfeed-show-mode`,
+  such as the titles and abstracts of the arXiv feeds. It draws the
+  previews again each time Elfeed shows an entry, from
+  `elfeed-show-update-hook`, excludes no region, and turns equation
+  numbering off in the entry buffer. Not on MELPA yet.
 - An equation that no engine could typeset shows a warning icon before its
   source, with the tooltip of the source: the engine, the error and the
   command that opens the log (issue #7). Before, it looked like an equation not typeset yet. The icon
