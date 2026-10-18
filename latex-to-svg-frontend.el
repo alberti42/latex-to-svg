@@ -169,11 +169,10 @@ in a mode hook or in `.dir-locals.el', to silence one kind of document."
 
 When non-nil (the default), the icon `latex-to-svg-frontend-failure'
 is shown before the source of a failed equation, with the same tooltip
-as the source: the engine and the error.  The tooltip of the icon
-names `latex-to-svg-frontend-show-error-log', which opens the log.
-The icon is hidden while point is in the equation, and shown again
-when point leaves it unchanged; an edited equation is typeset again
-when point leaves it.
+as the source: the engine, the error, and the command that opens the
+log, `latex-to-svg-frontend-show-error-log'.  The icon is hidden while
+point is in the equation, and shown again when point leaves it
+unchanged; an edited equation is typeset again when point leaves it.
 When nil, a failed equation looks like an equation not typeset yet.
 Change the icon with `customize-icon'.  Setting the option with
 `setq', `setq-local' or Customize updates the previews on its own."
@@ -1544,14 +1543,18 @@ same cache entry.  Replaces any existing preview overlay in the span."
               (latex-to-svg-frontend--appearance))
         ov))))
 
-(defun latex-to-svg-frontend--failure-help-echo (failure)
+(defun latex-to-svg-frontend--failure-help-echo (failure &optional tooltip)
   "Return the `help-echo' of an equation whose request ended in FAILURE.
 FAILURE is the plist the backend passes to the callback (see
 `latex-to-svg-backend').  For a `formula' failure it names the engine
-and gives the message: \"LaTeX could not typeset it: MESSAGE\", or
-\"RaTeX could not parse it: MESSAGE\".  For a `setup' failure it gives
-the message, which names the program that was not found.  The log is
-not named: `latex-to-svg-frontend-show-error-log' opens it."
+and gives the message: \"LaTeX could not typeset it: MESSAGE.\", or
+\"RaTeX could not parse it: MESSAGE.\".  For a `setup' failure it gives
+the message, which names the program that was not found.  The text
+ends with a full stop, unless it already ends with `.', `!' or `?'.
+With TOOLTIP, when FAILURE has a log, a sentence follows on the same
+line, so that a tooltip shown on one line reads well: \"Call M-x
+latex-to-svg-frontend-show-error-log with point in the equation to
+open the log.\"  The log file is not named."
   (let* ((engine (plist-get failure :engine))
          (message (plist-get failure :message))
          (text (if (eq (plist-get failure :kind) 'setup)
@@ -1563,13 +1566,17 @@ not named: `latex-to-svg-frontend-show-error-log' opens it."
                                  (latex-to-svg-frontend--engine-name engine)
                                  (if (eq engine 'ratex) "parse" "typeset"))
                          (and message (concat ": " message))))))
-    (latex-to-svg-frontend--help-echo-text text)))
+    (concat (latex-to-svg-frontend--help-echo-text
+             (if (string-match-p "[.!?]\\'" text) text (concat text ".")))
+            (and tooltip (plist-get failure :log)
+                 " Call \\[latex-to-svg-frontend-show-error-log] with point \
+in the equation to open the log."))))
 
 (defun latex-to-svg-frontend--show-failure-mark (ov)
   "Show the failure mark before the failed equation OV, if it is on.
 See `latex-to-svg-frontend-failure-mark'.  The mark is OV's
 `before-string', so `--hide-image' hides it when point enters OV.
-Its tooltip is the source's, and says how to open the log when there
+Its tooltip is the source's, which says how to open the log when there
 is one: a click cannot, as the press puts point in the equation, which
 hides the mark before the release."
   (when-let* ((failure (overlay-get ov 'latex-to-svg-frontend-failure))
@@ -1578,12 +1585,8 @@ hides the mark before the release."
     (overlay-put ov 'before-string
                  (concat (propertize (icon-string 'latex-to-svg-frontend-failure)
                                      'help-echo
-                                     (concat
-                                      (latex-to-svg-frontend--failure-help-echo
-                                       failure)
-                                      (and (plist-get failure :log)
-                                           "\nCall \\[latex-to-svg-frontend-show-error-log] \
-with point in the equation to open the log.")))
+                                     (latex-to-svg-frontend--failure-help-echo
+                                      failure t))
                          " "))))
 
 (defun latex-to-svg-frontend-show-error-log ()
@@ -1634,7 +1637,7 @@ an edit re-renders it."
          (failure
           (overlay-put ov 'latex-to-svg-frontend-failure failure)
           (overlay-put ov 'help-echo
-                       (latex-to-svg-frontend--failure-help-echo failure))
+                       (latex-to-svg-frontend--failure-help-echo failure t))
           (latex-to-svg-frontend--show-failure-mark ov))
          ((stringp engine)
           (overlay-put ov 'help-echo engine)

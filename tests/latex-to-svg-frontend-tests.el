@@ -3583,15 +3583,24 @@ compiled.  Once point leaves it, both show the new picture."
   (dolist (case
            `((,l2sf-tests--failure
               . "LaTeX could not typeset it: Undefined control sequence.")
+             ;; In a tooltip, the command that opens the log follows.
+             ((tooltip . ,l2sf-tests--failure)
+              . ,(concat "LaTeX could not typeset it: Undefined control sequence. "
+                         "Call M-x latex-to-svg-frontend-show-error-log "
+                         "with point in the equation to open the log."))
              ((:kind formula :engine ratex :message "Unknown command `\\x'")
-              . "RaTeX could not parse it: Unknown command `\\x'")
+              . "RaTeX could not parse it: Unknown command `\\x'.")
+             ((:kind formula :engine ratex :message "Unexpected end!")
+              . "RaTeX could not parse it: Unexpected end!")
              ((:kind formula :engine texres)
-              . "texres could not typeset it")
+              . "texres could not typeset it.")
              ((:kind setup :engine texres :program "pdftocairo"
                :message "The texres engine could not run `pdftocairo': program not found.")
               . "The texres engine could not run `pdftocairo': program not found.")))
     (should (equal (substitute-command-keys
-                    (latex-to-svg-frontend--failure-help-echo (car case)))
+                    (if (eq (caar case) 'tooltip)
+                        (latex-to-svg-frontend--failure-help-echo (cdar case) t)
+                      (latex-to-svg-frontend--failure-help-echo (car case))))
                    (cdr case)))))
 
 ;; The backend stub of `l2sf-tests--with-stub', but failing every
@@ -3742,14 +3751,12 @@ compiled.  Once point leaves it, both show the new picture."
                  (substring-no-properties
                   (icon-string 'latex-to-svg-frontend-failure))
                  mark))
-        ;; The tooltip of the source, and how to open the log.
-        (should (equal (substitute-command-keys
-                        (get-text-property 0 'help-echo mark))
-                       (concat "LaTeX could not typeset it: "
-                               "Undefined control sequence.\n"
-                               "Call "
-                               "M-x latex-to-svg-frontend-show-error-log "
-                               "with point in the equation to open the log.")))
+        ;; The tooltip of the source, which says how to open the log.
+        (should (equal (get-text-property 0 'help-echo mark)
+                       (overlay-get ov 'help-echo)))
+        (should (string-suffix-p "to open the log."
+                                 (substitute-command-keys
+                                  (overlay-get ov 'help-echo))))
         (latex-to-svg-frontend--open-overlay ov)
         (should-not (overlay-get ov 'before-string))
         (latex-to-svg-frontend--close-overlay ov)
@@ -3759,15 +3766,14 @@ compiled.  Once point leaves it, both show the new picture."
           (latex-to-svg-frontend--set-unrendered-overlay
            30 33 "$y$" nil engine))
         (should-not (overlay-get (cadr (l2sf-tests--overlays)) 'before-string)))
-      ;; With no log, the tooltip is the source's.
+      ;; With no log, the tooltip does not name the command.
       (latex-to-svg-frontend--set-unrendered-overlay
        8 22 "$\\notacommand$" nil 'latex nil
        (plist-put (copy-sequence l2sf-tests--failure) :log nil))
       (should (equal (get-text-property
                       0 'help-echo
                       (overlay-get (car (l2sf-tests--overlays)) 'before-string))
-                     (latex-to-svg-frontend--failure-help-echo
-                      l2sf-tests--failure)))
+                     "LaTeX could not typeset it: Undefined control sequence."))
       (let ((latex-to-svg-frontend-failure-mark nil))
         (latex-to-svg-frontend--set-unrendered-overlay
          8 22 "$\\notacommand$" nil 'latex nil l2sf-tests--failure)

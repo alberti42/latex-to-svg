@@ -498,8 +498,10 @@ LaTeX picture comes straight from the cache.
 When no engine can typeset an equation, its source stays as text, and the
 backend warns once per equation per buffer, naming the buffer and linking to
 the log. A warning icon stands before the source: ⚠️, ⚠ or `[!]`, the first
-one Emacs can show. Hovering over the source or the icon shows the engine and
-the error: "LaTeX could not typeset it: Undefined control sequence.". The icon
+one Emacs can show. Hovering over the source or the icon shows the engine, the
+error and how to open the log: "LaTeX could not typeset it: Undefined control
+sequence. Call M-x latex-to-svg-frontend-show-error-log with point in the
+equation to open the log." The icon
 is hidden while point is in the equation, and shown again when point leaves it
 unchanged. `M-x latex-to-svg-frontend-show-error-log` with point in the
 equation opens the log; when there is none (RaTeX's errors, a program that
