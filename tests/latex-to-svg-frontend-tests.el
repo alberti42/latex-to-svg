@@ -4446,6 +4446,69 @@ Each element is (BEG END TEXT); every overlay must display a newline."
         (goto-char (overlay-start (car refs)))
         (should-error (latex-to-svg-frontend-goto-reference) :type 'user-error)))))
 
+;; A jump into a folded section shows what Org's `ancestors' shows: the
+;; heading and entry holding the equation, and the headings above them.
+;; The sibling sections stay folded.  Markdown always shows that; Org
+;; shows what `org-fold-show-context-detail' says, `ancestors' by default.
+
+(declare-function org-fold-hide-subtree "org-fold")
+
+(defun l2sf-tests--outline (star)
+  "The test outline, with STAR as the heading character."
+  (let ((h (lambda (n title) (concat (make-string n star) " " title "\n"))))
+    (concat (funcall h 1 "Introduction") "\nSee \\eqref{eq:fit}.\n\n"
+            (funcall h 1 "Results") "\nResults text.\n\n"
+            (funcall h 2 "Data") "\nData text.\n\n"
+            (funcall h 2 "Fits") "\nFits text.\n\n"
+            (funcall h 3 "Model") "\n"
+            "\\begin{equation}\\label{eq:fit}\nx\n\\end{equation}\n\n"
+            (funcall h 3 "Residuals") "\nResiduals text.\n\n"
+            (funcall h 1 "Discussion") "\nDiscussion text.\n")))
+
+(defun l2sf-tests--jump-into-fold (fold)
+  "Fold with FOLD at the heading \"Results\", jump to eq:fit, check what shows."
+  (latex-to-svg-frontend--render-region (point-min) (point-max))
+  (let ((at (lambda (s) (save-excursion (goto-char (point-min))
+                                        (search-forward s)
+                                        (match-beginning 0)))))
+    (goto-char (funcall at "Results")) (funcall fold)
+    (should (invisible-p (funcall at "\\begin{equation}")))
+    (goto-char (overlay-start
+                (seq-find (lambda (o) (overlay-get o 'latex-to-svg-frontend-ref))
+                          (l2sf-tests--overlays))))
+    (latex-to-svg-frontend-goto-reference)
+    (should (= (point) (funcall at "\\begin{equation}")))
+    (should-not (invisible-p (point)))
+    (dolist (shown '("Results" "Fits" "Model" "Discussion"))
+      (should-not (invisible-p (funcall at shown))))
+    (dolist (hidden '("Results text" "Data" "Fits text" "Residuals"))
+      (should (invisible-p (funcall at hidden))))))
+
+(ert-deftest l2sf-org-jump-shows-ancestors ()
+  (l2sf-tests--with-stub
+    (with-temp-buffer
+      (insert (l2sf-tests--outline ?*))
+      (org-mode)
+      (latex-to-svg-for-org-mode 1)
+      (l2sf-tests--jump-into-fold #'org-fold-hide-subtree)
+      (latex-to-svg-for-org-mode -1)
+      (should-not (local-variable-p 'latex-to-svg-frontend-reveal-function)))))
+
+(ert-deftest l2sf-markdown-jump-shows-ancestors ()
+  (l2sf-tests--with-stub
+    (l2sf-tests--md (l2sf-tests--outline ?#)
+      (setq major-mode 'markdown-mode)
+      (setq-local outline-regexp "#+ ")
+      (latex-to-svg-for-markdown-mode 1)
+      (l2sf-tests--jump-into-fold #'outline-hide-subtree)
+      ;; Before the first heading nothing can be folded: no error.
+      (goto-char (point-min))
+      (insert "Preamble.\n\n")
+      (goto-char (point-min))
+      (funcall latex-to-svg-frontend-reveal-function)
+      (latex-to-svg-for-markdown-mode -1)
+      (should-not (local-variable-p 'latex-to-svg-frontend-reveal-function)))))
+
 (ert-deftest l2sf-eqref-follows-renumber ()
   (l2sf-tests--with-stub
     (l2sf-tests--md

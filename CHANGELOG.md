@@ -48,6 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   function, or setting the option to `always`, `writable` or nil, which
   need no function. The failure still counts as nil.
 
+### Fixed
+
+- A jump from `\eqref` / `\ref` to an equation in a folded Markdown
+  section showed nothing: the section stayed folded.
+  `latex-to-svg-for-markdown-mode` now shows the heading and entry that
+  hold the equation, and the headings above them, as Org's default
+  (`ancestors` in `org-fold-show-context-detail`) does.
+
 ## [0.22.2] - 2026-10-17
 
 ### Fixed

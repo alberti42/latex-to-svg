@@ -527,7 +527,9 @@ scanner skips math inside them.  nil means no exclusions.")
 
 (defvar-local latex-to-svg-frontend-reveal-function nil
   "Function of no args, called after a jump to unfold the target.
-E.g. Org sets it to `org-fold-show-context'.  nil means no unfolding.")
+E.g. Org sets it to `org-fold-show-context', which shows as much as
+`org-fold-show-context-detail' says; Markdown to
+`latex-to-svg-for-markdown--reveal'.  nil means no unfolding.")
 
 (defvar-local latex-to-svg-frontend-labels-function nil
   "Function of no args -> hash table from label to its printed number.

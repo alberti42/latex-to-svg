@@ -9,7 +9,7 @@
 
 Markdown adaptor for `latex-to-svg-frontend`: a thin layer that tells the
 shared core what counts as "code" in a Markdown buffer (so math inside code
-is not previewed) and enables the core. All the actual work — detection,
+is not previewed) and how to unfold a jump target, and enables the core. All the actual work — detection,
 overlays, numbering, references, reveal-on-cursor, refresh — lives in
 `latex-to-svg-frontend`; see the [README](../README.md).
 
@@ -47,6 +47,12 @@ In any other major mode, the mode refuses to turn on.
 
 With the mode on, all math renders when the buffer opens. See
 [`example.md`](example.md) for a ready-to-open demo.
+
+Jumping to an equation from a reference (see the README's
+[Numbering and cross-references](../README.md#numbering-and-cross-references))
+shows the heading and entry that hold it, and the headings above them, as
+Org does by default (`ancestors`). Markdown folds headings with outline (`markdown-cycle`,
+or `outline-minor-mode`); every other fold stays as it is.
 
 ## What is not previewed
 
