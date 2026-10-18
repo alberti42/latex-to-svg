@@ -844,15 +844,16 @@ a value when the mode turns on."
 
 (defun latex-to-svg-frontend--check-options ()
   "Warn about each color option whose value is not a color.
-Run when the mode turns on.  The options are
+Run when the mode turns on, and in each buffer updated after a watched
+option changed (see `latex-to-svg-frontend--update-after-option').
+The options are
 `latex-to-svg-frontend-foreground-color' and
 `latex-to-svg-frontend-background-color'; a value that is not a
 string, or that a graphical frame cannot resolve, is ignored when
 equations are drawn (see `latex-to-svg-frontend--option-color').  A
 color resolves on a frame, so the check uses the frame that shows the
 buffer, else any graphical frame; with none, as in a daemon that has
-opened no graphical frame yet, it checks nothing.  An option set
-while the mode is on is not checked until the mode turns on again."
+opened no graphical frame yet, it checks nothing."
   (when-let* ((frame (or (latex-to-svg-frontend--display-frame
                           (current-buffer))
                          (seq-find #'display-graphic-p (frame-list)))))
@@ -2968,7 +2969,9 @@ in one go (a block of `setq's in an init file)."
 (defun latex-to-svg-frontend--update-after-option ()
   "Update the buffers `--option-changed' collected (see `--update-buffer').
 That is each buffer with previews whose local value of a watched option
-changed, or that has no local value of an option whose default changed."
+changed, or that has no local value of an option whose default changed.
+Each is checked first (see `latex-to-svg-frontend--check-options'), so a
+color option set to a value that is not a color warns once per buffer."
   (let ((buffers latex-to-svg-frontend--option-buffers)
         (defaults latex-to-svg-frontend--option-defaults))
     (setq latex-to-svg-frontend--option-buffers nil
@@ -2981,6 +2984,8 @@ changed, or that has no local value of an option whose default changed."
                      (seq-some (lambda (option)
                                  (not (local-variable-p option buf)))
                                defaults)))
+        (with-current-buffer buf
+          (latex-to-svg-frontend--check-options))
         (latex-to-svg-frontend--update-buffer buf)))))
 
 (dolist (option latex-to-svg-frontend--watched-options)

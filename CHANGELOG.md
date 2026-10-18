@@ -43,8 +43,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - A color option (`latex-to-svg-frontend-foreground-color`,
   `latex-to-svg-frontend-background-color`) whose value is not a color is
-  reported when `latex-to-svg-frontend-mode` turns on, each time, instead
-  of once for the life of the Emacs process, when an equation was first
+  reported when `latex-to-svg-frontend-mode` turns on and when an option
+  of this package is set, in each buffer with the mode on, instead of
+  once for the life of the Emacs process, when an equation was first
   drawn. Drawing an equation ignores such a value with no warning, as it
   ignored it before after the first warning.
 
