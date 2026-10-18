@@ -822,6 +822,16 @@ File "/tmp/orgtexeQT6GZ.dvi" wasn't produced  Please adjust 'dvisvgm' part of 'o
 and the error stops `org-mode`'s setup, so `latex-to-svg-for-org-mode` is
 never turned on and shows no warning. The fix is the same.
 
+Org's next release brings `org-latex-preview-mode`, a minor mode that previews
+the math as you type. With it and `latex-to-svg-for-org-mode` both on in a
+buffer, both draw images over the same math. `latex-to-svg-for-org-mode` warns,
+whichever of the two turned on first, and does not turn Org's mode off:
+
+- If `org-latex-preview-mode` is on `org-mode-hook`, remove it from the hook.
+  This warning comes once per session.
+- Otherwise, turn it off with `M-x org-latex-preview-mode`. This warning comes
+  once per buffer.
+
 Packages that run Org's preview on their own, such as `org-fragtog`, draw over
 this package's previews too; turn them off in buffers where
 `latex-to-svg-for-org-mode` is on.

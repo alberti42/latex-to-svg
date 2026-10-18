@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   user's config (warned once per session). The warning links to the new
   Troubleshooting section of the README, which explains how to turn
   Org's preview off. The Org adaptor's page links there too. Refs #9.
+- `latex-to-svg-for-org-mode` warns when `org-latex-preview-mode`, which
+  Org's next release brings, is on in the same buffer, whichever of the
+  two turned on first. If it is on `org-mode-hook`, the warning says to
+  remove it from the hook (once per session); otherwise, to turn it off
+  with `M-x org-latex-preview-mode` (once per buffer). The adaptor does
+  not turn Org's mode off.
 
 ## [0.22.2] - 2026-10-17
 

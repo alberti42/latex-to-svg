@@ -1816,6 +1816,68 @@ can reveal equations and leave references as text."
             (should-not (open "$a$\n"))
             (should-not (open "#+startup: nolatexpreview\n$a$\n"))))))))
 
+;; `org-latex-preview-mode' is in Org's main branch, not in a release yet:
+;; stand in for it when the installed Org lacks it.  `eval', so that the
+;; compiled tests do not define it when Org has it.
+(defvar org-mode-hook)
+(defvar org-latex-preview-mode)
+(declare-function org-latex-preview-mode "org-latex-preview")
+(unless (fboundp 'org-latex-preview-mode)
+  (eval '(define-minor-mode org-latex-preview-mode
+           "Stand-in for Org's `org-latex-preview-mode', for the tests."
+           :lighter nil)
+        t))
+
+(ert-deftest l2sf-org-mode-warns-about-org-latex-preview-mode ()
+  ;; The mode warns when `org-latex-preview-mode' is on with it, whichever
+  ;; turned on first.  On the global `org-mode-hook': "remove it from
+  ;; `org-mode-hook'", once per session.  Otherwise: "turn it off with
+  ;; M-x", once per buffer.  It turns Org's mode off in no case.
+  (let ((warnings '())
+        (latex-to-svg-for-org--warned-hook nil)
+        (org-mode-hook nil))
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (_type message &rest _) (push message warnings))))
+      (l2sf-tests--with-stub
+        ;; Org's mode first, then ours.
+        (with-temp-buffer
+          (org-mode)
+          (org-latex-preview-mode 1)
+          (latex-to-svg-for-org-mode 1)
+          (should (= (length warnings) 1))
+          (should (string-match-p "M-x org-latex-preview-mode" (car warnings)))
+          (should (string-match-p "#org-previews-the-math-too" (car warnings)))
+          (should org-latex-preview-mode)
+          ;; Once per buffer.
+          (org-latex-preview-mode -1)
+          (org-latex-preview-mode 1)
+          (should (= (length warnings) 1)))
+        ;; Ours first, then Org's.
+        (setq warnings '())
+        (with-temp-buffer
+          (org-mode)
+          (latex-to-svg-for-org-mode 1)
+          (should-not warnings)
+          (org-latex-preview-mode 1)
+          (should (string-match-p "M-x org-latex-preview-mode" (car warnings)))
+          ;; With our mode off, Org's mode turns on with no warning.
+          (setq warnings '())
+          (latex-to-svg-for-org-mode -1)
+          (org-latex-preview-mode -1)
+          (org-latex-preview-mode 1)
+          (should-not warnings))
+        ;; On the global `org-mode-hook', in both orders: once per session.
+        (setq warnings '())
+        (dolist (hook '((org-latex-preview-mode latex-to-svg-for-org-mode)
+                        (latex-to-svg-for-org-mode org-latex-preview-mode)))
+          (setq org-mode-hook hook)
+          (with-temp-buffer
+            (org-mode)
+            (should org-latex-preview-mode)))
+        (should (= (length warnings) 1))
+        (should (string-match-p "Remove it from `org-mode-hook'"
+                                (car warnings)))))))
+
 (ert-deftest l2sf-latex-exclusions ()
   ;; The LaTeX adaptor skips the preamble, comments (not an escaped `\%'),
   ;; `\verb' with any delimiter, verbatim and `comment' environments,
