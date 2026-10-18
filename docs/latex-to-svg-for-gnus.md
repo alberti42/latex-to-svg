@@ -10,6 +10,8 @@ article Gnus shows in `gnus-article-mode`, such as the abstracts of the arXiv
 feeds on gwene.org. All the actual work — detection, overlays, reveal-on-cursor,
 refresh — lives in `latex-to-svg-frontend`; see the [README](../README.md).
 
+![An arXiv abstract from gwene.org in `gnus-article-mode`, below the summary buffer: the inline math in the abstract is drawn in the color and size of the text around it.](../Screenshot-gnus.png)
+
 ## Requirements
 
 Nothing beyond the requirements of the whole stack, in the README's
