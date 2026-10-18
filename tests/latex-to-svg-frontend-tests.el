@@ -3577,11 +3577,12 @@ compiled.  Once point leaves it, both show the new picture."
                  (latex-to-svg-frontend--element-at 10)))))))
 
 (ert-deftest l2sf-failed-overlay-help-echo ()
-  ;; `help-echo' names the engine and gives the message and the log, as
-  ;; written: Emacs runs it through `substitute-command-keys'.
+  ;; `help-echo' names the engine and gives the message, as written:
+  ;; Emacs runs it through `substitute-command-keys'.  It does not name
+  ;; the log: `latex-to-svg-frontend-show-error-log' opens it.
   (dolist (case
            `((,l2sf-tests--failure
-              . "LaTeX could not typeset it: Undefined control sequence.\nLog: /cache/key.log")
+              . "LaTeX could not typeset it: Undefined control sequence.")
              ((:kind formula :engine ratex :message "Unknown command `\\x'")
               . "RaTeX could not parse it: Unknown command `\\x'")
              ((:kind formula :engine texres)
@@ -3741,9 +3742,14 @@ compiled.  Once point leaves it, both show the new picture."
                  (substring-no-properties
                   (icon-string 'latex-to-svg-frontend-failure))
                  mark))
-        (should (equal (get-text-property 0 'help-echo mark)
-                       (latex-to-svg-frontend--failure-help-echo
-                        l2sf-tests--failure)))
+        ;; The tooltip of the source, and how to open the log.
+        (should (equal (substitute-command-keys
+                        (get-text-property 0 'help-echo mark))
+                       (concat "LaTeX could not typeset it: "
+                               "Undefined control sequence.\n"
+                               "Click here, or call "
+                               "M-x latex-to-svg-frontend-show-error-log "
+                               "with point in the equation, to open the log.")))
         (latex-to-svg-frontend--open-overlay ov)
         (should-not (overlay-get ov 'before-string))
         (latex-to-svg-frontend--close-overlay ov)
@@ -3753,6 +3759,15 @@ compiled.  Once point leaves it, both show the new picture."
           (latex-to-svg-frontend--set-unrendered-overlay
            30 33 "$y$" nil engine))
         (should-not (overlay-get (cadr (l2sf-tests--overlays)) 'before-string)))
+      ;; With no log, the tooltip is the source's.
+      (latex-to-svg-frontend--set-unrendered-overlay
+       8 22 "$\\notacommand$" nil 'latex nil
+       (plist-put (copy-sequence l2sf-tests--failure) :log nil))
+      (should (equal (get-text-property
+                      0 'help-echo
+                      (overlay-get (car (l2sf-tests--overlays)) 'before-string))
+                     (latex-to-svg-frontend--failure-help-echo
+                      l2sf-tests--failure)))
       (let ((latex-to-svg-frontend-failure-mark nil))
         (latex-to-svg-frontend--set-unrendered-overlay
          8 22 "$\\notacommand$" nil 'latex nil l2sf-tests--failure)

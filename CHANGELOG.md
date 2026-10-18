@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - An equation that no engine could typeset shows a warning icon before its
-  source, with the tooltip of the source: the engine, the error and the log
+  source, with the tooltip of the source: the engine and the error
   (issue #7). Before, it looked like an equation not typeset yet. The icon
   is hidden while point is in the equation, and shown again when point
   leaves it unchanged. `latex-to-svg-frontend-failure-mark` (default t)
@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The tooltip of an equation that no engine could typeset no longer
+  names its log file. Clicking the warning icon, or
+  `latex-to-svg-frontend-show-error-log`, opens the log.
 - A color option (`latex-to-svg-frontend-foreground-color`,
   `latex-to-svg-frontend-background-color`) whose value is not a color is
   reported when `latex-to-svg-frontend-mode` turns on and when an option
