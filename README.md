@@ -26,6 +26,7 @@ This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 - **`latex-to-svg-for-org`** — [Org adaptor](docs/latex-to-svg-for-org.md).
 - **`latex-to-svg-for-latex`** — [LaTeX adaptor](docs/latex-to-svg-for-latex.md).
 - **`latex-to-svg-for-gnus`** — [Gnus adaptor](docs/latex-to-svg-for-gnus.md).
+- **`latex-to-svg-for-elfeed`** — [Elfeed adaptor](docs/latex-to-svg-for-elfeed.md).
 
 An overview of the adaptors is presented under [One adaptor per markup](#one-adaptor-per-markup).
 
@@ -33,7 +34,8 @@ An overview of the adaptors is presented under [One adaptor per markup](#one-ada
   latex-to-svg-for-markdown ─┐
   latex-to-svg-for-org ──────┤
   latex-to-svg-for-latex ────┼─▶ latex-to-svg-frontend ─▶ latex-to-svg-backend
-  latex-to-svg-for-gnus ─────┘        (this repo)             (backend)
+  latex-to-svg-for-gnus ─────┤        (this repo)             (backend)
+  latex-to-svg-for-elfeed ───┘
 ```
 
 You install an **adaptor**; it pulls in the frontend core and the backend
@@ -158,6 +160,16 @@ emphasis from inside math.
 
 See [its page](docs/latex-to-svg-for-gnus.md) for the adaptor's documentation.
 
+### `latex-to-svg-for-elfeed`
+
+Not on MELPA yet.
+
+For Elfeed's `elfeed-show-mode`, such as the titles and abstracts of the arXiv
+feeds. Skips nothing. Draws the previews again for each entry Elfeed shows and
+turns equation numbering off in the entry buffer.
+
+See [its page](docs/latex-to-svg-for-elfeed.md) for the adaptor's documentation.
+
 To add an adaptor for another markup, see
 [Writing an adaptor for another markup](#writing-an-adaptor-for-another-markup).
 
@@ -217,7 +229,8 @@ The stack has three layers:
   shared preview core (detection, overlays, numbering, refresh),
   markup-agnostic.
 - **`latex-to-svg-for-markdown`** / **`latex-to-svg-for-org`** /
-  **`latex-to-svg-for-latex`** / **`latex-to-svg-for-gnus`** — the per-mode
+  **`latex-to-svg-for-latex`** / **`latex-to-svg-for-gnus`** /
+  **`latex-to-svg-for-elfeed`** — the per-mode
   adaptors. Install whichever you
   use.
 
@@ -243,9 +256,10 @@ instead of `:ensure t` (run `M-x straight-pull-recipe-repositories` if your
 recipes predate the packages). Each adaptor's page gives its lines
 ([Markdown](docs/latex-to-svg-for-markdown.md#installation),
 [Org](docs/latex-to-svg-for-org.md#installation),
-[LaTeX](docs/latex-to-svg-for-latex.md#installation)). The Gnus adaptor is
-not on MELPA yet: its page gives a git recipe
-([Gnus](docs/latex-to-svg-for-gnus.md#installation)).
+[LaTeX](docs/latex-to-svg-for-latex.md#installation)). The Gnus and Elfeed
+adaptors are not on MELPA yet: their pages give a git recipe
+([Gnus](docs/latex-to-svg-for-gnus.md#installation),
+[Elfeed](docs/latex-to-svg-for-elfeed.md#installation)).
 
 Optionally, re-tint previews the instant you switch themes, and rescale them
 when the frame font changes (see
@@ -763,7 +777,8 @@ buffer-local protocol and toggles the core:
   records, replacing the scanner entirely. Escape hatch; rarely needed.
 
 See `latex-to-svg-for-markdown.el` / `latex-to-svg-for-org.el` /
-`latex-to-svg-for-latex.el` / `latex-to-svg-for-gnus.el` as templates.
+`latex-to-svg-for-latex.el` / `latex-to-svg-for-gnus.el` /
+`latex-to-svg-for-elfeed.el` as templates.
 
 Pull requests adding adaptors for other major modes are welcome.
 
