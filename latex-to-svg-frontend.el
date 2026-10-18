@@ -832,25 +832,39 @@ when COLOR is nil or FRAME cannot resolve it."
            (apply #'format "#%02x%02x%02x"
                   (mapcar (lambda (v) (round (* v 255) 65535)) values))))))
 
-(defvar latex-to-svg-frontend--warned-colors nil
-  "The (OPTION . VALUE) pairs reported as colors no frame resolved.")
-
 (defun latex-to-svg-frontend--option-color (option frame)
   "Return the color in OPTION as a `#rrggbb' string resolved on FRAME, or nil.
 Nil when OPTION is nil.  A value FRAME cannot resolve, or one that is
-not a string, is nil too, and is reported once with `display-warning'."
+not a string, is nil too, with no warning: this runs for every
+equation drawn.  `latex-to-svg-frontend--check-options' reports such
+a value when the mode turns on."
   (when-let* ((color (symbol-value option)))
-    (or (and (stringp color)
-             (latex-to-svg-frontend--hex-color color frame))
-        (let ((pair (cons option color)))
-          (unless (member pair latex-to-svg-frontend--warned-colors)
-            (push pair latex-to-svg-frontend--warned-colors)
-            (display-warning
-             'latex-to-svg-frontend
-             (format "Cannot resolve `%s' (%S) as a color; ignoring it"
-                     option color)
-             :warning))
-          nil))))
+    (and (stringp color)
+         (latex-to-svg-frontend--hex-color color frame))))
+
+(defun latex-to-svg-frontend--check-options ()
+  "Warn about each color option whose value is not a color.
+Run when the mode turns on.  The options are
+`latex-to-svg-frontend-foreground-color' and
+`latex-to-svg-frontend-background-color'; a value that is not a
+string, or that a graphical frame cannot resolve, is ignored when
+equations are drawn (see `latex-to-svg-frontend--option-color').  A
+color resolves on a frame, so the check uses the frame that shows the
+buffer, else any graphical frame; with none, as in a daemon that has
+opened no graphical frame yet, it checks nothing.  An option set
+while the mode is on is not checked until the mode turns on again."
+  (when-let* ((frame (or (latex-to-svg-frontend--display-frame
+                          (current-buffer))
+                         (seq-find #'display-graphic-p (frame-list)))))
+    (dolist (option '(latex-to-svg-frontend-foreground-color
+                      latex-to-svg-frontend-background-color))
+      (when-let* ((color (symbol-value option))
+                  ((not (latex-to-svg-frontend--option-color option frame))))
+        (display-warning
+         'latex-to-svg-frontend
+         (format "%s: `%s' is %S, which is not a color; ignoring it"
+                 (buffer-name) option color)
+         :warning)))))
 
 (defun latex-to-svg-frontend--foreground-for (pos frame)
   "Return the `#rrggbb' color to tint the equation that opens at POS with.
@@ -3462,6 +3476,7 @@ an option of this package updates the previews on its own (see
                   #'latex-to-svg-frontend--after-clone -90 t)
         (add-hook 'kill-buffer-hook #'latex-to-svg-frontend--unshare nil t)
         (latex-to-svg-frontend--share t)
+        (latex-to-svg-frontend--check-options)
         (latex-to-svg-frontend--add-font-lock-keywords)
         (if buffer-file-name
             (unless (timerp latex-to-svg-frontend--initial-render-timer)

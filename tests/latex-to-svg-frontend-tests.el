@@ -908,44 +908,58 @@ a height of 23.  `latex-to-svg-frontend--x-height-ratio' reads
           (should (equal (latex-to-svg-frontend--foreground-for 1 frame)
                          "#ff0000")))))))
 
-(ert-deftest l2sf-unresolved-option-color-warns-once ()
-  ;; A color name the frame cannot resolve is reported once, and the
-  ;; equation takes the `default' face's foreground and no box.
+(ert-deftest l2sf-unresolved-option-color-is-ignored-silently ()
+  ;; When equations are drawn, a color option the frame cannot resolve, or
+  ;; one that is not a string, gives the `default' face's foreground and
+  ;; no box, with no warning: this runs for every equation.
   (l2sf-tests--with-frame
-    (let ((latex-to-svg-frontend--warned-colors nil)
-          (latex-to-svg-frontend-foreground-color "no-such-color")
-          (latex-to-svg-frontend-background-color "no-such-color")
-          (warnings nil)
+    (let ((warnings nil)
           (frame (selected-frame)))
       (cl-letf (((symbol-function 'display-warning)
                  (lambda (_type message &rest _) (push message warnings))))
         (with-temp-buffer
           (insert "$a$")
-          (dotimes (_ 2)
-            (should (equal (latex-to-svg-frontend--foreground-for 1 frame)
-                           "#ffffff"))
-            (should-not (latex-to-svg-frontend--background-for frame)))))
-      (should (= (length warnings) 2)))))
+          (dolist (values '(("no-such-color" . "no-such-color")
+                            (black . white)))
+            (let ((latex-to-svg-frontend-foreground-color (car values))
+                  (latex-to-svg-frontend-background-color (cdr values)))
+              (should (equal (latex-to-svg-frontend--foreground-for 1 frame)
+                             "#ffffff"))
+              (should-not (latex-to-svg-frontend--background-for frame))))))
+      (should-not warnings))))
 
-(ert-deftest l2sf-option-color-not-a-string-warns-once ()
-  ;; A value that is not a string, such as the symbol `black', is reported
-  ;; once and treated as nil, like a name the frame cannot resolve; it
-  ;; does not signal, which would stop every equation from being drawn.
-  (l2sf-tests--with-frame
-    (let ((latex-to-svg-frontend--warned-colors nil)
-          (latex-to-svg-frontend-foreground-color 'black)
-          (latex-to-svg-frontend-background-color 'white)
-          (warnings nil)
-          (frame (selected-frame)))
-      (cl-letf (((symbol-function 'display-warning)
-                 (lambda (_type message &rest _) (push message warnings))))
-        (with-temp-buffer
-          (insert "$a$")
-          (dotimes (_ 2)
-            (should (equal (latex-to-svg-frontend--foreground-for 1 frame)
-                           "#ffffff"))
-            (should-not (latex-to-svg-frontend--background-for frame)))))
-      (should (= (length warnings) 2)))))
+(ert-deftest l2sf-mode-checks-color-options-when-it-turns-on ()
+  ;; The mode warns about each color option that is not a color, each time
+  ;; it turns on.  A good value, or nil, gives no warning; with no
+  ;; graphical frame it checks nothing.
+  (let ((warnings nil))
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (_type message &rest _) (push message warnings))))
+      (l2sf-tests--with-stub
+        (l2sf-tests--with-frame
+          (let ((latex-to-svg-frontend-foreground-color "no-such-color")
+                (latex-to-svg-frontend-background-color 'white))
+            (l2sf-tests--md "$a$\n"
+              (latex-to-svg-frontend-mode 1)
+              (should (= (length warnings) 2))
+              (should (seq-some (lambda (w)
+                                  (string-match-p
+                                   "`latex-to-svg-frontend-foreground-color' is \"no-such-color\""
+                                   w))
+                                warnings))
+              (latex-to-svg-frontend-mode -1)
+              (latex-to-svg-frontend-mode 1)
+              (should (= (length warnings) 4))))
+          (setq warnings nil)
+          (let ((latex-to-svg-frontend-foreground-color "red")
+                (latex-to-svg-frontend-background-color nil))
+            (l2sf-tests--md "$a$\n"
+              (latex-to-svg-frontend-mode 1)
+              (should-not warnings))))
+        (let ((latex-to-svg-frontend-foreground-color "no-such-color"))
+          (l2sf-tests--md "$a$\n"
+            (latex-to-svg-frontend-mode 1)
+            (should-not warnings)))))))
 
 (ert-deftest l2sf-appearance-reads-the-display-frame ()
   ;; The signature is the `default' face's colors on the frame that shows
