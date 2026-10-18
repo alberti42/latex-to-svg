@@ -825,12 +825,11 @@ never turned on and shows no warning. The fix is the same.
 Org's next release brings `org-latex-preview-mode`, a minor mode that previews
 the math as you type. With it and `latex-to-svg-for-org-mode` both on in a
 buffer, both draw images over the same math. `latex-to-svg-for-org-mode` warns,
-whichever of the two turned on first, and does not turn Org's mode off:
+each time one of the two turns on while the other is on, and does not turn
+Org's mode off:
 
 - If `org-latex-preview-mode` is on `org-mode-hook`, remove it from the hook.
-  This warning comes once per session.
-- Otherwise, turn it off with `M-x org-latex-preview-mode`. This warning comes
-  once per buffer.
+- Otherwise, turn it off with `M-x org-latex-preview-mode`.
 
 Instead of changing these settings, you can have `latex-to-svg-for-org-mode`
 turn Org's preview off itself:

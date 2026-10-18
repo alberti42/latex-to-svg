@@ -1790,11 +1790,10 @@ can reveal equations and leave references as text."
 
 (ert-deftest l2sf-org-mode-warns-about-org-preview ()
   ;; The mode warns when Org's own preview ran as the buffer opened,
-  ;; because of the file's `#+startup: latexpreview' (every time) or the
-  ;; user's config (once per session).  With neither, and with
+  ;; because of the file's `#+startup: latexpreview' or the user's
+  ;; config, each time the mode turns on.  With neither, and with
   ;; `#+startup: nolatexpreview' over a config value t, it says nothing.
-  (let ((warnings '())
-        (latex-to-svg-for-org--warned-config nil))
+  (let ((warnings '()))
     (cl-letf (((symbol-function 'display-warning)
                (lambda (_type message &rest _) (push message warnings)))
               ((symbol-function 'org-latex-preview) #'ignore))
@@ -1813,7 +1812,7 @@ can reveal equations and leave references as text."
             (should (string-match-p "#org-previews-the-math-too" (car ws))))
           (let ((org-startup-with-latex-preview t))
             (should (string-match-p "in your config" (car (open "$a$\n"))))
-            (should-not (open "$a$\n"))
+            (should (string-match-p "in your config" (car (open "$a$\n"))))
             (should-not (open "#+startup: nolatexpreview\n$a$\n"))))))))
 
 ;; `org-latex-preview-mode' is in Org's main branch, not in a release yet:
@@ -1830,11 +1829,10 @@ can reveal equations and leave references as text."
 
 (ert-deftest l2sf-org-mode-warns-about-org-latex-preview-mode ()
   ;; The mode warns when `org-latex-preview-mode' is on with it, whichever
-  ;; turned on first.  On the global `org-mode-hook': "remove it from
-  ;; `org-mode-hook'", once per session.  Otherwise: "turn it off with
-  ;; M-x", once per buffer.  It turns Org's mode off in no case.
+  ;; turned on first, each time one of them turns on.  On the global
+  ;; `org-mode-hook': "remove it from `org-mode-hook'".  Otherwise: "turn
+  ;; it off with M-x".  It turns Org's mode off in no case.
   (let ((warnings '())
-        (latex-to-svg-for-org--warned-hook nil)
         (org-mode-hook nil))
     (cl-letf (((symbol-function 'display-warning)
                (lambda (_type message &rest _) (push message warnings))))
@@ -1848,10 +1846,10 @@ can reveal equations and leave references as text."
           (should (string-match-p "M-x org-latex-preview-mode" (car warnings)))
           (should (string-match-p "#org-previews-the-math-too" (car warnings)))
           (should org-latex-preview-mode)
-          ;; Once per buffer.
+          ;; Again when Org's mode turns on again.
           (org-latex-preview-mode -1)
           (org-latex-preview-mode 1)
-          (should (= (length warnings) 1)))
+          (should (= (length warnings) 2)))
         ;; Ours first, then Org's.
         (setq warnings '())
         (with-temp-buffer
@@ -1866,7 +1864,7 @@ can reveal equations and leave references as text."
           (org-latex-preview-mode -1)
           (org-latex-preview-mode 1)
           (should-not warnings))
-        ;; On the global `org-mode-hook', in both orders: once per session.
+        ;; On the global `org-mode-hook', in both orders.
         (setq warnings '())
         (dolist (hook '((org-latex-preview-mode latex-to-svg-for-org-mode)
                         (latex-to-svg-for-org-mode org-latex-preview-mode)))
@@ -1874,9 +1872,9 @@ can reveal equations and leave references as text."
           (with-temp-buffer
             (org-mode)
             (should org-latex-preview-mode)))
-        (should (= (length warnings) 1))
-        (should (string-match-p "Remove it from `org-mode-hook'"
-                                (car warnings)))))))
+        (should (= (length warnings) 2))
+        (dolist (w warnings)
+          (should (string-match-p "Remove it from `org-mode-hook'" w)))))))
 
 (ert-deftest l2sf-org-mode-turns-off-org-preview ()
   ;; With `latex-to-svg-for-org-turn-off-org-preview' on, the mode removes
@@ -1887,7 +1885,6 @@ can reveal equations and leave references as text."
   ;; the option.  With the option off, every warning names it.
   (let ((warnings '())
         (messages '())
-        (latex-to-svg-for-org--warned-hook nil)
         (org-mode-hook nil)
         (latex-to-svg-for-org-turn-off-org-preview t))
     (cl-letf (((symbol-function 'display-warning)

@@ -179,11 +179,6 @@ Troubleshooting section."
              "  Or set `latex-to-svg-for-org-turn-off-org-preview' to t.")
            latex-to-svg-for-org--troubleshooting-url)))
 
-(defvar latex-to-svg-for-org--warned-config nil
-  "Non-nil once the mode warned about `org-startup-with-latex-preview'.
-A value set in the user's config applies to every Org file, so the
-mode warns about it once per session.")
-
 (defun latex-to-svg-for-org--warn-org-preview ()
   "Warn when Org's own LaTeX preview ran when this buffer opened.
 Org runs its preview while `org-mode' sets up the buffer, before
@@ -202,33 +197,24 @@ when `latex-to-svg-for-org-turn-off-org-preview' is nil."
 because of its `#+startup: latexpreview'.  Delete that word from the \
 file, then close the file and open it again."))
                 ((bound-and-true-p org-startup-with-latex-preview)
-                 (unless latex-to-svg-for-org--warned-config
-                   (setq latex-to-svg-for-org--warned-config t)
-                   "Org's own LaTeX preview runs whenever an Org file opens, \
+                 "Org's own LaTeX preview runs whenever an Org file opens, \
 because `org-startup-with-latex-preview' is non-nil in your config.  Set it \
-to nil, then close the Org files and open them again.")))))
+to nil, then close the Org files and open them again."))))
     (latex-to-svg-for-org--warn message)))
 
 (defvar org-latex-preview-mode)
 (defvar latex-to-svg-for-org-mode)
 (declare-function org-latex-preview-mode "org-latex-preview")
 
-(defvar latex-to-svg-for-org--warned-hook nil
-  "Non-nil once the mode warned about Org's mode on `org-mode-hook'.
-Org's mode is `org-latex-preview-mode'.  That hook applies to every
-Org file, so the mode warns about it once per session.")
-
-(defvar-local latex-to-svg-for-org--warned-org-mode nil
-  "Non-nil once the mode warned about `org-latex-preview-mode' in this buffer.")
-
 (defun latex-to-svg-for-org--warn-org-latex-preview-mode ()
   "Warn when `org-latex-preview-mode' and this mode are both on.
 Org's mode previews the math as it is typed, and its images cover
 the same math as this package's.  The mode runs this when it turns
 on, and from `org-latex-preview-mode-hook' when Org's mode turns on
-after it.  The warning names the case: `org-latex-preview-mode' on
-the global `org-mode-hook' (once per session), or turned on in this
-buffer only (once per buffer).  The mode does not turn Org's mode
+after it, so it warns each time one of the two turns on while the
+other is on.  The warning names the case: `org-latex-preview-mode' on
+the global `org-mode-hook', or turned on in this buffer only.  The
+mode does not turn Org's mode
 off here: with `latex-to-svg-for-org-turn-off-org-preview' non-nil,
 it turned it off when it turned on, and this warns only when Org's
 mode turns on after it."
@@ -237,16 +223,12 @@ mode turns on after it."
               (message
                (if (memq 'org-latex-preview-mode
                          (default-value 'org-mode-hook))
-                   (unless latex-to-svg-for-org--warned-hook
-                     (setq latex-to-svg-for-org--warned-hook t)
-                     "`org-latex-preview-mode' is on `org-mode-hook', so it \
+                   "`org-latex-preview-mode' is on `org-mode-hook', so it \
 previews the math of every Org file over this package's previews.  Remove it \
-from `org-mode-hook'.")
-                 (unless latex-to-svg-for-org--warned-org-mode
-                   (setq latex-to-svg-for-org--warned-org-mode t)
-                   "`org-latex-preview-mode' is on in this buffer, and \
+from `org-mode-hook'."
+                 "`org-latex-preview-mode' is on in this buffer, and \
 previews the math over this package's previews.  Turn it off with \
-`M-x org-latex-preview-mode'."))))
+`M-x org-latex-preview-mode'.")))
     (latex-to-svg-for-org--warn message)))
 
 (defvar-local latex-to-svg-for-org--turned-off nil
