@@ -532,25 +532,25 @@ shows its source whatever the value."
 ;; It would move on every scroll, go above or below the equation as room
 ;; allows, and compete for the place under the line with completion
 ;; popups, such as corfu's.
-(defcustom latex-to-svg-frontend-editing-preview 'smart-right
+(defcustom latex-to-svg-frontend-editing-preview 'smart-above-below
   "Where to show the image of the equation whose source is shown.
 While point is in an equation and its LaTeX source is shown (see
 `latex-to-svg-frontend-reveal'), the equation's image is shown in a
-child frame in the window's text area.  `right' puts the frame at the
-right edge, with its top at the top of the equation's first line; it
-follows the equation when the window scrolls.  `smart-right' (the
-default) does the same, unless the frame there would cover the lines
-of the equation, from the beginning of its first line; then it puts the
-frame as `smart-right-corner' does.  `below' puts the frame below the
-equation's last line, starting where the equation starts, and `above'
-above its first line; both keep the first number of
+child frame in the window's text area.  `above' puts the frame above
+the equation's first line, starting where the equation starts, and
+`below' below its last line; both keep the first number of
 `latex-to-svg-frontend-editing-preview-margin' from the equation and
-follow it when the window scrolls.  `smart-above-below' is `above',
-or `below' when the frame fits below but not above: a completion
-popup, such as corfu's, opens below the line point is on.
+follow it when the window scrolls.  `smart-above-below' (the default)
+is `above', or `below' when the frame fits below but not above: a
+completion popup, such as corfu's, opens below the line point is on.
 `smart-below-above' is `below', or `above' when the frame fits above
-but not below.  `top-right', `top-left',
-`bottom-left' and `bottom-right' put it at that corner.
+but not below.  `right' puts the frame at the right edge, with its top
+at the top of the equation's first line; it follows the equation when
+the window scrolls.  `smart-right' does the same, unless the frame
+there would cover the lines of the equation, from the beginning of its
+first line; then it puts the frame as `smart-right-corner' does.
+`top-right', `top-left', `bottom-left' and `bottom-right' put it at
+that corner.
 `smart-right-corner' is `top-right', or `bottom-right' when the frame
 there would cover lines of the equation; `smart-left-corner' is
 `top-left', or `bottom-left'.  The frame covers the text under it,
@@ -559,14 +559,14 @@ which does not move.  An edit is typeset once Emacs has been idle for
 shows the new image.  Math with no picture yet, typed new or failed,
 shows the frame from its first picture on.  nil shows no frame.  Only
 on a graphical frame."
-  :type '(choice (const :tag "Right, else top or bottom right" smart-right)
-                 (const :tag "Right, beside the equation" right)
-                 (const :tag "Above, else below the equation"
+  :type '(choice (const :tag "Above, else below the equation"
                         smart-above-below)
                  (const :tag "Below, else above the equation"
                         smart-below-above)
-                 (const :tag "Below the equation" below)
                  (const :tag "Above the equation" above)
+                 (const :tag "Below the equation" below)
+                 (const :tag "Right, else top or bottom right" smart-right)
+                 (const :tag "Right, beside the equation" right)
                  (const :tag "Top right" top-right)
                  (const :tag "Top left" top-left)
                  (const :tag "Bottom left" bottom-left)
@@ -577,8 +577,8 @@ on a graphical frame."
                         smart-left-corner)
                  (const :tag "No frame" nil))
   :safe (lambda (value)
-          (memq value '(smart-right right smart-above-below
-                        smart-below-above below above
+          (memq value '(smart-above-below smart-below-above above below
+                        smart-right right
                         top-right top-left bottom-left
                         bottom-right smart-right-corner smart-left-corner
                         nil)))

@@ -4160,10 +4160,10 @@ after a hide.  The selected frame counts as graphical."
   (l2sf-tests--editing-preview "$a$ and \\eqref{x} after\n"
     (goto-char (1+ (point-min)))
     (latex-to-svg-frontend--handle-cursor)
-    (should (equal l2sf-tests--shown '(fake-image smart-right)))
+    (should (equal l2sf-tests--shown '(fake-image smart-above-below)))
     (insert "b")
     (latex-to-svg-frontend--handle-cursor)
-    (should (equal l2sf-tests--shown '(fake-image smart-right)))
+    (should (equal l2sf-tests--shown '(fake-image smart-above-below)))
     (goto-char (point-max))
     (latex-to-svg-frontend--handle-cursor)
     (should-not l2sf-tests--shown)
@@ -4199,7 +4199,7 @@ after a hide.  The selected frame counts as graphical."
         (should-not l2sf-tests--shown)
         (set-window-buffer (selected-window) buffer)
         (latex-to-svg-frontend--editing-preview-follow)
-        (should (equal l2sf-tests--shown '(fake-image smart-right)))))))
+        (should (equal l2sf-tests--shown '(fake-image smart-above-below)))))))
 
 (ert-deftest l2sf-typing-typesets-the-edited-equation ()
   ;; An edit in the equation whose image the frame shows is typeset with
@@ -4219,7 +4219,7 @@ after a hide.  The selected frame counts as graphical."
     (should (eq (plist-get l2sf-tests--last-args :quiet) t))
     (should (equal (plist-get l2sf-tests--last-args :padding) 4))
     (should-not (plist-get l2sf-tests--last-args :fallback))
-    (should (equal l2sf-tests--shown '(typed-image smart-right)))
+    (should (equal l2sf-tests--shown '(typed-image smart-above-below)))
     ;; With its opening delimiter deleted, nothing is typeset.
     (save-excursion
       (goto-char (point-min))
@@ -4253,10 +4253,10 @@ after a hide.  The selected frame counts as graphical."
         (latex-to-svg-frontend--request-while-typing)
         (should (equal l2sf-tests--cancelled (list first)))
         (finish "$bca$" 'new-image)
-        (should (equal l2sf-tests--shown '(new-image smart-right)))
+        (should (equal l2sf-tests--shown '(new-image smart-above-below)))
         (push (cons "$ba$" 'old-image) ready)
         (funcall first nil)
-        (should (equal l2sf-tests--shown '(new-image smart-right))))
+        (should (equal l2sf-tests--shown '(new-image smart-above-below))))
       (insert "d")
       (latex-to-svg-frontend--request-while-typing)
       (let ((pending-request latex-to-svg-frontend--typing-request))
@@ -4278,14 +4278,14 @@ after a hide.  The selected frame counts as graphical."
         (sit-for 0.01))
       (should (equal (nth 3 latex-to-svg-frontend--typing)
                      l2sf-tests--failure))
-      (should (equal l2sf-tests--shown '(fake-image smart-right)))
+      (should (equal l2sf-tests--shown '(fake-image smart-above-below)))
       (delete-char -6)
       (insert "b")
       (let ((l2sf-tests--image 'typed-image))
         (latex-to-svg-frontend--request-while-typing))
       (should-not (nth 3 latex-to-svg-frontend--typing))
       (should (overlay-buffer ov))
-      (should (equal l2sf-tests--shown '(typed-image smart-right))))))
+      (should (equal l2sf-tests--shown '(typed-image smart-above-below))))))
 
 (ert-deftest l2sf-editing-preview-content ()
   ;; The frame's text is the image, after the failure mark when the last
@@ -4353,12 +4353,12 @@ after a hide.  The selected frame counts as graphical."
     (let ((l2sf-tests--image 'typed-image))
       (latex-to-svg-frontend--request-while-typing))
     (should (equal (car l2sf-tests--calls) '("$c$" . latex)))
-    (should (equal l2sf-tests--shown '(typed-image smart-right)))
+    (should (equal l2sf-tests--shown '(typed-image smart-above-below)))
     (insert "\\frac{")
     (l2sf-tests--with-failing "frac"
       (latex-to-svg-frontend--request-while-typing)
       (sit-for 0.01))
-    (should (equal l2sf-tests--shown '(typed-image smart-right)))
+    (should (equal l2sf-tests--shown '(typed-image smart-above-below)))
     (should (equal (nth 3 latex-to-svg-frontend--typing) l2sf-tests--failure))
     (goto-char (point-min))
     (latex-to-svg-frontend--handle-cursor)
@@ -4379,7 +4379,7 @@ after a hide.  The selected frame counts as graphical."
     (let ((l2sf-tests--image 'typed-image))
       (latex-to-svg-frontend--request-while-typing))
     (should (equal (car l2sf-tests--calls) '("$x$" . latex)))
-    (should (equal l2sf-tests--shown '(typed-image smart-right)))))
+    (should (equal l2sf-tests--shown '(typed-image smart-above-below)))))
 
 (ert-deftest l2sf-typing-schedules-one-idle-timer ()
   ;; An edit starts one idle timer, none while the frame is off.
