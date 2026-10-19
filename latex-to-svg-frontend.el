@@ -2285,6 +2285,21 @@ See `latex-to-svg-frontend--editing-preview-image'."
                      (list image padding padded))
         padded))))
 
+(defun latex-to-svg-frontend--editing-preview-content (image failure)
+  "Return the text of the editing preview's buffer: IMAGE, after a mark.
+FAILURE is the plist of the last request while typing, when it ended
+without a picture, else nil.  The mark is the icon
+`latex-to-svg-frontend-failure', with the failure as its tooltip, shown
+when there is a FAILURE and `latex-to-svg-frontend-failure-mark' is on.
+IMAGE is then the last picture that was typeset."
+  (concat (and failure latex-to-svg-frontend-failure-mark
+               (concat (propertize (icon-string 'latex-to-svg-frontend-failure)
+                                   'help-echo
+                                   (latex-to-svg-frontend--failure-help-echo
+                                    failure))
+                       " "))
+          (propertize " " 'display image)))
+
 (defun latex-to-svg-frontend--editing-preview-show (window image corner &optional ov)
   "Show IMAGE in the editing preview, at CORNER of WINDOW.
 CORNER is as in `latex-to-svg-frontend--editing-preview-position', where
@@ -2304,11 +2319,15 @@ value it has makes the frame flicker on macOS."
          (background (face-background 'default parent))
          (border (face-background 'latex-to-svg-frontend-editing-preview-border
                                   parent 'default)))
-    (with-current-buffer (window-buffer win)
-      (unless (eq (get-text-property (point-min) 'display) image)
-        (let ((inhibit-read-only t))
-          (erase-buffer)
-          (insert (propertize " " 'display image)))))
+    (let ((content (latex-to-svg-frontend--editing-preview-content
+                    image
+                    (and ov (overlay-get
+                             ov 'latex-to-svg-frontend-typing-failure)))))
+      (with-current-buffer (window-buffer win)
+        (unless (equal-including-properties (buffer-string) content)
+          (let ((inhibit-read-only t))
+            (erase-buffer)
+            (insert content)))))
     (unless (equal (frame-parameter frame 'background-color) background)
       (set-frame-parameter frame 'background-color background))
     (unless (equal (face-background 'child-frame-border frame) border)
@@ -2492,23 +2511,32 @@ as `latex-to-svg-frontend-typing-image', which the frame then shows."
 (defun latex-to-svg-frontend--typing-done (buffer ov callback request outcome)
   "End the request while typing REQUEST, made with CALLBACK for OV in BUFFER.
 OUTCOME is the backend's: nil when the picture is in the cache, which
-the request then fetches.  Nothing is done unless CALLBACK is still
+the request then fetches, else the failure plist, for which OV keeps
+its last image and the frame shows the failure mark.  Nothing is done
+unless CALLBACK is still
 `latex-to-svg-frontend--typing-request' and OV is live."
   (when (buffer-live-p buffer)
     (with-current-buffer buffer
       (when (and (eq callback latex-to-svg-frontend--typing-request)
                  (overlay-buffer ov))
         (setq latex-to-svg-frontend--typing-request nil)
-        (unless outcome
+        (if outcome
+            (latex-to-svg-frontend--show-typing-image ov nil outcome)
           (when-let* ((image (apply #'latex-to-svg-backend (car request)
                                     (cdr request))))
             (latex-to-svg-frontend--show-typing-image ov image)))))))
 
-(defun latex-to-svg-frontend--show-typing-image (ov image)
+(defun latex-to-svg-frontend--show-typing-image (ov image &optional failure)
   "Record IMAGE, typeset while typing, on OV, and show it in the frame.
+With FAILURE, the plist of a request that ended without a picture, IMAGE
+is nil: OV keeps the last image, and records FAILURE as
+`latex-to-svg-frontend-typing-failure', for which the frame shows the
+failure mark (see `--editing-preview-content').  A picture clears it.
 The frame is updated only while the selected window shows OV's buffer:
 otherwise it may be showing another buffer's equation."
-  (overlay-put ov 'latex-to-svg-frontend-typing-image image)
+  (when image
+    (overlay-put ov 'latex-to-svg-frontend-typing-image image))
+  (overlay-put ov 'latex-to-svg-frontend-typing-failure failure)
   (when (eq (window-buffer) (current-buffer))
     (latex-to-svg-frontend--update-editing-preview
      (latex-to-svg-frontend--revealable-overlay-at (point)))))

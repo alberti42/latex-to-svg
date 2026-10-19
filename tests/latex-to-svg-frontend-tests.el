@@ -4228,6 +4228,48 @@ after a hide.  The selected frame counts as graphical."
         (should (eq (car l2sf-tests--cancelled) pending-request))
         (should-not latex-to-svg-frontend--typing-request)))))
 
+(ert-deftest l2sf-typing-failure-keeps-the-last-image ()
+  ;; A request while typing that fails keeps the last image in the
+  ;; frame and marks the failure; the next picture clears it.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (goto-char (1+ (point-min)))
+    (latex-to-svg-frontend--handle-cursor)
+    (let ((ov (car (l2sf-tests--overlays))))
+      (insert "\\frac{")
+      (l2sf-tests--with-failing "frac"
+        (latex-to-svg-frontend--request-while-typing)
+        (sit-for 0.01))
+      (should (equal (overlay-get ov 'latex-to-svg-frontend-typing-failure)
+                     l2sf-tests--failure))
+      (should (equal l2sf-tests--shown '(fake-image smart-right)))
+      (delete-char -6)
+      (insert "b")
+      (let ((l2sf-tests--image 'typed-image))
+        (latex-to-svg-frontend--request-while-typing))
+      (should-not (overlay-get ov 'latex-to-svg-frontend-typing-failure))
+      (should (equal l2sf-tests--shown '(typed-image smart-right))))))
+
+(ert-deftest l2sf-editing-preview-content ()
+  ;; The frame's text is the image, after the failure mark when the last
+  ;; request failed and the mark is on.
+  (let ((image '(image :type svg :data "<svg/>")))
+    (should (equal (get-text-property
+                    0 'display
+                    (latex-to-svg-frontend--editing-preview-content image nil))
+                   image))
+    (let ((text (latex-to-svg-frontend--editing-preview-content
+                 image l2sf-tests--failure)))
+      (should (string-prefix-p
+               (substring-no-properties
+                (icon-string 'latex-to-svg-frontend-failure))
+               text))
+      (should (equal (get-text-property (1- (length text)) 'display text)
+                     image)))
+    (let ((latex-to-svg-frontend-failure-mark nil))
+      (should (= (length (latex-to-svg-frontend--editing-preview-content
+                          image l2sf-tests--failure))
+                 1)))))
+
 (ert-deftest l2sf-typing-schedules-one-idle-timer ()
   ;; An edit starts one idle timer, none while the frame is off.
   (l2sf-tests--editing-preview "$a$ after\n"
