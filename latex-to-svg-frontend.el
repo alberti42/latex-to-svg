@@ -571,6 +571,20 @@ recompile).  See `latex-to-svg-frontend-editing-preview'."
   :safe #'latex-to-svg-frontend--padding-p
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-editing-preview-margin '(4 4)
+  "Distance in pixels between the editing preview and the window's text.
+A list (TOP-BOTTOM LEFT-RIGHT): TOP-BOTTOM pixels from the top or the
+bottom edge of the text area, LEFT-RIGHT pixels from its left or right
+edge.  The left edge is where the text starts, after the line numbers.
+A negative number moves the frame past the edge.
+See `latex-to-svg-frontend-editing-preview'."
+  :type '(list (integer :tag "From the top or bottom edge")
+               (integer :tag "From the left or right edge"))
+  :safe (lambda (value)
+          (and (proper-list-p value) (= (length value) 2)
+               (seq-every-p #'integerp value)))
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-suppress-emphasis t
   "Whether to strip markup emphasis decoration from math source text.
 Markup font-lock (Org's `+…+' / `_…_' / `/…/', Markdown's `*…*', ...) has no
@@ -2066,6 +2080,14 @@ left."
   (let ((edges (window-inside-pixel-edges window)))
     (cons (+ (car edges) (line-number-display-width t)) (cdr edges))))
 
+(defun latex-to-svg-frontend--inset-edges (edges margin)
+  "Return EDGES, (LEFT TOP RIGHT BOTTOM), moved inwards by MARGIN.
+MARGIN is a value of `latex-to-svg-frontend-editing-preview-margin'."
+  (pcase-let ((`(,left ,top ,right ,bottom) edges)
+              (`(,vertical ,horizontal) margin))
+    (list (+ left horizontal) (+ top vertical)
+          (- right horizontal) (- bottom vertical))))
+
 (defun latex-to-svg-frontend--editing-preview-smart-corner (rows top height)
   "Return the corner where `smart-corner' puts a frame HEIGHT pixels high.
 That is `top-right', or `bottom-right' when the frame there, from TOP,
@@ -2213,7 +2235,9 @@ picture for it, OV's own image."
 CORNER is as in `latex-to-svg-frontend--editing-preview-position', where
 `right' is beside OV, the preview whose image the frame shows, or
 `smart-corner', which puts the frame where it does not cover OV (see
-`--editing-preview-smart-corner').  The frame's background is that of
+`--editing-preview-smart-corner').  The frame keeps
+`latex-to-svg-frontend-editing-preview-margin' from the edges of the
+text area.  The frame's background is that of
 the `default' face on WINDOW's frame, and its border that of the face
 `latex-to-svg-frontend-editing-preview-border'.  Each parameter is set
 only when it changes: corfu notes that setting a frame parameter to the
@@ -2238,7 +2262,9 @@ value it has makes the frame flicker on macOS."
     (pcase-let* ((`(,width . ,height)
                   (window-text-pixel-size win nil nil 10000 10000))
                  (b (frame-internal-border-width frame))
-                 (edges (latex-to-svg-frontend--text-edges window))
+                 (edges (latex-to-svg-frontend--inset-edges
+                         (latex-to-svg-frontend--text-edges window)
+                         latex-to-svg-frontend-editing-preview-margin))
                  (rows (and (memq corner '(smart-corner right))
                             (latex-to-svg-frontend--overlay-rows ov window)))
                  (corner (if (eq corner 'smart-corner)

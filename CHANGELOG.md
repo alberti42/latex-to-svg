@@ -26,7 +26,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nil turns the frame off.
   `latex-to-svg-frontend-editing-preview-padding` sets the padding around the
   image in the frame, with the values of the other padding options (pt;
-  default 4). Only on a graphical frame.
+  default 4). `latex-to-svg-frontend-editing-preview-margin` sets the
+  distance in pixels between the frame and the edges of the text,
+  `(TOP-BOTTOM LEFT-RIGHT)` (default `(4 4)`); a negative number moves the
+  frame past the edge. Only on a graphical frame.
 
 ## [0.23.0] - 2026-10-18
 

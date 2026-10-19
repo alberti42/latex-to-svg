@@ -4068,6 +4068,18 @@ after a hide.  The selected frame counts as graphical."
     (should (equal (latex-to-svg-frontend--text-edges (selected-window))
                    '(76 20 510 320)))))
 
+(ert-deftest l2sf-editing-preview-margin ()
+  ;; The margin moves the edges of the text area inwards: the first
+  ;; number at the top and bottom, the second at the left and right.
+  (should (equal (latex-to-svg-frontend--inset-edges '(10 20 510 320) '(4 8))
+                 '(18 24 502 316)))
+  ;; A negative number moves them outwards.
+  (should (equal (latex-to-svg-frontend--inset-edges '(10 20 510 320) '(-2 0))
+                 '(10 18 510 322)))
+  (should (funcall (get 'latex-to-svg-frontend-editing-preview-margin
+                        'safe-local-variable)
+                   '(-2 0))))
+
 (ert-deftest l2sf-editing-preview-smart-corner ()
   ;; `smart-corner' puts a frame 40 pixels high at the top right, from the top
   ;; edge at 20, unless an equation's rows start above its bottom at 60.
