@@ -342,9 +342,10 @@ changed it or typed it new.
 
 While the source of an equation is shown, its image is shown in a child
 frame beside it, at the right edge of the window, an Isearch included. The
-frame covers the text under it, which does not move. It shows the image the
-equation had when point entered it; an edit is typeset when point leaves the
-equation. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
+frame covers the text under it, which does not move. When you edit the
+equation, it is typeset once Emacs has been idle for
+`latex-to-svg-frontend-editing-preview-delay` (1 s), and the frame shows the
+new image. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
 `right` puts it at the right edge of the window, with its top at the top of the
 equation's first line, and it follows the equation when the window scrolls.
 `smart-right` (default) does the same, unless the frame there would cover the

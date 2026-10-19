@@ -107,6 +107,8 @@ them again: `latex main.tex' twice in that directory, keeping only the
 (defvar l2sf-tests--last-rescale)
 (defvar l2sf-tests--last-args)
 (defvar l2sf-tests--calls)
+(defvar l2sf-tests--cancelled nil
+  "The callbacks the stubbed `latex-to-svg-backend-cancel' was given.")
 (defvar l2sf-tests--engine-used)
 
 (defconst l2sf-tests--failure
@@ -154,6 +156,7 @@ The stub signals as the backend does when the colors break its contract
          (l2sf-tests--last-args nil)
          (l2sf-tests--calls nil)
          (l2sf-tests--engine-used nil)
+         (l2sf-tests--cancelled nil)
          (latex-to-svg-backend-metadata-prefix nil))
      (cl-letf (((symbol-function 'latex-to-svg-backend)
                 (lambda (latex &rest args)
@@ -179,7 +182,9 @@ The stub signals as the backend does when the colors break its contract
                   (push latex l2sf-tests--invalidated)
                   (push engine l2sf-tests--invalidated-engines)))
                ((symbol-function 'latex-to-svg-backend-invalidate-format)
-                (lambda () (cl-incf l2sf-tests--formats-invalidated))))
+                (lambda () (cl-incf l2sf-tests--formats-invalidated)))
+               ((symbol-function 'latex-to-svg-backend-cancel)
+                (lambda (callback) (push callback l2sf-tests--cancelled) t)))
        ,@body)))
 
 (defmacro l2sf-tests--md (text &rest body)
@@ -4158,6 +4163,86 @@ after a hide.  The selected frame counts as graphical."
         (set-window-buffer (selected-window) buffer)
         (latex-to-svg-frontend--editing-preview-follow)
         (should (equal l2sf-tests--shown '(fake-image smart-right)))))))
+
+(ert-deftest l2sf-typing-typesets-the-edited-equation ()
+  ;; An edit in the equation whose image the frame shows is typeset with
+  ;; the equation's engine, the frame's padding and `:quiet' t, and the
+  ;; frame shows the new image.  An equation not edited is not typeset.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (goto-char (1+ (point-min)))
+    (latex-to-svg-frontend--handle-cursor)
+    (setq l2sf-tests--calls nil)
+    (latex-to-svg-frontend--request-while-typing)
+    (should-not l2sf-tests--calls)
+    (insert "b")
+    (latex-to-svg-frontend--handle-cursor)
+    (let ((l2sf-tests--image 'typed-image))
+      (latex-to-svg-frontend--request-while-typing))
+    (should (equal (car l2sf-tests--calls) '("$ba$" . latex)))
+    (should (eq (plist-get l2sf-tests--last-args :quiet) t))
+    (should (equal (plist-get l2sf-tests--last-args :padding) 4))
+    (should-not (plist-get l2sf-tests--last-args :fallback))
+    (should (equal l2sf-tests--shown '(typed-image smart-right)))
+    ;; With its opening delimiter deleted, nothing is typeset.
+    (save-excursion
+      (goto-char (point-min))
+      (delete-char 1))
+    (setq l2sf-tests--calls nil)
+    (latex-to-svg-frontend--request-while-typing)
+    (should-not l2sf-tests--calls)
+    (save-excursion
+      (goto-char (point-min))
+      (insert "$"))
+    ;; Leaving the equation typesets it as before.
+    (goto-char (point-max))
+    (latex-to-svg-frontend--handle-cursor)
+    (should-not l2sf-tests--shown)
+    (should (equal (overlay-get (car (l2sf-tests--overlays))
+                                'latex-to-svg-frontend-source)
+                   "$ba$"))))
+
+(ert-deftest l2sf-typing-cancels-the-request-before ()
+  ;; A new request cancels the pending one, whose late picture is not
+  ;; shown; leaving the equation cancels the pending one too.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (l2sf-tests--with-pending
+      (goto-char (1+ (point-min)))
+      (latex-to-svg-frontend--handle-cursor)
+      (insert "b")
+      (latex-to-svg-frontend--request-while-typing)
+      (let ((first latex-to-svg-frontend--typing-request))
+        (should first)
+        (insert "c")
+        (latex-to-svg-frontend--request-while-typing)
+        (should (equal l2sf-tests--cancelled (list first)))
+        (finish "$bca$" 'new-image)
+        (should (equal l2sf-tests--shown '(new-image smart-right)))
+        (push (cons "$ba$" 'old-image) ready)
+        (funcall first nil)
+        (should (equal l2sf-tests--shown '(new-image smart-right))))
+      (insert "d")
+      (latex-to-svg-frontend--request-while-typing)
+      (let ((pending-request latex-to-svg-frontend--typing-request))
+        (goto-char (point-max))
+        (latex-to-svg-frontend--handle-cursor)
+        (should (eq (car l2sf-tests--cancelled) pending-request))
+        (should-not latex-to-svg-frontend--typing-request)))))
+
+(ert-deftest l2sf-typing-schedules-one-idle-timer ()
+  ;; An edit starts one idle timer, none while the frame is off.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (unwind-protect
+        (progn
+          (latex-to-svg-frontend--schedule-typing)
+          (let ((timer latex-to-svg-frontend--typing-timer))
+            (should (timerp timer))
+            (latex-to-svg-frontend--schedule-typing)
+            (should (eq latex-to-svg-frontend--typing-timer timer)))
+          (latex-to-svg-frontend--cancel-typing)
+          (setq-local latex-to-svg-frontend-editing-preview nil)
+          (latex-to-svg-frontend--schedule-typing)
+          (should-not latex-to-svg-frontend--typing-timer))
+      (latex-to-svg-frontend--cancel-typing))))
 
 (ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
   ;; A failed `align' still takes its two numbers: the equation below it is

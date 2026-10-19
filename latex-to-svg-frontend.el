@@ -546,9 +546,9 @@ frame as `smart-right-corner' does.  `top-right', `top-left',
 `smart-right-corner' is `top-right', or `bottom-right' when the frame
 there would cover lines of the equation; `smart-left-corner' is
 `top-left', or `bottom-left'.  The frame covers the text under it,
-which does not move.  It shows the image the equation had when point
-entered it; an edit is typeset when point leaves the equation.  nil
-shows no frame.  Only on a graphical frame."
+which does not move.  An edit is typeset once Emacs has been idle for
+`latex-to-svg-frontend-editing-preview-delay', and the frame then
+shows the new image.  nil shows no frame.  Only on a graphical frame."
   :type '(choice (const :tag "Right, else top or bottom right" smart-right)
                  (const :tag "Right, beside the equation" right)
                  (const :tag "Top right" top-right)
@@ -592,6 +592,18 @@ See `latex-to-svg-frontend-editing-preview'."
   :safe (lambda (value)
           (and (proper-list-p value) (= (length value) 2)
                (seq-every-p #'integerp value)))
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-editing-preview-delay 1.0
+  "Seconds without input after which an edited equation is typeset.
+While point is in an equation whose source is shown and the editing
+preview shows its image (see `latex-to-svg-frontend-editing-preview'),
+an edit is typeset once Emacs has been idle this long, and the frame
+shows the new image.  The equation is typeset with its own engine and
+fallback, the ones used when point leaves it, and failures write no
+warning.  Each new request cancels the one before."
+  :type 'number
+  :safe #'numberp
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-suppress-emphasis t
@@ -1884,7 +1896,10 @@ Fix the function, or set `latex-to-svg-frontend-reveal' to `always', \
   (latex-to-svg-frontend--hide-image ov))
 
 (defun latex-to-svg-frontend--close-overlay (ov)
-  "Re-show OV's preview, or re-render it if its source was edited while open."
+  "Re-show OV's preview, or re-render it if its source was edited while open.
+The request while typing, if any, is cancelled (see
+`latex-to-svg-frontend--request-while-typing')."
+  (latex-to-svg-frontend--cancel-typing)
   (when (overlay-buffer ov)
     (cond
      ((overlay-get ov 'latex-to-svg-frontend-modified)
@@ -2244,10 +2259,18 @@ The frame is made, hidden, when there is none or it has another parent."
 
 (defun latex-to-svg-frontend--editing-preview-image (ov)
   "Return the image of preview OV for the editing preview.
-It is OV's image drawn with `latex-to-svg-frontend-editing-preview-padding'
+That is the image of OV's source as edited, typeset while typing (see
+`latex-to-svg-frontend--typing-request'), when there is one.  Else it
+is OV's image drawn with `latex-to-svg-frontend-editing-preview-padding'
 \(see `latex-to-svg-frontend--overlay-request'), fetched from cache once
 per image of OV and padding, and recorded on OV.  When the cache has no
 picture for it, OV's own image."
+  (or (overlay-get ov 'latex-to-svg-frontend-typing-image)
+      (latex-to-svg-frontend--padded-image ov)))
+
+(defun latex-to-svg-frontend--padded-image (ov)
+  "Return OV's image with the editing preview's padding.
+See `latex-to-svg-frontend--editing-preview-image'."
   (let ((image (overlay-get ov 'latex-to-svg-frontend-image))
         (padding latex-to-svg-frontend-editing-preview-padding)
         (shown (overlay-get ov 'latex-to-svg-frontend-editing-preview)))
@@ -2369,6 +2392,126 @@ Otherwise it is hidden."
          (selected-window) (latex-to-svg-frontend--editing-preview-image ov)
          corner ov)
       (latex-to-svg-frontend--editing-preview-hide))))
+
+;;;; Editing preview while typing
+
+(declare-function latex-to-svg-backend-cancel "latex-to-svg-backend" (callback))
+
+(defvar-local latex-to-svg-frontend--typing-timer nil
+  "The idle timer that typesets the edited equation, or nil.
+See `latex-to-svg-frontend-editing-preview-delay'.")
+
+(defvar-local latex-to-svg-frontend--typing-request nil
+  "The callback of the pending request made while typing, or nil.
+`latex-to-svg-backend-cancel' identifies the request by it.  The
+callback acts only while it is this value: a newer request, or point
+leaving the equation, replaces or clears it.")
+
+(defun latex-to-svg-frontend--schedule-typing (&rest _)
+  "Typeset the edited equation once Emacs is idle.
+On `after-change-functions'.  Starts the timer
+`latex-to-svg-frontend--typing-timer' unless it is pending: an idle
+timer counts from the last input, so one timer serves a run of edits.
+Nothing is scheduled while `latex-to-svg-frontend-editing-preview' is
+nil."
+  (when (and latex-to-svg-frontend-editing-preview
+             (not (timerp latex-to-svg-frontend--typing-timer)))
+    (setq latex-to-svg-frontend--typing-timer
+          (run-with-idle-timer latex-to-svg-frontend-editing-preview-delay nil
+                               #'latex-to-svg-frontend--typing-timeout
+                               (current-buffer)))))
+
+(defun latex-to-svg-frontend--typing-timeout (buffer)
+  "Run the request while typing in BUFFER, from its timer."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (setq latex-to-svg-frontend--typing-timer nil)
+      (when latex-to-svg-frontend-mode
+        (latex-to-svg-frontend--request-while-typing)))))
+
+(defun latex-to-svg-frontend--typing-arguments (ov el)
+  "Return (VALUE . ARGUMENTS), the request for math EL edited in preview OV.
+VALUE is EL's source, numbered as `--render-element' numbers it, from
+`--local-table'.  ARGUMENTS are those of `--overlay-request', with
+EL's engine and fallback, the frame's padding, and `:quiet' t.  Nil
+when EL's engine typesets nothing (`skip', or a cookie's warning)."
+  (let* ((source (latex-to-svg-frontend--math-value el))
+         (engine (latex-to-svg-frontend--engine-for source)))
+    (when (memq engine '(nil latex ratex texres))
+      (let ((k (gethash (latex-to-svg-frontend--math-begin el)
+                        (car (latex-to-svg-frontend--local-table el)))))
+        (cons (latex-to-svg-frontend--backend-value k source engine)
+              (append
+               (list :engine engine
+                     :fallback (latex-to-svg-frontend--fallback-for engine)
+                     :metadata (and k (1+ k))
+                     :padding latex-to-svg-frontend-editing-preview-padding
+                     :quiet t)
+               (latex-to-svg-frontend--overlay-request ov)))))))
+
+(defun latex-to-svg-frontend--cancel-typing ()
+  "Cancel the request while typing and its timer, if any."
+  (when (timerp latex-to-svg-frontend--typing-timer)
+    (cancel-timer latex-to-svg-frontend--typing-timer))
+  (when latex-to-svg-frontend--typing-request
+    (latex-to-svg-backend-cancel latex-to-svg-frontend--typing-request))
+  (setq latex-to-svg-frontend--typing-timer nil
+        latex-to-svg-frontend--typing-request nil))
+
+(defun latex-to-svg-frontend--request-while-typing ()
+  "Typeset the equation point is in, edited, for the editing preview.
+Only an edited preview with an image, showing its source in the
+selected window, is typeset: the one whose image the frame shows.  It
+is typeset while the math at point starts where it starts.  The
+request before is cancelled.  The new image is recorded on the preview
+as `latex-to-svg-frontend-typing-image', which the frame then shows."
+  (let ((ov (latex-to-svg-frontend--revealable-overlay-at (point)))
+        (buffer (current-buffer)))
+    (when-let* (((and ov (overlay-get ov 'latex-to-svg-frontend-image)
+                      (overlay-get ov 'latex-to-svg-frontend-modified)
+                      (null (overlay-get ov 'display))
+                      latex-to-svg-frontend-editing-preview))
+                ((eq (latex-to-svg-frontend--display-window buffer)
+                     (selected-window)))
+                (el (latex-to-svg-frontend--element-at (point)))
+                ;; An edit that broke the delimiters may leave other math
+                ;; at point, starting elsewhere.
+                ((= (latex-to-svg-frontend--math-begin el) (overlay-start ov)))
+                (request (latex-to-svg-frontend--typing-arguments ov el)))
+      (latex-to-svg-frontend--cancel-typing)
+      (letrec ((callback
+                (lambda (outcome)
+                  (latex-to-svg-frontend--typing-done
+                   buffer ov callback request outcome))))
+        (let ((image (apply #'latex-to-svg-backend (car request)
+                            :callback callback (cdr request))))
+          (if image
+              (latex-to-svg-frontend--show-typing-image ov image)
+            (setq latex-to-svg-frontend--typing-request callback)))))))
+
+(defun latex-to-svg-frontend--typing-done (buffer ov callback request outcome)
+  "End the request while typing REQUEST, made with CALLBACK for OV in BUFFER.
+OUTCOME is the backend's: nil when the picture is in the cache, which
+the request then fetches.  Nothing is done unless CALLBACK is still
+`latex-to-svg-frontend--typing-request' and OV is live."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (when (and (eq callback latex-to-svg-frontend--typing-request)
+                 (overlay-buffer ov))
+        (setq latex-to-svg-frontend--typing-request nil)
+        (unless outcome
+          (when-let* ((image (apply #'latex-to-svg-backend (car request)
+                                    (cdr request))))
+            (latex-to-svg-frontend--show-typing-image ov image)))))))
+
+(defun latex-to-svg-frontend--show-typing-image (ov image)
+  "Record IMAGE, typeset while typing, on OV, and show it in the frame.
+The frame is updated only while the selected window shows OV's buffer:
+otherwise it may be showing another buffer's equation."
+  (overlay-put ov 'latex-to-svg-frontend-typing-image image)
+  (when (eq (window-buffer) (current-buffer))
+    (latex-to-svg-frontend--update-editing-preview
+     (latex-to-svg-frontend--revealable-overlay-at (point)))))
 
 ;;;; Numbering
 
@@ -3861,6 +4004,8 @@ an option of this package updates the previews on its own (see
                   #'latex-to-svg-frontend--maybe-refresh nil t)
         (add-hook 'after-change-functions
                   #'latex-to-svg-frontend--schedule-reconcile nil t)
+        (add-hook 'after-change-functions
+                  #'latex-to-svg-frontend--schedule-typing nil t)
         (add-hook 'post-command-hook
                   #'latex-to-svg-frontend--handle-cursor nil t)
         (add-hook 'change-major-mode-hook
@@ -3903,6 +4048,9 @@ an option of this package updates the previews on its own (see
                  #'latex-to-svg-frontend--maybe-refresh t)
     (remove-hook 'after-change-functions
                  #'latex-to-svg-frontend--schedule-reconcile t)
+    (remove-hook 'after-change-functions
+                 #'latex-to-svg-frontend--schedule-typing t)
+    (latex-to-svg-frontend--cancel-typing)
     (remove-hook 'post-command-hook #'latex-to-svg-frontend--handle-cursor t)
     (remove-hook 'change-major-mode-hook
                  #'latex-to-svg-frontend--before-major-mode-change t)

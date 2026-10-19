@@ -17,13 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - While point is in an equation and its LaTeX source is shown, the
   equation's image is shown in a child frame beside it, at the right edge of
   the window, so the rendered equation stays in view while you read or edit
-  the source. The frame covers the text under it, which does not move. It
-  shows the image the equation had when point entered it.
+  the source. The frame covers the text under it, which does not move. An
+  edit is typeset once Emacs has been idle for
+  `latex-to-svg-frontend-editing-preview-delay` (default 1 s), with the
+  equation's own engine and fallback, and the frame shows the new image;
+  each new request cancels the one before.
   `latex-to-svg-frontend-editing-preview` sets where the frame goes: `right`
   at the right edge, beside the equation, following it when the window
   scrolls; `smart-right` (default) the same, unless the frame would cover the
-  lines of the equation, then as `smart-right-corner`; `top-right`, `top-left`, `bottom-left` or `bottom-right` at
-  that corner; `smart-right-corner` is `top-right`, or `bottom-right` when the
+  lines of the equation, then as `smart-right-corner`; `top-right`,
+  `top-left`, `bottom-left` or `bottom-right` at that corner; `smart-right-corner` is `top-right`, or `bottom-right` when the
   frame there would cover lines of the equation, and `smart-left-corner` the
   same on the left; nil turns the frame off.
   `latex-to-svg-frontend-editing-preview-padding` sets the padding around the
