@@ -3979,6 +3979,63 @@ compiled.  Once point leaves it, both show the new picture."
                     'bottom-right edges 600 400)
                    '(10 . 20)))))
 
+(defmacro l2sf-tests--editing-preview (text &rest body)
+  "Run BODY on rendered TEXT, recording what the editing preview shows.
+`l2sf-tests--shown' is the list (IMAGE CORNER) of the last show, nil
+after a hide.  The selected frame counts as graphical."
+  (declare (indent 1) (debug t))
+  `(l2sf-tests--with-stub
+     (l2sf-tests--with-frame
+       (l2sf-tests--md ,text
+         (set-window-buffer (selected-window) (current-buffer))
+         (setq-local latex-to-svg-frontend-mode t)
+         (setq-local latex-to-svg-frontend-reveal 'always)
+         (let ((l2sf-tests--shown nil))
+           (cl-letf (((symbol-function
+                       'latex-to-svg-frontend--editing-preview-show)
+                      (lambda (_window image corner)
+                        (setq l2sf-tests--shown (list image corner))))
+                     ((symbol-function
+                       'latex-to-svg-frontend--editing-preview-hide)
+                      (lambda () (setq l2sf-tests--shown nil))))
+             (latex-to-svg-frontend--render-region (point-min) (point-max))
+             ,@body))))))
+
+(defvar l2sf-tests--shown nil
+  "What `l2sf-tests--editing-preview' records the frame showing.")
+
+(ert-deftest l2sf-editing-preview-shows-while-source-shows ()
+  ;; Point entering an equation shows its image in the frame, at the
+  ;; corner of the option; leaving hides it.  The frame keeps the image
+  ;; while the source is edited.  On a reference, on an equation shown
+  ;; as its image, or with the option nil, the frame is hidden.
+  (l2sf-tests--editing-preview "$a$ and \\eqref{x} after\n"
+    (goto-char (1+ (point-min)))
+    (latex-to-svg-frontend--handle-cursor)
+    (should (equal l2sf-tests--shown '(fake-image top-right)))
+    (insert "b")
+    (latex-to-svg-frontend--handle-cursor)
+    (should (equal l2sf-tests--shown '(fake-image top-right)))
+    (goto-char (point-max))
+    (latex-to-svg-frontend--handle-cursor)
+    (should-not l2sf-tests--shown)
+    (goto-char (1+ (point-min)))
+    (latex-to-svg-frontend--handle-cursor)
+    (setq-local latex-to-svg-frontend-reveal nil)
+    (latex-to-svg-frontend--handle-cursor)
+    (should-not l2sf-tests--shown)
+    (setq-local latex-to-svg-frontend-reveal 'always)
+    (search-forward "\\eqref{")
+    (latex-to-svg-frontend--handle-cursor)
+    (should-not l2sf-tests--shown)
+    (setq-local latex-to-svg-frontend-editing-preview 'bottom-left)
+    (goto-char (1+ (point-min)))
+    (latex-to-svg-frontend--handle-cursor)
+    (should (equal l2sf-tests--shown '(fake-image bottom-left)))
+    (setq-local latex-to-svg-frontend-editing-preview nil)
+    (latex-to-svg-frontend--handle-cursor)
+    (should-not l2sf-tests--shown)))
+
 (ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
   ;; A failed `align' still takes its two numbers: the equation below it is
   ;; numbered 3, on a full reconcile and on the incremental path.

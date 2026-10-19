@@ -528,6 +528,28 @@ shows its source whatever the value."
   :safe (lambda (value) (memq value '(always writable nil)))
   :group 'latex-to-svg-frontend)
 
+;; TODO A value `follow-point': the frame under the equation point is in.
+;; It would move on every scroll, go above or below the equation as room
+;; allows, and compete for the place under the line with completion
+;; popups, such as corfu's.
+(defcustom latex-to-svg-frontend-editing-preview 'top-right
+  "Where to show the image of the equation whose source is shown.
+While point is in an equation and its LaTeX source is shown (see
+`latex-to-svg-frontend-reveal'), the equation's image is shown in a
+child frame at a corner of the window's text area: `top-right' (the
+default), `top-left', `bottom-left' or `bottom-right'.  The frame covers
+the text under it, which does not move.  It shows the image the
+equation had when point entered it; an edit is typeset when point
+leaves the equation.  nil shows no frame.  Only on a graphical frame."
+  :type '(choice (const :tag "Top right" top-right)
+                 (const :tag "Top left" top-left)
+                 (const :tag "Bottom left" bottom-left)
+                 (const :tag "Bottom right" bottom-right)
+                 (const :tag "No frame" nil))
+  :safe (lambda (value)
+          (memq value '(top-right top-left bottom-left bottom-right nil)))
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-suppress-emphasis t
   "Whether to strip markup emphasis decoration from math source text.
 Markup font-lock (Org's `+…+' / `_…_' / `/…/', Markdown's `*…*', ...) has no
@@ -1946,6 +1968,7 @@ On `post-command-hook' while the mode is on."
                  (not (and (overlay-get cur 'latex-to-svg-frontend-ref)
                            (mouse-event-p last-command-event))))
         (latex-to-svg-frontend--open-overlay cur))
+      (latex-to-svg-frontend--update-editing-preview cur)
       (unless latex-to-svg-frontend--last-point
         (setq latex-to-svg-frontend--last-point (make-marker)))
       (set-marker latex-to-svg-frontend--last-point (point))))))
@@ -2133,6 +2156,23 @@ frame parameter to the value it has makes the frame flicker on macOS."
   (let ((frame latex-to-svg-frontend--editing-preview-frame))
     (when (and (frame-live-p frame) (frame-visible-p frame))
       (make-frame-invisible frame))))
+
+(defun latex-to-svg-frontend--update-editing-preview (ov)
+  "Show the editing preview for the preview OV point is on, or hide it.
+OV is nil when point is on no preview.  The frame shows OV's image when
+`latex-to-svg-frontend-editing-preview' is non-nil, OV has an image and
+shows its source, and the selected window shows the current buffer on a
+graphical frame (`--display-window' prefers the selected window).
+Otherwise it is hidden."
+  (let ((corner latex-to-svg-frontend-editing-preview)
+        (image (and ov (overlay-get ov 'latex-to-svg-frontend-image))))
+    (if (and corner image
+             (null (overlay-get ov 'display))
+             (eq (latex-to-svg-frontend--display-window (current-buffer))
+                 (selected-window)))
+        (latex-to-svg-frontend--editing-preview-show
+         (selected-window) image corner)
+      (latex-to-svg-frontend--editing-preview-hide))))
 
 ;;;; Numbering
 
@@ -3674,6 +3714,8 @@ an option of this package updates the previews on its own (see
       (set-marker latex-to-svg-frontend--last-point nil))
     (setq latex-to-svg-frontend--last-point nil
           latex-to-svg-frontend--last-reveal nil)
+    (when (eq (window-buffer) (current-buffer))
+      (latex-to-svg-frontend--editing-preview-hide))
     (when (timerp latex-to-svg-frontend--reconcile-timer)
       (cancel-timer latex-to-svg-frontend--reconcile-timer)
       (setq latex-to-svg-frontend--reconcile-timer nil))
