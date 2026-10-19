@@ -596,7 +596,7 @@ See `latex-to-svg-frontend-editing-preview'."
                (seq-every-p #'integerp value)))
   :group 'latex-to-svg-frontend)
 
-(defcustom latex-to-svg-frontend-editing-preview-delay 1.0
+(defcustom latex-to-svg-frontend-editing-preview-delay 0.05
   "Seconds without input after which an edited equation is typeset.
 While point is in an equation whose source is shown and the editing
 preview shows its image (see `latex-to-svg-frontend-editing-preview'),
@@ -619,8 +619,7 @@ the editing preview shows the picture the equation will have.
 while it is edited, with no fallback.  The picture may then differ
 from the one the equation gets when point leaves it, or fail where
 that one does not.  `ratex' compiles in about 6 ms, against about
-300 ms for `latex', so it allows a shorter
-`latex-to-svg-frontend-editing-preview-delay'.  An equation whose
+300 ms for `latex', so its picture comes sooner.  An equation whose
 cookie says `engine=skip' is not typeset whatever the value."
   :type '(choice (const :tag "The equation's own engine" nil)
                  (const :tag "RaTeX" ratex)

@@ -344,24 +344,25 @@ While the source of an equation is shown, its image is shown in a child
 frame beside it, at the right edge of the window, an Isearch included. The
 frame covers the text under it, which does not move. When you edit the
 equation, it is typeset once Emacs has been idle for
-`latex-to-svg-frontend-editing-preview-delay` (1 s), and the frame shows the
+`latex-to-svg-frontend-editing-preview-delay` (50 ms), and the frame shows the
 new image. Math with no picture yet, typed new or failed, shows the frame from
 its first picture on. When the edit does not typeset, as while it is half
-typed, the frame keeps the last image and shows the failure icon before it. The edit is
-typeset with the equation's own engine and fallback, so the frame shows the
-picture you get when point leaves the equation.
+typed, the frame keeps the last image and shows the failure icon before it.
+The edit is typeset with the equation's own engine and fallback, so the frame
+shows the picture you get when point leaves the equation.
 `latex-to-svg-frontend-editing-preview-engine` typesets every edit with one
 engine instead, `ratex`, `texres` or `latex`, with no fallback. RaTeX
-compiles in about 6 ms, so a shorter delay works with `ratex`; the picture may
-then differ from the one the equation gets when point leaves it. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
+compiles in about 6 ms, so with `ratex` the picture comes sooner; it may
+then differ from the one the equation gets when point leaves it.
+`latex-to-svg-frontend-editing-preview` sets where the frame goes:
 `right` puts it at the right edge of the window, with its top at the top of the
 equation's first line, and it follows the equation when the window scrolls.
 `smart-right` (default) does the same, unless the frame there would cover the
 lines of the equation, from the beginning of its first line; then it puts the
-frame as `smart-right-corner` does. `top-right`, `top-left`, `bottom-left` and `bottom-right` put it at
-that corner. `smart-right-corner` is `top-right`, or `bottom-right` when the
-frame there would cover lines of the equation; `smart-left-corner` is
-`top-left`, or `bottom-left`. To turn the frame off:
+frame as `smart-right-corner` does. `top-right`, `top-left`, `bottom-left` and
+`bottom-right` put it at that corner. `smart-right-corner` is `top-right`, or
+`bottom-right` when the frame there would cover lines of the equation;
+`smart-left-corner` is `top-left`, or `bottom-left`. To turn the frame off:
 
 ```elisp
 (setq latex-to-svg-frontend-editing-preview nil)
@@ -369,10 +370,12 @@ frame there would cover lines of the equation; `smart-left-corner` is
 
 `latex-to-svg-frontend-editing-preview-padding` sets the padding around the
 image in the frame, with the values of the other padding options: a number
-of pt for all four sides (default 4), or `(TOP RIGHT BOTTOM LEFT)`. `latex-to-svg-frontend-editing-preview-margin` sets the distance in pixels
+of pt for all four sides (default 4), or `(TOP RIGHT BOTTOM LEFT)`.
+`latex-to-svg-frontend-editing-preview-margin` sets the distance in pixels
 between the frame and the edges of the text: `(TOP-BOTTOM LEFT-RIGHT)`,
-default `(4 4)`. A negative number moves the frame past the edge. The face `latex-to-svg-frontend-editing-preview-border` sets
-the color of the frame's border. The child frame is shown only on a graphical frame.
+default `(4 4)`. A negative number moves the frame past the edge. The face
+`latex-to-svg-frontend-editing-preview-border` sets the color of the frame's
+border. The child frame is shown only on a graphical frame.
 
 ### Per-mode configuration
 

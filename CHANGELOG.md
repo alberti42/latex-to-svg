@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the window, so the rendered equation stays in view while you read or edit
   the source. The frame covers the text under it, which does not move. An
   edit is typeset once Emacs has been idle for
-  `latex-to-svg-frontend-editing-preview-delay` (default 1 s), with the
+  `latex-to-svg-frontend-editing-preview-delay` (default 50 ms), with the
   equation's own engine and fallback, and the frame shows the new image;
   each new request cancels the one before. Math with no picture yet, typed
   new or failed, shows the frame from its first picture on. When the edit
@@ -27,8 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   image and shows the failure icon before it, with the error as its tooltip.
   `latex-to-svg-frontend-editing-preview-engine` typesets every edit with
   one engine instead, `ratex`, `texres` or `latex`, with no fallback: with
-  `ratex`, a shorter delay works, but the picture may differ from the one
-  the equation gets when point leaves it.
+  `ratex` the picture comes sooner, but it may differ from the one the
+  equation gets when point leaves it.
   `latex-to-svg-frontend-editing-preview` sets where the frame goes: `right`
   at the right edge, beside the equation, following it when the window
   scrolls; `smart-right` (default) the same, unless the frame would cover the
