@@ -347,7 +347,9 @@ equation, it is typeset once Emacs has been idle for
 `latex-to-svg-frontend-editing-preview-delay` (50 ms), and the frame shows the
 new image. Math with no picture yet, typed new or failed, shows the frame from
 its first picture on. When the edit does not typeset, as while it is half
-typed, the frame keeps the last image and shows the failure icon before it.
+typed, the frame keeps the last image and draws its border in the color of the
+face `latex-to-svg-frontend-editing-preview-failure-border`, which inherits
+`error`.
 The edit is typeset with the equation's own engine and fallback, so the frame
 shows the picture you get when point leaves the equation.
 `latex-to-svg-frontend-editing-preview-engine` typesets every edit with one

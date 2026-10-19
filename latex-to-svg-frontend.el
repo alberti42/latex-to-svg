@@ -726,6 +726,14 @@ typeset by LaTeX, so they match the surrounding prose font.  Set it to
 `default' for a plain, unlinked look."
   :group 'latex-to-svg-frontend)
 
+(defface latex-to-svg-frontend-editing-preview-failure-border
+  '((t :inherit error))
+  "Face of the editing preview's border after an edit failed to typeset.
+Only its foreground is used, as the color of the border: the frame
+then shows the last picture that was typeset.  It inherits `error', so
+it follows the theme.  See `latex-to-svg-frontend-failure-mark'."
+  :group 'latex-to-svg-frontend)
+
 (defface latex-to-svg-frontend-editing-preview-border
   '((((class color) (min-colors 88) (background dark)) :background "#323232")
     (((class color) (min-colors 88) (background light)) :background "#cecece")
@@ -2377,20 +2385,19 @@ See `latex-to-svg-frontend--editing-preview-image'."
                      (list image padding padded))
         padded))))
 
-(defun latex-to-svg-frontend--editing-preview-content (image failure)
-  "Return the text of the editing preview's buffer: IMAGE, after a mark.
-FAILURE is the plist of the last request while typing, when it ended
-without a picture, else nil.  The mark is the icon
-`latex-to-svg-frontend-failure', with the failure as its tooltip, shown
-when there is a FAILURE and `latex-to-svg-frontend-failure-mark' is on.
-IMAGE is then the last picture that was typeset."
-  (concat (and failure latex-to-svg-frontend-failure-mark
-               (concat (propertize (icon-string 'latex-to-svg-frontend-failure)
-                                   'help-echo
-                                   (latex-to-svg-frontend--failure-help-echo
-                                    failure))
-                       " "))
-          (propertize " " 'display image)))
+(defun latex-to-svg-frontend--editing-preview-border (parent failure)
+  "Return the color of the editing preview's border on frame PARENT.
+That is the foreground of the face
+`latex-to-svg-frontend-editing-preview-failure-border' when FAILURE,
+the plist of the last request while typing, is non-nil and
+`latex-to-svg-frontend-failure-mark' is on: the frame then shows the
+last picture that was typeset.  Otherwise it is the background of the
+face `latex-to-svg-frontend-editing-preview-border'."
+  (if (and failure latex-to-svg-frontend-failure-mark)
+      (face-foreground 'latex-to-svg-frontend-editing-preview-failure-border
+                       parent 'default)
+    (face-background 'latex-to-svg-frontend-editing-preview-border
+                     parent 'default)))
 
 (defun latex-to-svg-frontend--editing-preview-show (window image corner span)
   "Show IMAGE in the editing preview, at CORNER of WINDOW.
@@ -2398,27 +2405,25 @@ CORNER is as in `latex-to-svg-frontend--editing-preview-position', where
 `right' is beside SPAN, (BEG . END), the text of the equation whose
 image the frame shows, or `smart-right', `smart-right-corner' and
 `smart-left-corner', which put the frame where it does not cover SPAN
-\(see
-`--editing-preview-smart-corner').  The frame keeps
+\(see `--editing-preview-smart-corner').  The frame keeps
 `latex-to-svg-frontend-editing-preview-margin' from the edges of the
-text area.  The frame's background is that of
-the `default' face on WINDOW's frame, and its border that of the face
-`latex-to-svg-frontend-editing-preview-border'.  Each parameter is set
+text area.  The frame's background is that of the `default' face on
+WINDOW's frame, and its border has the color of
+`--editing-preview-border', which marks a failure while typing.  Each
+parameter is set
 only when it changes: corfu notes that setting a frame parameter to the
 value it has makes the frame flicker on macOS."
   (let* ((parent (window-frame window))
          (frame (latex-to-svg-frontend--editing-preview-frame parent))
          (win (frame-root-window frame))
          (background (face-background 'default parent))
-         (border (face-background 'latex-to-svg-frontend-editing-preview-border
-                                  parent 'default)))
-    (let ((content (latex-to-svg-frontend--editing-preview-content
-                    image (nth 3 (latex-to-svg-frontend--typing-state)))))
-      (with-current-buffer (window-buffer win)
-        (unless (equal-including-properties (buffer-string) content)
-          (let ((inhibit-read-only t))
-            (erase-buffer)
-            (insert content)))))
+         (border (latex-to-svg-frontend--editing-preview-border
+                  parent (nth 3 (latex-to-svg-frontend--typing-state)))))
+    (with-current-buffer (window-buffer win)
+      (unless (eq (get-text-property (point-min) 'display) image)
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert (propertize " " 'display image)))))
     (unless (equal (frame-parameter frame 'background-color) background)
       (set-frame-parameter frame 'background-color background))
     (unless (equal (face-background 'child-frame-border frame) border)
@@ -2661,7 +2666,8 @@ frame from its first picture on."
 TYPING is the value of `latex-to-svg-frontend--typing' it was made for.
 OUTCOME is the backend's: nil when the picture is in the cache, which
 the request then fetches, else the failure plist, for which the frame
-keeps the last picture and shows the failure mark.  Nothing is done
+keeps the last picture and draws its border in the color of a
+failure.  Nothing is done
 unless CALLBACK is still `latex-to-svg-frontend--typing-request' and
 TYPING still `latex-to-svg-frontend--typing'."
   (when (buffer-live-p buffer)
@@ -2679,10 +2685,11 @@ TYPING still `latex-to-svg-frontend--typing'."
   "Record IMAGE in TYPING, typeset while typing, and show it in the frame.
 TYPING is the value of `latex-to-svg-frontend--typing'.  With FAILURE,
 the plist of a request that ended without a picture, IMAGE is nil: the
-last picture stays, and FAILURE is recorded, for which the frame shows
-the failure mark (see `--editing-preview-content').  A picture clears
-it.  The frame is updated only while the selected window shows the
-current buffer: otherwise it may be showing another buffer's equation."
+last picture stays, and FAILURE is recorded, for which the frame draws
+its border in the color of a failure (see `--editing-preview-border').
+A picture clears it.  The frame is updated only while the selected
+window shows the current buffer: otherwise it may be showing another
+buffer's equation."
   (when image
     (setf (nth 2 typing) image))
   (setf (nth 3 typing) failure)

@@ -24,7 +24,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each new request cancels the one before. Math with no picture yet, typed
   new or failed, shows the frame from its first picture on. When the edit
   does not typeset, as while it is half typed, the frame keeps the last
-  image and shows the failure icon before it, with the error as its tooltip.
+  image and draws its border in the foreground of the new face
+  `latex-to-svg-frontend-editing-preview-failure-border`, which inherits
+  `error`.
   `latex-to-svg-frontend-editing-preview-engine` typesets every edit with
   one engine instead, `ratex`, `texres` or `latex`, with no fallback: with
   `ratex` the picture comes sooner, but it may differ from the one the

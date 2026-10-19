@@ -4287,26 +4287,28 @@ after a hide.  The selected frame counts as graphical."
       (should (overlay-buffer ov))
       (should (equal l2sf-tests--shown '(typed-image smart-above-below))))))
 
-(ert-deftest l2sf-editing-preview-content ()
-  ;; The frame's text is the image, after the failure mark when the last
-  ;; request failed and the mark is on.
-  (let ((image '(image :type svg :data "<svg/>")))
-    (should (equal (get-text-property
-                    0 'display
-                    (latex-to-svg-frontend--editing-preview-content image nil))
-                   image))
-    (let ((text (latex-to-svg-frontend--editing-preview-content
-                 image l2sf-tests--failure)))
-      (should (string-prefix-p
-               (substring-no-properties
-                (icon-string 'latex-to-svg-frontend-failure))
-               text))
-      (should (equal (get-text-property (1- (length text)) 'display text)
-                     image)))
+(ert-deftest l2sf-editing-preview-border ()
+  ;; The border has the foreground of the failure face after a failed
+  ;; edit, while the failure mark is on, else the background of the
+  ;; border face.
+  (cl-letf (((symbol-function 'face-foreground)
+             (lambda (face &rest _)
+               (and (eq face
+                        'latex-to-svg-frontend-editing-preview-failure-border)
+                    "red")))
+            ((symbol-function 'face-background)
+             (lambda (face &rest _)
+               (and (eq face 'latex-to-svg-frontend-editing-preview-border)
+                    "gray"))))
+    (should (equal (latex-to-svg-frontend--editing-preview-border nil nil)
+                   "gray"))
+    (should (equal (latex-to-svg-frontend--editing-preview-border
+                    nil l2sf-tests--failure)
+                   "red"))
     (let ((latex-to-svg-frontend-failure-mark nil))
-      (should (= (length (latex-to-svg-frontend--editing-preview-content
-                          image l2sf-tests--failure))
-                 1)))))
+      (should (equal (latex-to-svg-frontend--editing-preview-border
+                      nil l2sf-tests--failure)
+                     "gray")))))
 
 (ert-deftest l2sf-typing-engine ()
   ;; While typing, an equation is typeset with its own engine and
