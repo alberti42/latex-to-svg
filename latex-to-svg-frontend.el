@@ -3562,7 +3562,7 @@ it like the text at its start now (see
 `latex-to-svg-frontend--x-height-at').
 When the cache has no picture for them, because a backend option in the
 cache key changed \(`latex-to-svg-backend-preamble',
-`latex-to-svg-backend-preamble-not-precompiled') or the entry was
+`latex-to-svg-backend-preamble-macros') or the entry was
 collected, the backend compiles it and this runs again when the compile
 is done.  OV keeps its old image until then; an OV
 deleted in the meantime (edited, renumbered) is left alone.  When the
@@ -3706,8 +3706,8 @@ never rendered, as `--render-on-leave' never renders it."
     latex-to-svg-frontend-center-display-math
     latex-to-svg-frontend-failure-mark
     latex-to-svg-backend-preamble
-    latex-to-svg-backend-appended-preamble
-    latex-to-svg-backend-preamble-not-precompiled
+    latex-to-svg-backend-preamble-packages
+    latex-to-svg-backend-preamble-macros
     latex-to-svg-backend-line-width
     latex-to-svg-backend-ratex-macros)
   "Options whose change updates the previews on its own.
@@ -4201,7 +4201,7 @@ buffer visiting a file, the first render runs from a timer, after the
 file's local variables are applied: Emacs runs a major mode's hooks,
 where the mode is usually turned on, before it applies them, and they
 may set an option the render needs, such as
-`latex-to-svg-backend-preamble-not-precompiled' in `.dir-locals.el'.  Setting
+`latex-to-svg-backend-preamble-macros' in `.dir-locals.el'.  Setting
 an option of this package updates the previews on its own (see
 `latex-to-svg-frontend--watched-options')."
   :lighter " L2S"

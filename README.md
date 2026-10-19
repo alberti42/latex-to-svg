@@ -209,8 +209,8 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
   with 0.12.0 together with the backend's warning for a program that is not
   found; 0.12.1 fixed the texres engine on Emacs 29 to 31. The per-project
   preambles came with 0.11.1: the
-  backend reads `latex-to-svg-backend-preamble`, `-appended-preamble` and
-  `-preamble-not-precompiled` in the buffer that asks for an equation, and the
+  backend reads `latex-to-svg-backend-preamble`, `-preamble-packages` and
+  `-preamble-macros` in the buffer that asks for an equation, and the
   front-end watches all three, so that setting one updates the previews. The engine
   choice (`:engine`, behind `latex-to-svg-frontend-engine` and the
   `% engine=` cookie), the LaTeX fallback and quiet failures (`:fallback` /
@@ -412,7 +412,7 @@ These options update the previews on their own when you set them, with `setq`,
 | `latex-to-svg-frontend-foreground-color`, `-foreground-ignored-faces`, `-background-color`, `-padding-inline`, `-padding-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-rescale-inline`, `-rescale-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
-| `latex-to-svg-backend-preamble`, `-appended-preamble`, `-preamble-not-precompiled` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
+| `latex-to-svg-backend-preamble`, `-preamble-packages`, `-preamble-macros` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-line-width` | the numbered equations are compiled with the new width, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-ratex-macros` | the equations typeset with RaTeX are compiled with the new macros, or taken from cache if compiled with them before |
 
@@ -439,15 +439,15 @@ Equations that use a project's own macros or packages fail with the backend's
 default preamble. Set the project's preamble in its `.dir-locals.el`, in one of
 two backend options:
 
-- `latex-to-svg-backend-appended-preamble` is dumped into a `.fmt` file, one
+- `latex-to-svg-backend-preamble-packages` is dumped into a `.fmt` file, one
   per project: the place for packages, which it then reads once.
-- `latex-to-svg-backend-preamble-not-precompiled` is written into every
+- `latex-to-svg-backend-preamble-macros` is written into every
   compile and adds no `.fmt` file: enough for macros.
 
 For a file of macros, `\input` it:
 
 ```elisp
-((nil . ((latex-to-svg-backend-preamble-not-precompiled . "\\input{macros.tex}"))))
+((nil . ((latex-to-svg-backend-preamble-macros . "\\input{macros.tex}"))))
 ```
 
 Every backslash is doubled, as in any Elisp string. `\input` finds the file in

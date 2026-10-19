@@ -2449,15 +2449,15 @@ other buffer BODY opened."
   ;; equations, RaTeX's macros) update the previews like this package's
   ;; own options.
   (dolist (option '(latex-to-svg-backend-preamble
-                    latex-to-svg-backend-appended-preamble
-                    latex-to-svg-backend-preamble-not-precompiled
+                    latex-to-svg-backend-preamble-packages
+                    latex-to-svg-backend-preamble-macros
                     latex-to-svg-backend-line-width
                     latex-to-svg-backend-ratex-macros))
     (should (memq #'latex-to-svg-frontend--option-changed
                   (get-variable-watchers option)))))
 
 (ert-deftest l2sf-option-default-skips-buffers-with-own-value ()
-  ;; A change of `latex-to-svg-backend-preamble-not-precompiled''s default updates the
+  ;; A change of `latex-to-svg-backend-preamble-macros''s default updates the
   ;; buffers that use the default, not a buffer with its own value (set by
   ;; its `.dir-locals.el').  A buffer-local change updates that buffer.
   (l2sf-tests--with-stub
@@ -2470,13 +2470,13 @@ other buffer BODY opened."
             (dolist (buf (list own uses-default))
               (with-current-buffer buf (setq-local latex-to-svg-frontend-mode t)))
             (with-current-buffer own
-              (setq-local latex-to-svg-backend-preamble-not-precompiled "\\input{m}"))
+              (setq-local latex-to-svg-backend-preamble-macros "\\input{m}"))
             (should (equal latex-to-svg-frontend--option-buffers (list own)))
             (latex-to-svg-frontend--update-after-option)
             (should (equal updated (list own)))
             (setq updated nil)
-            (let ((latex-to-svg-backend-preamble-not-precompiled ""))
-              (setq latex-to-svg-backend-preamble-not-precompiled "\\input{g}")
+            (let ((latex-to-svg-backend-preamble-macros ""))
+              (setq latex-to-svg-backend-preamble-macros "\\input{g}")
               (latex-to-svg-frontend--update-after-option)
               (should (equal updated (list uses-default)))))
         (when (timerp latex-to-svg-frontend--option-timer)
@@ -3093,13 +3093,13 @@ with the failure plist FAILURE.  Issue #5."
         (l2sf-tests--with-stub
           (with-temp-file (expand-file-name ".dir-locals.el" dir)
             (prin1 '((text-mode
-                      . ((latex-to-svg-backend-preamble-not-precompiled . "\\input{m}"))))
+                      . ((latex-to-svg-backend-preamble-macros . "\\input{m}"))))
                    (current-buffer)))
           (with-temp-file file (insert "$a$\n"))
           (cl-letf (((symbol-function 'latex-to-svg-backend)
                      (lambda (_latex &rest args)
                        (l2sf-tests--check-colors args)
-                       (setq seen latex-to-svg-backend-preamble-not-precompiled)
+                       (setq seen latex-to-svg-backend-preamble-macros)
                        l2sf-tests--image)))
             (let ((enable-local-variables :all)
                   (text-mode-hook (list #'latex-to-svg-frontend-mode)))
