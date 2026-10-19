@@ -832,6 +832,21 @@ references are, so it leaves them alone:
 Call them in a buffer where `latex-to-svg-frontend-mode` is on, since the
 excluded regions come from the adaptor.
 
+## Troubleshooting
+
+This section covers the core, which every adaptor uses. Problems with one
+markup are in the Troubleshooting section of its adaptor's page:
+[Org](docs/latex-to-svg-for-org.md#troubleshooting) and
+[LaTeX](docs/latex-to-svg-for-latex.md#troubleshooting).
+
+### The editing preview is placed at the wrong spot
+
+The frame is placed when Emacs runs `window-state-change-hook`, the last of
+the hooks it runs when a window is selected, shows another buffer or changes
+its size. A package that changes the window's margins from a function on that
+same hook, run after ours, leaves the frame where the margins were before its
+change, until the next command places it again.
+
 ## Limitations
 
 - **`\tag`-based references and `subequations` sub-lettering** aren't modelled
