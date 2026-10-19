@@ -413,6 +413,7 @@ These options update the previews on their own when you set them, with `setq`,
 | `latex-to-svg-frontend-rescale-inline`, `-rescale-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
 | `latex-to-svg-backend-preamble`, `-preamble-packages`, `-preamble-macros` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
+| `latex-to-svg-backend-preamble-package-files`, `-preamble-macro-files` | the equations are compiled with the new list, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-line-width` | the numbered equations are compiled with the new width, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-ratex-macros` | the equations typeset with RaTeX are compiled with the new macros, or taken from cache if compiled with them before |
 

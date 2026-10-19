@@ -3708,13 +3708,15 @@ never rendered, as `--render-on-leave' never renders it."
     latex-to-svg-backend-preamble
     latex-to-svg-backend-preamble-packages
     latex-to-svg-backend-preamble-macros
+    latex-to-svg-backend-preamble-package-files
+    latex-to-svg-backend-preamble-macro-files
     latex-to-svg-backend-line-width
     latex-to-svg-backend-ratex-macros)
   "Options whose change updates the previews on its own.
 Each has a variable watcher (`latex-to-svg-frontend--option-changed').
-The last five are the backend's options in the cache key that a project
-sets in `.dir-locals.el': its three preambles, the width of numbered
-equations and RaTeX's macros.")
+The last seven are the backend's options in the cache key that a project
+sets in `.dir-locals.el': its three preambles, the files two of them
+load, the width of numbered equations and RaTeX's macros.")
 
 (defvar latex-to-svg-frontend--option-timer nil
   "Timer of the pending update after an option changed, or nil.")

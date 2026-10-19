@@ -2445,16 +2445,23 @@ other buffer BODY opened."
 
 (ert-deftest l2sf-backend-options-are-watched ()
   ;; The backend's options in the cache key that a project sets in
-  ;; `.dir-locals.el' (the three preambles, the width of numbered
-  ;; equations, RaTeX's macros) update the previews like this package's
-  ;; own options.
+  ;; `.dir-locals.el' (the three preambles, the files two of them load,
+  ;; the width of numbered equations, RaTeX's macros) update the previews
+  ;; like this package's own options.
   (dolist (option '(latex-to-svg-backend-preamble
                     latex-to-svg-backend-preamble-packages
                     latex-to-svg-backend-preamble-macros
+                    latex-to-svg-backend-preamble-package-files
+                    latex-to-svg-backend-preamble-macro-files
                     latex-to-svg-backend-line-width
                     latex-to-svg-backend-ratex-macros))
     (should (memq #'latex-to-svg-frontend--option-changed
-                  (get-variable-watchers option)))))
+                  (get-variable-watchers option))))
+  ;; No backend option is named by an obsolete alias: users read the new
+  ;; names.
+  (dolist (option latex-to-svg-frontend--watched-options)
+    (when (string-prefix-p "latex-to-svg-backend-" (symbol-name option))
+      (should-not (get option 'byte-obsolete-variable)))))
 
 (ert-deftest l2sf-option-default-skips-buffers-with-own-value ()
   ;; A change of `latex-to-svg-backend-preamble-macros''s default updates the

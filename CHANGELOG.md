@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   distance in pixels between the frame and the edges of the text,
   `(TOP-BOTTOM LEFT-RIGHT)` (default `(4 4)`); a negative number moves the
   frame past the edge. Only on a graphical frame.
+- Setting `latex-to-svg-backend-preamble-package-files` or
+  `latex-to-svg-backend-preamble-macro-files`, the files the project's
+  preambles load (backend 0.16.0), updates the previews, as setting a
+  preamble does.
 
 ### Fixed
 
