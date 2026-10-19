@@ -541,7 +541,12 @@ right edge, with its top at the top of the equation's first line; it
 follows the equation when the window scrolls.  `smart-right' (the
 default) does the same, unless the frame there would cover the lines
 of the equation, from the beginning of its first line; then it puts the
-frame as `smart-right-corner' does.  `top-right', `top-left',
+frame as `smart-right-corner' does.  `below' puts the frame below the
+equation's last line, starting where the equation starts, and `above'
+above its first line; both keep the first number of
+`latex-to-svg-frontend-editing-preview-margin' from the equation and
+follow it when the window scrolls.  `smart-above-below' is `above',
+or `below' when the frame fits below but not above.  `top-right', `top-left',
 `bottom-left' and `bottom-right' put it at that corner.
 `smart-right-corner' is `top-right', or `bottom-right' when the frame
 there would cover lines of the equation; `smart-left-corner' is
@@ -553,6 +558,10 @@ shows the frame from its first picture on.  nil shows no frame.  Only
 on a graphical frame."
   :type '(choice (const :tag "Right, else top or bottom right" smart-right)
                  (const :tag "Right, beside the equation" right)
+                 (const :tag "Above, else below the equation"
+                        smart-above-below)
+                 (const :tag "Below the equation" below)
+                 (const :tag "Above the equation" above)
                  (const :tag "Top right" top-right)
                  (const :tag "Top left" top-left)
                  (const :tag "Bottom left" bottom-left)
@@ -563,7 +572,8 @@ on a graphical frame."
                         smart-left-corner)
                  (const :tag "No frame" nil))
   :safe (lambda (value)
-          (memq value '(smart-right right top-right top-left bottom-left
+          (memq value '(smart-right right smart-above-below below above
+                        top-right top-left bottom-left
                         bottom-right smart-right-corner smart-left-corner
                         nil)))
   :group 'latex-to-svg-frontend)
@@ -587,7 +597,9 @@ recompile).  See `latex-to-svg-frontend-editing-preview'."
 A list (TOP-BOTTOM LEFT-RIGHT): TOP-BOTTOM pixels from the top or the
 bottom edge of the text area, LEFT-RIGHT pixels from its left or right
 edge.  The left edge is where the text starts, after the line numbers.
-A negative number moves the frame past the edge.
+For `below' and `above', TOP-BOTTOM is also the distance between the
+frame and the equation.  A negative number moves the frame past the
+edge.
 See `latex-to-svg-frontend-editing-preview'."
   :type '(list (integer :tag "From the top or bottom edge")
                (integer :tag "From the left or right edge"))
@@ -2112,24 +2124,51 @@ defining LABEL."
 
 ;;;; Editing preview
 
-(defun latex-to-svg-frontend--editing-preview-position (corner edges width height &optional rows)
+(defun latex-to-svg-frontend--editing-preview-position (corner edges width height &optional rows start gap)
   "Return (X . Y), where a frame WIDTH by HEIGHT pixels goes at CORNER.
-CORNER is `top-left', `top-right', `bottom-left' or `bottom-right', or
+CORNER is `top-left', `top-right', `bottom-left' or `bottom-right';
 `right': at the right edge, with its top at the top of ROWS, the pixel
 rows of the equation, (BEG . END), but no lower than to end at the
-bottom edge.  EDGES is (LEFT TOP RIGHT BOTTOM), the pixel edges of a
-window's text area, as `window-inside-pixel-edges' returns them; X, Y
-and ROWS are in the same coordinates, which are those of a child
-frame's position.  A frame wider than the text area starts at its left
-edge, and one taller than it at its top edge."
+bottom edge; `below': starting at START, the x of the equation's
+start, with its top GAP pixels below ROWS, but no lower than to end at
+the bottom edge; or `above': starting at START, with its bottom GAP
+pixels above ROWS.  EDGES is (LEFT TOP RIGHT BOTTOM), the pixel edges
+of a window's text area, as `window-inside-pixel-edges' returns them;
+X, Y, ROWS and START are in the same coordinates, which are those of a
+child frame's position.  START nil is the left edge.  A frame wider
+than the text area starts at its left edge, and one taller than it at
+its top edge; one that would pass the right edge moves left."
   (pcase-let ((`(,left ,top ,right ,bottom) edges))
-    (cons (if (memq corner '(top-left bottom-left))
-              left
-            (max left (- right width)))
+    (cons (pcase corner
+            ((or 'top-left 'bottom-left) left)
+            ((or 'above 'below) (max left (min (or start left) (- right width))))
+            (_ (max left (- right width))))
           (pcase corner
             ((or 'top-left 'top-right) top)
             ('right (max top (min (car rows) (- bottom height))))
+            ('below (max top (min (+ (cdr rows) gap) (- bottom height))))
+            ('above (max top (- (car rows) gap height)))
             (_ (max top (- bottom height)))))))
+
+(defun latex-to-svg-frontend--editing-preview-above-or-below (rows edges gap height)
+  "Return where `smart-above-below' puts a frame HEIGHT pixels high.
+That is `above' when the frame fits between the top of EDGES and GAP
+pixels above ROWS, else `below' when it fits between GAP pixels below
+ROWS and the bottom of EDGES, else `above'.  Above first: a completion
+popup, such as corfu's, opens below the line point is on.  ROWS and
+EDGES are as in `latex-to-svg-frontend--editing-preview-position'."
+  (pcase-let ((`(,_ ,top ,_ ,bottom) edges))
+    (cond ((>= (- (car rows) gap height) top) 'above)
+          ((<= (+ (cdr rows) gap height) bottom) 'below)
+          (t 'above))))
+
+(defun latex-to-svg-frontend--span-start-x (span window)
+  "Return the pixel x where SPAN starts in WINDOW, or nil out of view.
+SPAN is (BEG . END), the equation's text.  In the coordinates of
+`window-inside-pixel-edges': `posn-at-point' counts from the left of
+the text area, line numbers included."
+  (when-let* ((posn (posn-at-point (car span) window)))
+    (+ (car (window-inside-pixel-edges window)) (car (posn-x-y posn)))))
 
 (defun latex-to-svg-frontend--text-edges (window)
   "Return the pixel edges of the text in WINDOW, the selected window.
@@ -2380,8 +2419,12 @@ value it has makes the frame flicker on macOS."
                          (latex-to-svg-frontend--text-edges window)
                          latex-to-svg-frontend-editing-preview-margin))
                  (rows (and (memq corner '(smart-right smart-right-corner
-                                           smart-left-corner right))
+                                           smart-left-corner right above
+                                           below smart-above-below))
                             (latex-to-svg-frontend--span-rows span window)))
+                 (start (and (memq corner '(above below smart-above-below))
+                             (latex-to-svg-frontend--span-start-x span window)))
+                 (gap (car latex-to-svg-frontend-editing-preview-margin))
                  (corner (if (eq corner 'smart-right)
                              (latex-to-svg-frontend--editing-preview-smart-right
                               (latex-to-svg-frontend--span-text-right span window)
@@ -2396,9 +2439,13 @@ value it has makes the frame flicker on macOS."
                            ('smart-left-corner
                             (latex-to-svg-frontend--editing-preview-smart-corner
                              'left rows (nth 1 edges) (+ height b b)))
+                           ('smart-above-below
+                            (latex-to-svg-frontend--editing-preview-above-or-below
+                             rows edges gap (+ height b b)))
                            (_ corner)))
                  (`(,x . ,y) (latex-to-svg-frontend--editing-preview-position
-                              corner edges (+ width b b) (+ height b b) rows)))
+                              corner edges (+ width b b) (+ height b b) rows
+                              start gap)))
       (unless (and (= (frame-text-width frame) width)
                    (= (frame-text-height frame) height))
         ;; Else the window keeps four lines, the default minimum.

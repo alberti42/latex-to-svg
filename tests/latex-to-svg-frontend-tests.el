@@ -3993,7 +3993,35 @@ compiled.  Once point leaves it, both show the new picture."
                    '(410 . 280)))
     (should (equal (latex-to-svg-frontend--editing-preview-position
                     'right edges 100 400 '(100 . 130))
-                   '(410 . 20)))))
+                   '(410 . 20)))
+    ;; `below' and `above' start at the equation's start, GAP pixels
+    ;; from its rows, moved left or up to stay in the text area.
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'below edges 100 40 '(100 . 130) 200 4)
+                   '(200 . 134)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'above edges 100 40 '(100 . 130) 200 4)
+                   '(200 . 56)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'below edges 100 40 '(290 . 310) 450 4)
+                   '(410 . 280)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'above edges 100 40 '(30 . 50) nil 4)
+                   '(10 . 20)))))
+
+(ert-deftest l2sf-editing-preview-above-or-below ()
+  ;; Above when the frame fits there, else below when it fits there,
+  ;; else above.
+  (let ((edges '(10 20 510 320)))
+    (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
+                 '(100 . 130) edges 4 40)
+                'above))
+    (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
+                 '(30 . 50) edges 4 40)
+                'below))
+    (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
+                 '(30 . 300) edges 4 40)
+                'above))))
 
 (defmacro l2sf-tests--editing-preview (text &rest body)
   "Run BODY on rendered TEXT, recording what the editing preview shows.

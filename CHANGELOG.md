@@ -32,7 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-frontend-editing-preview` sets where the frame goes: `right`
   at the right edge, beside the equation, following it when the window
   scrolls; `smart-right` (default) the same, unless the frame would cover the
-  lines of the equation, then as `smart-right-corner`; `top-right`,
+  lines of the equation, then as `smart-right-corner`; `below` and `above`
+  below or above the equation, starting where it starts, and
+  `smart-above-below` above unless the frame fits only below; `top-right`,
   `top-left`, `bottom-left` or `bottom-right` at that corner; `smart-right-corner` is `top-right`, or `bottom-right` when the
   frame there would cover lines of the equation, and `smart-left-corner` the
   same on the left; nil turns the frame off.
