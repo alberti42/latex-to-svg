@@ -4101,10 +4101,10 @@ after a hide.  The selected frame counts as graphical."
   (l2sf-tests--editing-preview "$a$ and \\eqref{x} after\n"
     (goto-char (1+ (point-min)))
     (latex-to-svg-frontend--handle-cursor)
-    (should (equal l2sf-tests--shown '(fake-image top-right)))
+    (should (equal l2sf-tests--shown '(fake-image right)))
     (insert "b")
     (latex-to-svg-frontend--handle-cursor)
-    (should (equal l2sf-tests--shown '(fake-image top-right)))
+    (should (equal l2sf-tests--shown '(fake-image right)))
     (goto-char (point-max))
     (latex-to-svg-frontend--handle-cursor)
     (should-not l2sf-tests--shown)
@@ -4140,7 +4140,7 @@ after a hide.  The selected frame counts as graphical."
         (should-not l2sf-tests--shown)
         (set-window-buffer (selected-window) buffer)
         (latex-to-svg-frontend--editing-preview-follow)
-        (should (equal l2sf-tests--shown '(fake-image top-right)))))))
+        (should (equal l2sf-tests--shown '(fake-image right)))))))
 
 (ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
   ;; A failed `align' still takes its two numbers: the equation below it is

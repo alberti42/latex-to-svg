@@ -532,25 +532,25 @@ shows its source whatever the value."
 ;; It would move on every scroll, go above or below the equation as room
 ;; allows, and compete for the place under the line with completion
 ;; popups, such as corfu's.
-(defcustom latex-to-svg-frontend-editing-preview 'top-right
+(defcustom latex-to-svg-frontend-editing-preview 'right
   "Where to show the image of the equation whose source is shown.
 While point is in an equation and its LaTeX source is shown (see
 `latex-to-svg-frontend-reveal'), the equation's image is shown in a
-child frame at a corner of the window's text area: `top-right' (the
-default), `top-left', `bottom-left' or `bottom-right'.  `smart-corner' is
-`top-right', or `bottom-right' when the frame there would cover lines
-of the equation.  `right' puts the frame at the right edge, with its
-top at the top of the equation's first line; it follows the equation
-when the window scrolls.  The frame covers the text under it, which
-does not move.  It shows the image the
-equation had when point entered it; an edit is typeset when point
-leaves the equation.  nil shows no frame.  Only on a graphical frame."
-  :type '(choice (const :tag "Top right" top-right)
+child frame in the window's text area.  `right' (the default) puts the
+frame at the right edge, with its top at the top of the equation's
+first line; it follows the equation when the window scrolls.
+`top-right', `top-left', `bottom-left' and `bottom-right' put it at
+that corner.  `smart-corner' is `top-right', or `bottom-right' when the
+frame there would cover lines of the equation.  The frame covers the
+text under it, which does not move.  It shows the image the equation
+had when point entered it; an edit is typeset when point leaves the
+equation.  nil shows no frame.  Only on a graphical frame."
+  :type '(choice (const :tag "Right, beside the equation" right)
+                 (const :tag "Top right" top-right)
                  (const :tag "Top left" top-left)
                  (const :tag "Bottom left" bottom-left)
                  (const :tag "Bottom right" bottom-right)
                  (const :tag "Top right, else bottom right" smart-corner)
-                 (const :tag "Right, beside the equation" right)
                  (const :tag "No frame" nil))
   :safe (lambda (value)
           (memq value '(top-right top-left bottom-left bottom-right smart-corner

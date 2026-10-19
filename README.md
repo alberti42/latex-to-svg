@@ -341,15 +341,15 @@ leaving it shows the preview again, and renders the equation if you
 changed it or typed it new.
 
 While the source of an equation is shown, its image is shown in a child
-frame at a corner of the window, an Isearch included. The frame covers the
-text under it, which does not move. It shows the image the equation had
-when point entered it; an edit is typeset when point leaves the equation.
-`latex-to-svg-frontend-editing-preview` sets the corner: `top-right`
-(default), `top-left`, `bottom-left` or `bottom-right`. `smart-corner` is
-`top-right`, or `bottom-right` when the frame there would cover lines of the
-equation. `right` puts the frame at the right edge of the window, with its top
-at the top of the equation's first line; it follows the equation when the
-window scrolls. To turn the frame off:
+frame beside it, at the right edge of the window, an Isearch included. The
+frame covers the text under it, which does not move. It shows the image the
+equation had when point entered it; an edit is typeset when point leaves the
+equation. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
+`right` (default) puts it at the right edge of the window, with its top at the
+top of the equation's first line, and it follows the equation when the window
+scrolls. `top-right`, `top-left`, `bottom-left` and `bottom-right` put it at
+that corner. `smart-corner` is `top-right`, or `bottom-right` when the frame
+there would cover lines of the equation. To turn the frame off:
 
 ```elisp
 (setq latex-to-svg-frontend-editing-preview nil)
