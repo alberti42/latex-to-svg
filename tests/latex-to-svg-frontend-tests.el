@@ -3977,7 +3977,18 @@ compiled.  Once point leaves it, both show the new picture."
                    '(410 . 280)))
     (should (equal (latex-to-svg-frontend--editing-preview-position
                     'bottom-right edges 600 400)
-                   '(10 . 20)))))
+                   '(10 . 20)))
+    ;; `right' puts its top at the top of the equation's rows, but no
+    ;; lower than to end at the bottom edge, and no higher than the top.
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'right edges 100 40 '(100 . 130))
+                   '(410 . 100)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'right edges 100 40 '(300 . 330))
+                   '(410 . 280)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'right edges 100 400 '(100 . 130))
+                   '(410 . 20)))))
 
 (defmacro l2sf-tests--editing-preview (text &rest body)
   "Run BODY on rendered TEXT, recording what the editing preview shows.

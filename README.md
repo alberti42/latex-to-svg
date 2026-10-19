@@ -347,7 +347,9 @@ when point entered it; an edit is typeset when point leaves the equation.
 `latex-to-svg-frontend-editing-preview` sets the corner: `top-right`
 (default), `top-left`, `bottom-left` or `bottom-right`. `smart-corner` is
 `top-right`, or `bottom-right` when the frame there would cover lines of the
-equation. To turn the frame off:
+equation. `right` puts the frame at the right edge of the window, with its top
+at the top of the equation's first line; it follows the equation when the
+window scrolls. To turn the frame off:
 
 ```elisp
 (setq latex-to-svg-frontend-editing-preview nil)
