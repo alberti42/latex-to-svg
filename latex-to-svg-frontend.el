@@ -537,7 +537,9 @@ shows its source whatever the value."
 While point is in an equation and its LaTeX source is shown (see
 `latex-to-svg-frontend-reveal'), the equation's image is shown in a
 child frame at a corner of the window's text area: `top-right' (the
-default), `top-left', `bottom-left' or `bottom-right'.  The frame covers
+default), `top-left', `bottom-left' or `bottom-right'.  `smart' is
+`top-right', or `bottom-right' when the frame there would cover lines
+of the equation.  The frame covers
 the text under it, which does not move.  It shows the image the
 equation had when point entered it; an edit is typeset when point
 leaves the equation.  nil shows no frame.  Only on a graphical frame."
@@ -545,9 +547,10 @@ leaves the equation.  nil shows no frame.  Only on a graphical frame."
                  (const :tag "Top left" top-left)
                  (const :tag "Bottom left" bottom-left)
                  (const :tag "Bottom right" bottom-right)
+                 (const :tag "Top right, else bottom right" smart)
                  (const :tag "No frame" nil))
   :safe (lambda (value)
-          (memq value '(top-right top-left bottom-left bottom-right nil)))
+          (memq value '(top-right top-left bottom-left bottom-right smart nil)))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-suppress-emphasis t
@@ -2034,6 +2037,30 @@ it at its top edge."
               top
             (max top (- bottom height))))))
 
+(defun latex-to-svg-frontend--editing-preview-smart-corner (rows top height)
+  "Return the corner the value `smart' puts a frame HEIGHT pixels high at.
+That is `top-right', or `bottom-right' when the frame there, from TOP,
+the top edge of the text area, would cover ROWS.  ROWS is (BEG . END),
+the pixel rows the equation takes, in the coordinates of TOP."
+  (if (< (car rows) (+ top height)) 'bottom-right 'top-right))
+
+(defun latex-to-svg-frontend--overlay-rows (ov window)
+  "Return (BEG . END), the pixel rows the text of OV takes in WINDOW.
+In the coordinates of `window-inside-pixel-edges': from the top of the
+line OV starts on to the bottom of the line it ends on.  A line out of
+view counts from the top or to the bottom of the text area.  WINDOW is
+the selected window, which `line-pixel-height' measures."
+  (pcase-let* ((`(,_ ,top ,_ ,bottom) (window-inside-pixel-edges window))
+               (beg (posn-at-point (overlay-start ov) window))
+               (end (posn-at-point (overlay-end ov) window)))
+    (cons (if beg (+ top (cdr (posn-x-y beg))) top)
+          (if end
+              (+ top (cdr (posn-x-y end))
+                 (save-excursion
+                   (goto-char (overlay-end ov))
+                   (line-pixel-height)))
+            bottom))))
+
 (defconst latex-to-svg-frontend--editing-preview-parameters
   '((no-accept-focus . t)
     (no-focus-on-map . t)
@@ -2118,9 +2145,11 @@ The frame is made, hidden, when there is none or it has another parent."
       (setq latex-to-svg-frontend--editing-preview-frame frame))
     frame))
 
-(defun latex-to-svg-frontend--editing-preview-show (window image corner)
+(defun latex-to-svg-frontend--editing-preview-show (window image corner &optional ov)
   "Show IMAGE in the editing preview, at CORNER of WINDOW.
-CORNER is as in `latex-to-svg-frontend--editing-preview-position'.  The
+CORNER is as in `latex-to-svg-frontend--editing-preview-position', or
+`smart', which puts the frame where it does not cover OV, the preview
+whose image it shows (see `--editing-preview-smart-corner').  The
 frame's background is that of the `default' face on WINDOW's frame, and
 its border that of the face `latex-to-svg-frontend-editing-preview-border'.
 Each parameter is set only when it changes: corfu notes that setting a
@@ -2145,9 +2174,14 @@ frame parameter to the value it has makes the frame flicker on macOS."
     (pcase-let* ((`(,width . ,height)
                   (window-text-pixel-size win nil nil 10000 10000))
                  (b (frame-internal-border-width frame))
+                 (edges (window-inside-pixel-edges window))
+                 (corner (if (eq corner 'smart)
+                             (latex-to-svg-frontend--editing-preview-smart-corner
+                              (latex-to-svg-frontend--overlay-rows ov window)
+                              (nth 1 edges) (+ height b b))
+                           corner))
                  (`(,x . ,y) (latex-to-svg-frontend--editing-preview-position
-                              corner (window-inside-pixel-edges window)
-                              (+ width b b) (+ height b b))))
+                              corner edges (+ width b b) (+ height b b))))
       (unless (and (= (frame-text-width frame) width)
                    (= (frame-text-height frame) height))
         ;; Else the window keeps four lines, the default minimum.
@@ -2195,7 +2229,7 @@ Otherwise it is hidden."
              (eq (latex-to-svg-frontend--display-window (current-buffer))
                  (selected-window)))
         (latex-to-svg-frontend--editing-preview-show
-         (selected-window) image corner)
+         (selected-window) image corner ov)
       (latex-to-svg-frontend--editing-preview-hide))))
 
 ;;;; Numbering

@@ -345,8 +345,9 @@ frame at a corner of the window, an Isearch included. The frame covers the
 text under it, which does not move. It shows the image the equation had
 when point entered it; an edit is typeset when point leaves the equation.
 `latex-to-svg-frontend-editing-preview` sets the corner: `top-right`
-(default), `top-left`, `bottom-left` or `bottom-right`. To turn the frame
-off:
+(default), `top-left`, `bottom-left` or `bottom-right`. `smart` is
+`top-right`, or `bottom-right` when the frame there would cover lines of the
+equation. To turn the frame off:
 
 ```elisp
 (setq latex-to-svg-frontend-editing-preview nil)
