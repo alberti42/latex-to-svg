@@ -608,6 +608,14 @@ typeset by LaTeX, so they match the surrounding prose font.  Set it to
 `default' for a plain, unlinked look."
   :group 'latex-to-svg-frontend)
 
+(defface latex-to-svg-frontend-editing-preview-border
+  '((((class color) (min-colors 88) (background dark)) :background "#323232")
+    (((class color) (min-colors 88) (background light)) :background "#cecece")
+    (t :background "gray"))
+  "Face of the border of the editing preview.
+Only its background is used, as the color of the border."
+  :group 'latex-to-svg-frontend)
+
 (defconst latex-to-svg-frontend--neutralize-face
   '(:strike-through nil :underline nil :overline nil
     :weight normal :slant normal :box nil)
@@ -2002,6 +2010,129 @@ it at its top edge."
           (if (memq corner '(top-left top-right))
               top
             (max top (- bottom height))))))
+
+(defconst latex-to-svg-frontend--editing-preview-parameters
+  '((no-accept-focus . t)
+    (no-focus-on-map . t)
+    (min-width . t)
+    (min-height . t)
+    (border-width . 0)
+    (outer-border-width . 0)
+    (internal-border-width . 1)
+    (child-frame-border-width . 1)
+    (left-fringe . 0)
+    (right-fringe . 0)
+    (vertical-scroll-bars . nil)
+    (horizontal-scroll-bars . nil)
+    (menu-bar-lines . 0)
+    (tool-bar-lines . 0)
+    (tab-bar-lines . 0)
+    (tab-bar-lines-keep-state . t)
+    (no-other-frame . t)
+    (unsplittable . t)
+    (undecorated . t)
+    (fullscreen . nil)
+    (cursor-type . nil)
+    (no-special-glyphs . t)
+    (desktop-dont-save . t)
+    (inhibit-double-buffering . t))
+  "Parameters of the editing preview's frame.
+Those of corfu's child frame, `corfu--frame-parameters', with a border
+of one pixel and no fringes.")
+
+(defvar latex-to-svg-frontend--editing-preview-frame nil
+  "The child frame of the editing preview, or nil.
+It is made once and kept when hidden, so showing it again only moves it
+and changes its image.  It is made again when the preview is shown in
+another frame.")
+
+(defun latex-to-svg-frontend--editing-preview-buffer ()
+  "Return the buffer the editing preview's frame shows, made if needed."
+  (or (get-buffer " *latex-to-svg-frontend-editing-preview*")
+      (with-current-buffer
+          (get-buffer-create " *latex-to-svg-frontend-editing-preview*")
+        (setq-local mode-line-format nil
+                    header-line-format nil
+                    tab-line-format nil
+                    cursor-type nil
+                    cursor-in-non-selected-windows nil
+                    truncate-lines t
+                    line-spacing nil
+                    display-line-numbers nil
+                    buffer-read-only t)
+        (current-buffer))))
+
+(defun latex-to-svg-frontend--editing-preview-frame (parent)
+  "Return the editing preview's frame as a child of PARENT.
+The frame is made, hidden, when there is none or it has another parent."
+  (let ((frame latex-to-svg-frontend--editing-preview-frame))
+    (unless (and (frame-live-p frame)
+                 (eq (frame-parent frame) parent)
+                 (window-live-p (frame-root-window frame)))
+      (when (frame-live-p frame)
+        (delete-frame frame))
+      (setq frame (let ((before-make-frame-hook nil)
+                        (after-make-frame-functions nil))
+                    (make-frame
+                     `((name . "latex-to-svg-frontend-editing-preview")
+                       (parent-frame . ,parent)
+                       (minibuffer . ,(minibuffer-window parent))
+                       (width . 0) (height . 0) (visibility . nil)
+                       ,@latex-to-svg-frontend--editing-preview-parameters))))
+      (let ((win (frame-root-window frame)))
+        (set-window-buffer win (latex-to-svg-frontend--editing-preview-buffer))
+        (set-window-dedicated-p win t)
+        (set-window-parameter win 'no-other-window t)
+        (set-window-parameter win 'no-delete-other-windows t))
+      (setq latex-to-svg-frontend--editing-preview-frame frame))
+    frame))
+
+(defun latex-to-svg-frontend--editing-preview-show (window image corner)
+  "Show IMAGE in the editing preview, at CORNER of WINDOW.
+CORNER is as in `latex-to-svg-frontend--editing-preview-position'.  The
+frame's background is that of the `default' face on WINDOW's frame, and
+its border that of the face `latex-to-svg-frontend-editing-preview-border'.
+Each parameter is set only when it changes: corfu notes that setting a
+frame parameter to the value it has makes the frame flicker on macOS."
+  (let* ((parent (window-frame window))
+         (frame (latex-to-svg-frontend--editing-preview-frame parent))
+         (win (frame-root-window frame))
+         (background (face-background 'default parent))
+         (border (face-background 'latex-to-svg-frontend-editing-preview-border
+                                  parent 'default)))
+    (with-current-buffer (window-buffer win)
+      (unless (eq (get-text-property (point-min) 'display) image)
+        (let ((inhibit-read-only t))
+          (erase-buffer)
+          (insert (propertize " " 'display image)))))
+    (unless (equal (frame-parameter frame 'background-color) background)
+      (set-frame-parameter frame 'background-color background))
+    (unless (equal (face-background 'child-frame-border frame) border)
+      (set-face-background 'child-frame-border border frame))
+    (unless (equal (face-background 'internal-border frame) border)
+      (set-face-background 'internal-border border frame))
+    (pcase-let* ((`(,width . ,height)
+                  (window-text-pixel-size win nil nil 10000 10000))
+                 (b (frame-internal-border-width frame))
+                 (`(,x . ,y) (latex-to-svg-frontend--editing-preview-position
+                              corner (window-inside-pixel-edges window)
+                              (+ width b b) (+ height b b))))
+      (unless (and (= (frame-text-width frame) width)
+                   (= (frame-text-height frame) height))
+        ;; Else the window keeps four lines, the default minimum.
+        (let ((window-min-height 1)
+              (window-min-width 1))
+          (set-frame-size frame width height t)))
+      (unless (equal (frame-position frame) (cons x y))
+        (set-frame-position frame x y)))
+    (unless (frame-visible-p frame)
+      (make-frame-visible frame))))
+
+(defun latex-to-svg-frontend--editing-preview-hide ()
+  "Hide the editing preview, keeping its frame for the next show."
+  (let ((frame latex-to-svg-frontend--editing-preview-frame))
+    (when (and (frame-live-p frame) (frame-visible-p frame))
+      (make-frame-invisible frame))))
 
 ;;;; Numbering
 
