@@ -2576,9 +2576,12 @@ nil."
 VALUE is EL's source, numbered as `--render-element' numbers it, from
 `--local-table'.  ARGUMENTS are EL's engine and fallback, or the engine
 `latex-to-svg-frontend-editing-preview-engine' with none, the frame's
-padding, `:quiet' t, and the size and color at EL's start (see
-`--appearance-arguments').  Nil when EL's engine typesets nothing
-\(`skip', or a cookie's warning)."
+padding, `:quiet' t, `:tentative' t, and the size and color at EL's
+start (see `--appearance-arguments').  `:tentative' tells the backend
+that a failure is expected: a half-typed formula that fails with the
+precompiled preamble (the `.fmt' file) is not compiled again with the
+full preamble, and the `.fmt' file stays in use.  Nil when EL's engine
+typesets nothing (`skip', or a cookie's warning)."
   (let* ((source (latex-to-svg-frontend--math-value el))
          (begin (latex-to-svg-frontend--math-begin el))
          (own (latex-to-svg-frontend--engine-for source))
@@ -2593,7 +2596,8 @@ padding, `:quiet' t, and the size and color at EL's start (see
                                     (latex-to-svg-frontend--fallback-for engine))
                      :metadata (and k (1+ k))
                      :padding latex-to-svg-frontend-editing-preview-padding
-                     :quiet t)
+                     :quiet t
+                     :tentative t)
                (latex-to-svg-frontend--appearance-arguments
                 begin (latex-to-svg-frontend--display-p source))))))))
 

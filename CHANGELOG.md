@@ -21,7 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Emacs has been idle for
   `latex-to-svg-frontend-editing-preview-delay` (default 50 ms), with the
   equation's own engine and fallback, and the frame shows the new image;
-  each new request cancels the one before. Math with no picture yet, typed
+  each new request cancels the one before. These requests write no warning
+  for a failed formula, and a half-typed formula that fails does not stop
+  the precompiled preamble from being used. Math with no picture yet, typed
   new or failed, shows the frame from its first picture on. When the edit
   does not typeset, as while it is half typed, the frame keeps the last
   image and draws its border in the foreground of the new face

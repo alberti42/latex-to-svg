@@ -4217,6 +4217,7 @@ after a hide.  The selected frame counts as graphical."
       (latex-to-svg-frontend--request-while-typing))
     (should (equal (car l2sf-tests--calls) '("$ba$" . latex)))
     (should (eq (plist-get l2sf-tests--last-args :quiet) t))
+    (should (eq (plist-get l2sf-tests--last-args :tentative) t))
     (should (equal (plist-get l2sf-tests--last-args :padding) 4))
     (should-not (plist-get l2sf-tests--last-args :fallback))
     (should (equal l2sf-tests--shown '(typed-image smart-above-below)))
