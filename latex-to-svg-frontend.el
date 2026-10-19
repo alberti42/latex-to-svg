@@ -2058,6 +2058,14 @@ edge, and one taller than it at its top edge."
             ('right (max top (min (car rows) (- bottom height))))
             (_ (max top (- bottom height)))))))
 
+(defun latex-to-svg-frontend--text-edges (window)
+  "Return the pixel edges of the text in WINDOW, the selected window.
+Those of `window-inside-pixel-edges', from the right of the line
+numbers: `display-line-numbers' draws them inside the text area, at its
+left."
+  (let ((edges (window-inside-pixel-edges window)))
+    (cons (+ (car edges) (line-number-display-width t)) (cdr edges))))
+
 (defun latex-to-svg-frontend--editing-preview-smart-corner (rows top height)
   "Return the corner where `smart-corner' puts a frame HEIGHT pixels high.
 That is `top-right', or `bottom-right' when the frame there, from TOP,
@@ -2223,7 +2231,7 @@ value it has makes the frame flicker on macOS."
     (pcase-let* ((`(,width . ,height)
                   (window-text-pixel-size win nil nil 10000 10000))
                  (b (frame-internal-border-width frame))
-                 (edges (window-inside-pixel-edges window))
+                 (edges (latex-to-svg-frontend--text-edges window))
                  (rows (and (memq corner '(smart-corner right))
                             (latex-to-svg-frontend--overlay-rows ov window)))
                  (corner (if (eq corner 'smart-corner)

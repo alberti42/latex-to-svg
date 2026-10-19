@@ -4059,6 +4059,15 @@ after a hide.  The selected frame counts as graphical."
       (should (equal (plist-get l2sf-tests--last-args :padding) 0))
       (should (eq (overlay-get ov 'latex-to-svg-frontend-image) 'fake-image)))))
 
+(ert-deftest l2sf-editing-preview-text-edges ()
+  ;; The left edge of the text is to the right of the line numbers.
+  (cl-letf (((symbol-function 'window-inside-pixel-edges)
+             (lambda (&optional _window) (list 10 20 510 320)))
+            ((symbol-function 'line-number-display-width)
+             (lambda (&optional _pixelwise) 66)))
+    (should (equal (latex-to-svg-frontend--text-edges (selected-window))
+                   '(76 20 510 320)))))
+
 (ert-deftest l2sf-editing-preview-smart-corner ()
   ;; `smart-corner' puts a frame 40 pixels high at the top right, from the top
   ;; edge at 20, unless an equation's rows start above its bottom at 60.
