@@ -3958,6 +3958,27 @@ compiled.  Once point leaves it, both show the new picture."
                 latex-to-svg-frontend--option-buffers nil
                 latex-to-svg-frontend--option-defaults nil))))))
 
+(ert-deftest l2sf-editing-preview-position ()
+  ;; A frame 100 by 40 pixels in a text area from (10, 20) to (510, 320)
+  ;; goes in the corner it names.  One wider or taller than the text area
+  ;; starts at its left or top edge.
+  (let ((edges '(10 20 510 320)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'top-left edges 100 40)
+                   '(10 . 20)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'top-right edges 100 40)
+                   '(410 . 20)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'bottom-left edges 100 40)
+                   '(10 . 280)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'bottom-right edges 100 40)
+                   '(410 . 280)))
+    (should (equal (latex-to-svg-frontend--editing-preview-position
+                    'bottom-right edges 600 400)
+                   '(10 . 20)))))
+
 (ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
   ;; A failed `align' still takes its two numbers: the equation below it is
   ;; numbered 3, on a full reconcile and on the incremental path.

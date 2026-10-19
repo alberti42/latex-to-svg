@@ -1985,6 +1985,24 @@ defining LABEL."
                      (list #'latex-to-svg-frontend--on-modify))
         ov))))
 
+;;;; Editing preview
+
+(defun latex-to-svg-frontend--editing-preview-position (corner edges width height)
+  "Return (X . Y), where a frame WIDTH by HEIGHT pixels goes at CORNER.
+CORNER is `top-left', `top-right', `bottom-left' or `bottom-right'.
+EDGES is (LEFT TOP RIGHT BOTTOM), the pixel edges of a window's text
+area, as `window-inside-pixel-edges' returns them; X and Y are in the
+same coordinates, which are those of a child frame's position.  A frame
+wider than the text area starts at its left edge, and one taller than
+it at its top edge."
+  (pcase-let ((`(,left ,top ,right ,bottom) edges))
+    (cons (if (memq corner '(top-left bottom-left))
+              left
+            (max left (- right width)))
+          (if (memq corner '(top-left top-right))
+              top
+            (max top (- bottom height))))))
+
 ;;;; Numbering
 
 (defconst latex-to-svg-frontend--unnumbered-regexp
