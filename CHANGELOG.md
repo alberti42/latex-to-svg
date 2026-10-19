@@ -20,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   frame covers the text under it, which does not move. It shows the image
   the equation had when point entered it. `latex-to-svg-frontend-editing-preview`
   sets the corner: `top-right` (default), `top-left`, `bottom-left` or
-  `bottom-right`; `smart` is `top-right`, or `bottom-right` when the frame
+  `bottom-right`; `smart-corner` is `top-right`, or `bottom-right` when the frame
   there would cover lines of the equation; nil turns the frame off.
   `latex-to-svg-frontend-editing-preview-padding` sets the padding around the
   image in the frame, with the values of the other padding options (pt;

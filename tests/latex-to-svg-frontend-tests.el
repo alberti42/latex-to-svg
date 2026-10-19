@@ -4042,7 +4042,7 @@ after a hide.  The selected frame counts as graphical."
       (should (eq (overlay-get ov 'latex-to-svg-frontend-image) 'fake-image)))))
 
 (ert-deftest l2sf-editing-preview-smart-corner ()
-  ;; `smart' puts a frame 40 pixels high at the top right, from the top
+  ;; `smart-corner' puts a frame 40 pixels high at the top right, from the top
   ;; edge at 20, unless an equation's rows start above its bottom at 60.
   (should (eq (latex-to-svg-frontend--editing-preview-smart-corner
                '(60 . 90) 20 40)
