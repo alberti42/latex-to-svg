@@ -2069,6 +2069,14 @@ It is made once and kept when hidden, so showing it again only moves it
 and changes its image.  It is made again when the preview is shown in
 another frame.")
 
+(defconst latex-to-svg-frontend--editing-preview-hooks
+  '(window-selection-change-functions
+    window-buffer-change-functions
+    window-size-change-functions)
+  "The hooks on which the editing preview follows the selected window.
+`latex-to-svg-frontend--editing-preview-follow' is on their global
+values while the frame is shown.")
+
 (defun latex-to-svg-frontend--editing-preview-buffer ()
   "Return the buffer the editing preview's frame shows, made if needed."
   (or (get-buffer " *latex-to-svg-frontend-editing-preview*")
@@ -2149,13 +2157,29 @@ frame parameter to the value it has makes the frame flicker on macOS."
       (unless (equal (frame-position frame) (cons x y))
         (set-frame-position frame x y)))
     (unless (frame-visible-p frame)
-      (make-frame-visible frame))))
+      (make-frame-visible frame))
+    (dolist (hook latex-to-svg-frontend--editing-preview-hooks)
+      (add-hook hook #'latex-to-svg-frontend--editing-preview-follow))))
 
 (defun latex-to-svg-frontend--editing-preview-hide ()
   "Hide the editing preview, keeping its frame for the next show."
+  (dolist (hook latex-to-svg-frontend--editing-preview-hooks)
+    (remove-hook hook #'latex-to-svg-frontend--editing-preview-follow))
   (let ((frame latex-to-svg-frontend--editing-preview-frame))
     (when (and (frame-live-p frame) (frame-visible-p frame))
       (make-frame-invisible frame))))
+
+(defun latex-to-svg-frontend--editing-preview-follow (&rest _)
+  "Show or hide the editing preview for the selected window.
+On `latex-to-svg-frontend--editing-preview-hooks': after another window
+is selected, the window shows another buffer, or its size changes, the
+frame shows the image of the preview at point in the selected window,
+moved to its corner, or is hidden.  These changes need no command in
+the buffer of the equation, so `--handle-cursor' does not see them."
+  (with-current-buffer (window-buffer)
+    (latex-to-svg-frontend--update-editing-preview
+     (and latex-to-svg-frontend-mode
+          (latex-to-svg-frontend--revealable-overlay-at (point))))))
 
 (defun latex-to-svg-frontend--update-editing-preview (ov)
   "Show the editing preview for the preview OV point is on, or hide it.

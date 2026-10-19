@@ -4036,6 +4036,23 @@ after a hide.  The selected frame counts as graphical."
     (latex-to-svg-frontend--handle-cursor)
     (should-not l2sf-tests--shown)))
 
+(ert-deftest l2sf-editing-preview-follows-the-selected-window ()
+  ;; When the selected window shows another buffer, the frame is hidden;
+  ;; when it shows the equation's buffer again, with point in the
+  ;; equation, the frame shows its image.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (goto-char (1+ (point-min)))
+    (latex-to-svg-frontend--handle-cursor)
+    (should l2sf-tests--shown)
+    (let ((buffer (current-buffer)))
+      (with-temp-buffer
+        (set-window-buffer (selected-window) (current-buffer))
+        (latex-to-svg-frontend--editing-preview-follow)
+        (should-not l2sf-tests--shown)
+        (set-window-buffer (selected-window) buffer)
+        (latex-to-svg-frontend--editing-preview-follow)
+        (should (equal l2sf-tests--shown '(fake-image top-right)))))))
+
 (ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
   ;; A failed `align' still takes its two numbers: the equation below it is
   ;; numbered 3, on a full reconcile and on the incremental path.
