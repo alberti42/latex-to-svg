@@ -2129,13 +2129,20 @@ and changes its image.  It is made again when the preview is shown in
 another frame.")
 
 (defconst latex-to-svg-frontend--editing-preview-hooks
-  '(window-selection-change-functions
-    window-buffer-change-functions
-    window-size-change-functions
+  '(window-state-change-hook
     window-scroll-functions)
   "The hooks on which the editing preview follows the selected window.
 `latex-to-svg-frontend--editing-preview-follow' is on their global
-values while the frame is shown.")
+values while the frame is shown, at depth 90.
+Emacs runs `window-state-change-hook' when a window was selected,
+changed its buffer or its size, after all the other window change
+hooks.  A margin set by a function on those does not make Emacs run
+them again: at the end, Emacs records the windows as they are.  So the
+frame is placed after other packages set the margins: git-gutter sets
+the left margin for its own column, and a function on
+`window-configuration-change-hook' sets the centering margins again.
+Run before that function, the frame was placed for the margins in
+between, at the left edge of the window.")
 
 (defun latex-to-svg-frontend--editing-preview-buffer ()
   "Return the buffer the editing preview's frame shows, made if needed."
@@ -2251,7 +2258,7 @@ value it has makes the frame flicker on macOS."
     (unless (frame-visible-p frame)
       (make-frame-visible frame))
     (dolist (hook latex-to-svg-frontend--editing-preview-hooks)
-      (add-hook hook #'latex-to-svg-frontend--editing-preview-follow))))
+      (add-hook hook #'latex-to-svg-frontend--editing-preview-follow 90))))
 
 (defun latex-to-svg-frontend--editing-preview-hide ()
   "Hide the editing preview, keeping its frame for the next show."
