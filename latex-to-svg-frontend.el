@@ -541,7 +541,8 @@ frame at the right edge, with its top at the top of the equation's
 first line; it follows the equation when the window scrolls.
 `top-right', `top-left', `bottom-left' and `bottom-right' put it at
 that corner.  `smart-right-corner' is `top-right', or `bottom-right'
-when the frame there would cover lines of the equation.  The frame
+when the frame there would cover lines of the equation;
+`smart-left-corner' is `top-left', or `bottom-left'.  The frame
 covers the text under it, which does not move.  It shows the image the
 equation had when point entered it; an edit is typeset when point
 leaves the equation.  nil shows no frame.  Only on a graphical frame."
@@ -552,10 +553,12 @@ leaves the equation.  nil shows no frame.  Only on a graphical frame."
                  (const :tag "Bottom right" bottom-right)
                  (const :tag "Top right, else bottom right"
                         smart-right-corner)
+                 (const :tag "Top left, else bottom left"
+                        smart-left-corner)
                  (const :tag "No frame" nil))
   :safe (lambda (value)
           (memq value '(right top-right top-left bottom-left bottom-right
-                        smart-right-corner nil)))
+                        smart-right-corner smart-left-corner nil)))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-editing-preview-padding 4
@@ -2089,12 +2092,15 @@ MARGIN is a value of `latex-to-svg-frontend-editing-preview-margin'."
     (list (+ left horizontal) (+ top vertical)
           (- right horizontal) (- bottom vertical))))
 
-(defun latex-to-svg-frontend--editing-preview-smart-corner (rows top height)
-  "Return the corner `smart-right-corner' puts a frame HEIGHT pixels high at.
-That is `top-right', or `bottom-right' when the frame there, from TOP,
-the top edge of the text area, would cover ROWS.  ROWS is (BEG . END),
-the pixel rows the equation takes, in the coordinates of TOP."
-  (if (< (car rows) (+ top height)) 'bottom-right 'top-right))
+(defun latex-to-svg-frontend--editing-preview-smart-corner (side rows top height)
+  "Return the corner where `smart-SIDE-corner' puts a frame HEIGHT high.
+SIDE is `right' or `left'.  The corner is the top one of SIDE, or the
+bottom one when the frame there, from TOP, the top edge of the text
+area, would cover ROWS.  ROWS is (BEG . END), the pixel rows the
+equation takes, in the coordinates of TOP.  HEIGHT is in pixels."
+  (if (< (car rows) (+ top height))
+      (if (eq side 'left) 'bottom-left 'bottom-right)
+    (if (eq side 'left) 'top-left 'top-right)))
 
 (defun latex-to-svg-frontend--overlay-rows (ov window)
   "Return (BEG . END), the pixel rows the text of OV takes in WINDOW.
@@ -2235,8 +2241,8 @@ picture for it, OV's own image."
   "Show IMAGE in the editing preview, at CORNER of WINDOW.
 CORNER is as in `latex-to-svg-frontend--editing-preview-position', where
 `right' is beside OV, the preview whose image the frame shows, or
-`smart-right-corner', which puts the frame where it does not cover OV
-\(see `--editing-preview-smart-corner').  The frame keeps
+`smart-right-corner' and `smart-left-corner', which put the frame where
+it does not cover OV (see `--editing-preview-smart-corner').  The frame keeps
 `latex-to-svg-frontend-editing-preview-margin' from the edges of the
 text area.  The frame's background is that of
 the `default' face on WINDOW's frame, and its border that of the face
@@ -2266,12 +2272,17 @@ value it has makes the frame flicker on macOS."
                  (edges (latex-to-svg-frontend--inset-edges
                          (latex-to-svg-frontend--text-edges window)
                          latex-to-svg-frontend-editing-preview-margin))
-                 (rows (and (memq corner '(smart-right-corner right))
+                 (rows (and (memq corner '(smart-right-corner smart-left-corner
+                                           right))
                             (latex-to-svg-frontend--overlay-rows ov window)))
-                 (corner (if (eq corner 'smart-right-corner)
-                             (latex-to-svg-frontend--editing-preview-smart-corner
-                              rows (nth 1 edges) (+ height b b))
-                           corner))
+                 (corner (pcase corner
+                           ('smart-right-corner
+                            (latex-to-svg-frontend--editing-preview-smart-corner
+                             'right rows (nth 1 edges) (+ height b b)))
+                           ('smart-left-corner
+                            (latex-to-svg-frontend--editing-preview-smart-corner
+                             'left rows (nth 1 edges) (+ height b b)))
+                           (_ corner)))
                  (`(,x . ,y) (latex-to-svg-frontend--editing-preview-position
                               corner edges (+ width b b) (+ height b b) rows)))
       (unless (and (= (frame-text-width frame) width)

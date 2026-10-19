@@ -4083,16 +4083,22 @@ after a hide.  The selected frame counts as graphical."
 (ert-deftest l2sf-editing-preview-smart-corner ()
   ;; `smart-right-corner' puts a frame 40 pixels high at the top right,
   ;; from the top edge at 20, unless an equation's rows start above its
-  ;; bottom at 60.
+  ;; bottom at 60.  `smart-left-corner' does the same on the left.
   (should (eq (latex-to-svg-frontend--editing-preview-smart-corner
-               '(60 . 90) 20 40)
+               'right '(60 . 90) 20 40)
               'top-right))
   (should (eq (latex-to-svg-frontend--editing-preview-smart-corner
-               '(59 . 90) 20 40)
+               'right '(59 . 90) 20 40)
               'bottom-right))
   (should (eq (latex-to-svg-frontend--editing-preview-smart-corner
-               '(20 . 40) 20 40)
-              'bottom-right)))
+               'right '(20 . 40) 20 40)
+              'bottom-right))
+  (should (eq (latex-to-svg-frontend--editing-preview-smart-corner
+               'left '(60 . 90) 20 40)
+              'top-left))
+  (should (eq (latex-to-svg-frontend--editing-preview-smart-corner
+               'left '(59 . 90) 20 40)
+              'bottom-left)))
 
 (ert-deftest l2sf-editing-preview-shows-while-source-shows ()
   ;; Point entering an equation shows its image in the frame, at the

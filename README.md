@@ -349,7 +349,8 @@ equation. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
 top of the equation's first line, and it follows the equation when the window
 scrolls. `top-right`, `top-left`, `bottom-left` and `bottom-right` put it at
 that corner. `smart-right-corner` is `top-right`, or `bottom-right` when the
-frame there would cover lines of the equation. To turn the frame off:
+frame there would cover lines of the equation; `smart-left-corner` is
+`top-left`, or `bottom-left`. To turn the frame off:
 
 ```elisp
 (setq latex-to-svg-frontend-editing-preview nil)

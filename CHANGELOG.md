@@ -23,7 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (default) at the right edge, beside the equation, following it when the
   window scrolls; `top-right`, `top-left`, `bottom-left` or `bottom-right` at
   that corner; `smart-right-corner` is `top-right`, or `bottom-right` when the
-  frame there would cover lines of the equation; nil turns the frame off.
+  frame there would cover lines of the equation, and `smart-left-corner` the
+  same on the left; nil turns the frame off.
   `latex-to-svg-frontend-editing-preview-padding` sets the padding around the
   image in the frame, with the values of the other padding options (pt;
   default 4). `latex-to-svg-frontend-editing-preview-margin` sets the
