@@ -4239,14 +4239,15 @@ after a hide.  The selected frame counts as graphical."
       (l2sf-tests--with-failing "frac"
         (latex-to-svg-frontend--request-while-typing)
         (sit-for 0.01))
-      (should (equal (overlay-get ov 'latex-to-svg-frontend-typing-failure)
+      (should (equal (nth 3 latex-to-svg-frontend--typing)
                      l2sf-tests--failure))
       (should (equal l2sf-tests--shown '(fake-image smart-right)))
       (delete-char -6)
       (insert "b")
       (let ((l2sf-tests--image 'typed-image))
         (latex-to-svg-frontend--request-while-typing))
-      (should-not (overlay-get ov 'latex-to-svg-frontend-typing-failure))
+      (should-not (nth 3 latex-to-svg-frontend--typing))
+      (should (overlay-buffer ov))
       (should (equal l2sf-tests--shown '(typed-image smart-right))))))
 
 (ert-deftest l2sf-editing-preview-content ()
@@ -4295,6 +4296,53 @@ after a hide.  The selected frame counts as graphical."
     (setq latex-to-svg-frontend--option-timer nil
           latex-to-svg-frontend--option-buffers nil
           latex-to-svg-frontend--option-defaults nil)))
+
+(ert-deftest l2sf-typing-shows-new-math-once-typeset ()
+  ;; Math typed new has no preview: the frame shows nothing until an
+  ;; edit typesets, then the picture; a failure after keeps it with the
+  ;; mark.  Leaving the math forgets it.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (goto-char (point-max))
+    (insert "$\\frac{$")
+    (backward-char)
+    (latex-to-svg-frontend--handle-cursor)
+    (l2sf-tests--with-failing "frac"
+      (latex-to-svg-frontend--request-while-typing)
+      (sit-for 0.01))
+    (should (equal (car l2sf-tests--calls) '("$\\frac{$" . latex)))
+    (should-not l2sf-tests--shown)
+    (delete-char -6)
+    (insert "c")
+    (let ((l2sf-tests--image 'typed-image))
+      (latex-to-svg-frontend--request-while-typing))
+    (should (equal (car l2sf-tests--calls) '("$c$" . latex)))
+    (should (equal l2sf-tests--shown '(typed-image smart-right)))
+    (insert "\\frac{")
+    (l2sf-tests--with-failing "frac"
+      (latex-to-svg-frontend--request-while-typing)
+      (sit-for 0.01))
+    (should (equal l2sf-tests--shown '(typed-image smart-right)))
+    (should (equal (nth 3 latex-to-svg-frontend--typing) l2sf-tests--failure))
+    (goto-char (point-min))
+    (latex-to-svg-frontend--handle-cursor)
+    (should-not latex-to-svg-frontend--typing)))
+
+(ert-deftest l2sf-typing-shows-a-failed-equation-once-typeset ()
+  ;; An equation that failed has no picture: editing it shows the frame
+  ;; once an edit typesets.
+  (l2sf-tests--editing-preview "Before $\\notacommand$ after\n"
+    (latex-to-svg-frontend--set-unrendered-overlay
+     8 22 "$\\notacommand$" nil 'latex nil l2sf-tests--failure)
+    (goto-char 9)
+    (latex-to-svg-frontend--handle-cursor)
+    (should-not l2sf-tests--shown)
+    (delete-region 9 21)
+    (insert "x")
+    (latex-to-svg-frontend--handle-cursor)
+    (let ((l2sf-tests--image 'typed-image))
+      (latex-to-svg-frontend--request-while-typing))
+    (should (equal (car l2sf-tests--calls) '("$x$" . latex)))
+    (should (equal l2sf-tests--shown '(typed-image smart-right)))))
 
 (ert-deftest l2sf-typing-schedules-one-idle-timer ()
   ;; An edit starts one idle timer, none while the frame is off.
