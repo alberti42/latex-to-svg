@@ -601,9 +601,30 @@ preview shows its image (see `latex-to-svg-frontend-editing-preview'),
 an edit is typeset once Emacs has been idle this long, and the frame
 shows the new image.  The equation is typeset with its own engine and
 fallback, the ones used when point leaves it, and failures write no
-warning.  Each new request cancels the one before."
+warning.  Each new request cancels the one before.  See
+`latex-to-svg-frontend-editing-preview-engine' to typeset with another
+engine while typing."
   :type 'number
   :safe #'numberp
+  :group 'latex-to-svg-frontend)
+
+(defcustom latex-to-svg-frontend-editing-preview-engine nil
+  "The engine that typesets an equation while it is edited, or nil.
+nil (the default) typesets it with its own engine and fallback, the
+ones used when point leaves it (see `latex-to-svg-frontend-engine'), so
+the editing preview shows the picture the equation will have.
+`ratex', `texres' or `latex' typesets every equation with that engine
+while it is edited, with no fallback.  The picture may then differ
+from the one the equation gets when point leaves it, or fail where
+that one does not.  `ratex' compiles in about 6 ms, against about
+300 ms for `latex', so it allows a shorter
+`latex-to-svg-frontend-editing-preview-delay'.  An equation whose
+cookie says `engine=skip' is not typeset whatever the value."
+  :type '(choice (const :tag "The equation's own engine" nil)
+                 (const :tag "RaTeX" ratex)
+                 (const :tag "texres" texres)
+                 (const :tag "LaTeX" latex))
+  :safe (lambda (value) (memq value '(nil ratex texres latex)))
   :group 'latex-to-svg-frontend)
 
 (defcustom latex-to-svg-frontend-suppress-emphasis t
@@ -2452,17 +2473,22 @@ nil."
   "Return (VALUE . ARGUMENTS), the request for math EL edited in preview OV.
 VALUE is EL's source, numbered as `--render-element' numbers it, from
 `--local-table'.  ARGUMENTS are those of `--overlay-request', with
-EL's engine and fallback, the frame's padding, and `:quiet' t.  Nil
-when EL's engine typesets nothing (`skip', or a cookie's warning)."
+EL's engine and fallback, or the engine
+`latex-to-svg-frontend-editing-preview-engine' with none, the frame's
+padding, and `:quiet' t.  Nil when EL's engine typesets nothing
+\(`skip', or a cookie's warning)."
   (let* ((source (latex-to-svg-frontend--math-value el))
-         (engine (latex-to-svg-frontend--engine-for source)))
-    (when (memq engine '(nil latex ratex texres))
+         (own (latex-to-svg-frontend--engine-for source))
+         (engine (or latex-to-svg-frontend-editing-preview-engine own)))
+    (when (memq own '(nil latex ratex texres))
       (let ((k (gethash (latex-to-svg-frontend--math-begin el)
                         (car (latex-to-svg-frontend--local-table el)))))
         (cons (latex-to-svg-frontend--backend-value k source engine)
               (append
                (list :engine engine
-                     :fallback (latex-to-svg-frontend--fallback-for engine)
+                     :fallback (and (null
+                                     latex-to-svg-frontend-editing-preview-engine)
+                                    (latex-to-svg-frontend--fallback-for engine))
                      :metadata (and k (1+ k))
                      :padding latex-to-svg-frontend-editing-preview-padding
                      :quiet t)

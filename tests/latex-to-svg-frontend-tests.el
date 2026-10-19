@@ -4270,6 +4270,32 @@ after a hide.  The selected frame counts as graphical."
                           image l2sf-tests--failure))
                  1)))))
 
+(ert-deftest l2sf-typing-engine ()
+  ;; While typing, an equation is typeset with its own engine and
+  ;; fallback, or with `latex-to-svg-frontend-editing-preview-engine' and
+  ;; no fallback.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (goto-char (1+ (point-min)))
+    (latex-to-svg-frontend--handle-cursor)
+    (insert "b")
+    (dolist (case '((latex nil latex nil)
+                    (ratex nil ratex latex)
+                    (latex ratex ratex nil)
+                    (ratex texres texres nil)))
+      (pcase-let ((`(,own ,option ,engine ,fallback) case))
+        (setq-local latex-to-svg-frontend-engine own)
+        (setq-local latex-to-svg-frontend-editing-preview-engine option)
+        (latex-to-svg-frontend--request-while-typing)
+        (should (equal (list (plist-get l2sf-tests--last-args :engine)
+                             (plist-get l2sf-tests--last-args :fallback))
+                       (list engine fallback)))))
+    ;; Setting the engine started the option watcher's timer.
+    (when (timerp latex-to-svg-frontend--option-timer)
+      (cancel-timer latex-to-svg-frontend--option-timer))
+    (setq latex-to-svg-frontend--option-timer nil
+          latex-to-svg-frontend--option-buffers nil
+          latex-to-svg-frontend--option-defaults nil)))
+
 (ert-deftest l2sf-typing-schedules-one-idle-timer ()
   ;; An edit starts one idle timer, none while the frame is off.
   (l2sf-tests--editing-preview "$a$ after\n"

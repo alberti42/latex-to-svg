@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each new request cancels the one before. When the edit does not typeset,
   as while it is half typed, the frame keeps the last image and shows the
   failure icon before it, with the error as its tooltip.
+  `latex-to-svg-frontend-editing-preview-engine` typesets every edit with
+  one engine instead, `ratex`, `texres` or `latex`, with no fallback: with
+  `ratex`, a shorter delay works, but the picture may differ from the one
+  the equation gets when point leaves it.
   `latex-to-svg-frontend-editing-preview` sets where the frame goes: `right`
   at the right edge, beside the equation, following it when the window
   scrolls; `smart-right` (default) the same, unless the frame would cover the

@@ -346,7 +346,13 @@ frame covers the text under it, which does not move. When you edit the
 equation, it is typeset once Emacs has been idle for
 `latex-to-svg-frontend-editing-preview-delay` (1 s), and the frame shows the
 new image. When the edit does not typeset, as while it is half typed, the
-frame keeps the last image and shows the failure icon before it. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
+frame keeps the last image and shows the failure icon before it. The edit is
+typeset with the equation's own engine and fallback, so the frame shows the
+picture you get when point leaves the equation.
+`latex-to-svg-frontend-editing-preview-engine` typesets every edit with one
+engine instead, `ratex`, `texres` or `latex`, with no fallback. RaTeX
+compiles in about 6 ms, so a shorter delay works with `ratex`; the picture may
+then differ from the one the equation gets when point leaves it. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
 `right` puts it at the right edge of the window, with its top at the top of the
 equation's first line, and it follows the equation when the window scrolls.
 `smart-right` (default) does the same, unless the frame there would cover the
