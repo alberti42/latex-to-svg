@@ -4004,6 +4004,21 @@ after a hide.  The selected frame counts as graphical."
 (defvar l2sf-tests--shown nil
   "What `l2sf-tests--editing-preview' records the frame showing.")
 
+(ert-deftest l2sf-editing-preview-buffer-has-no-margins ()
+  ;; A default margin would take its width from the image's, which
+  ;; would then be cut on the right.
+  (let ((buffer (get-buffer " *latex-to-svg-frontend-editing-preview*")))
+    (when buffer (kill-buffer buffer)))
+  (let ((left (default-value 'left-margin-width)))
+    (unwind-protect
+        (progn
+          (setq-default left-margin-width 1)
+          (with-current-buffer (latex-to-svg-frontend--editing-preview-buffer)
+            (should (= left-margin-width 0))
+            (should (= right-margin-width 0))))
+      (setq-default left-margin-width left)
+      (kill-buffer " *latex-to-svg-frontend-editing-preview*"))))
+
 (ert-deftest l2sf-editing-preview-smart-corner ()
   ;; `smart' puts a frame 40 pixels high at the top right, from the top
   ;; edge at 20, unless an equation's rows start above its bottom at 60.

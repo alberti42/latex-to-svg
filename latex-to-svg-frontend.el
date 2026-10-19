@@ -2115,6 +2115,9 @@ values while the frame is shown.")
                     cursor-type nil
                     cursor-in-non-selected-windows nil
                     truncate-lines t
+                    ;; A margin would take its width from the image's.
+                    left-margin-width 0
+                    right-margin-width 0
                     line-spacing nil
                     display-line-numbers nil
                     buffer-read-only t)
