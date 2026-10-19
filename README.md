@@ -340,6 +340,21 @@ Entering the insert state with point on an equation shows its source;
 leaving it shows the preview again, and renders the equation if you
 changed it or typed it new.
 
+While the source of an equation is shown, its image is shown in a child
+frame at a corner of the window, an Isearch included. The frame covers the
+text under it, which does not move. It shows the image the equation had
+when point entered it; an edit is typeset when point leaves the equation.
+`latex-to-svg-frontend-editing-preview` sets the corner: `top-right`
+(default), `top-left`, `bottom-left` or `bottom-right`. To turn the frame
+off:
+
+```elisp
+(setq latex-to-svg-frontend-editing-preview nil)
+```
+
+The face `latex-to-svg-frontend-editing-preview-border` sets the color of
+the frame's border. The child frame is shown only on a graphical frame.
+
 ### Per-mode configuration
 
 The size multipliers, colors, numbering, and detection toggles are ordinary
