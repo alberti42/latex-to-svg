@@ -4010,18 +4010,27 @@ compiled.  Once point leaves it, both show the new picture."
                    '(10 . 20)))))
 
 (ert-deftest l2sf-editing-preview-above-or-below ()
-  ;; Above when the frame fits there, else below when it fits there,
-  ;; else above.
+  ;; The first side when the frame fits there, else the other when it
+  ;; fits there, else the first.
   (let ((edges '(10 20 510 320)))
     (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
-                 '(100 . 130) edges 4 40)
+                 'above '(100 . 130) edges 4 40)
                 'above))
     (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
-                 '(30 . 50) edges 4 40)
+                 'above '(30 . 50) edges 4 40)
                 'below))
     (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
-                 '(30 . 300) edges 4 40)
-                'above))))
+                 'above '(30 . 300) edges 4 40)
+                'above))
+    (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
+                 'below '(100 . 130) edges 4 40)
+                'below))
+    (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
+                 'below '(280 . 300) edges 4 40)
+                'above))
+    (should (eq (latex-to-svg-frontend--editing-preview-above-or-below
+                 'below '(30 . 300) edges 4 40)
+                'below))))
 
 (defmacro l2sf-tests--editing-preview (text &rest body)
   "Run BODY on rendered TEXT, recording what the editing preview shows.

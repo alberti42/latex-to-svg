@@ -365,7 +365,8 @@ first line; both keep the first number of
 `latex-to-svg-frontend-editing-preview-margin` from the equation and follow it
 when the window scrolls. `smart-above-below` is `above`, or `below` when the
 frame fits below but not above: a completion popup, such as corfu's, opens
-below the line you are on. `top-right`, `top-left`, `bottom-left` and
+below the line you are on. `smart-below-above` is `below`, or `above` when the
+frame fits above but not below. `top-right`, `top-left`, `bottom-left` and
 `bottom-right` put it at that corner. `smart-right-corner` is `top-right`, or
 `bottom-right` when the frame there would cover lines of the equation;
 `smart-left-corner` is `top-left`, or `bottom-left`. To turn the frame off:

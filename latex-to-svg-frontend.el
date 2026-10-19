@@ -546,7 +546,10 @@ equation's last line, starting where the equation starts, and `above'
 above its first line; both keep the first number of
 `latex-to-svg-frontend-editing-preview-margin' from the equation and
 follow it when the window scrolls.  `smart-above-below' is `above',
-or `below' when the frame fits below but not above.  `top-right', `top-left',
+or `below' when the frame fits below but not above: a completion
+popup, such as corfu's, opens below the line point is on.
+`smart-below-above' is `below', or `above' when the frame fits above
+but not below.  `top-right', `top-left',
 `bottom-left' and `bottom-right' put it at that corner.
 `smart-right-corner' is `top-right', or `bottom-right' when the frame
 there would cover lines of the equation; `smart-left-corner' is
@@ -560,6 +563,8 @@ on a graphical frame."
                  (const :tag "Right, beside the equation" right)
                  (const :tag "Above, else below the equation"
                         smart-above-below)
+                 (const :tag "Below, else above the equation"
+                        smart-below-above)
                  (const :tag "Below the equation" below)
                  (const :tag "Above the equation" above)
                  (const :tag "Top right" top-right)
@@ -572,7 +577,8 @@ on a graphical frame."
                         smart-left-corner)
                  (const :tag "No frame" nil))
   :safe (lambda (value)
-          (memq value '(smart-right right smart-above-below below above
+          (memq value '(smart-right right smart-above-below
+                        smart-below-above below above
                         top-right top-left bottom-left
                         bottom-right smart-right-corner smart-left-corner
                         nil)))
@@ -2150,17 +2156,24 @@ its top edge; one that would pass the right edge moves left."
             ('above (max top (- (car rows) gap height)))
             (_ (max top (- bottom height)))))))
 
-(defun latex-to-svg-frontend--editing-preview-above-or-below (rows edges gap height)
-  "Return where `smart-above-below' puts a frame HEIGHT pixels high.
-That is `above' when the frame fits between the top of EDGES and GAP
-pixels above ROWS, else `below' when it fits between GAP pixels below
-ROWS and the bottom of EDGES, else `above'.  Above first: a completion
-popup, such as corfu's, opens below the line point is on.  ROWS and
-EDGES are as in `latex-to-svg-frontend--editing-preview-position'."
-  (pcase-let ((`(,_ ,top ,_ ,bottom) edges))
-    (cond ((>= (- (car rows) gap height) top) 'above)
-          ((<= (+ (cdr rows) gap height) bottom) 'below)
-          (t 'above))))
+(defun latex-to-svg-frontend--editing-preview-above-or-below (first rows edges gap height)
+  "Return where a frame HEIGHT pixels high goes, above or below ROWS.
+FIRST is `above', for `smart-above-below', or `below', for
+`smart-below-above'.  The frame goes on the side FIRST when it fits
+there, else on the other side when it fits there, else on the side
+FIRST.  It fits above between the top of EDGES and GAP pixels above
+ROWS, and below between GAP pixels below ROWS and the bottom of
+EDGES.  ROWS and EDGES are as in
+`latex-to-svg-frontend--editing-preview-position'."
+  (pcase-let* ((`(,_ ,top ,_ ,bottom) edges)
+               (fits (lambda (side)
+                       (if (eq side 'above)
+                           (>= (- (car rows) gap height) top)
+                         (<= (+ (cdr rows) gap height) bottom))))
+               (second (if (eq first 'above) 'below 'above)))
+    (cond ((funcall fits first) first)
+          ((funcall fits second) second)
+          (t first))))
 
 (defun latex-to-svg-frontend--span-start-x (span window)
   "Return the pixel x where SPAN starts in WINDOW, or nil out of view.
@@ -2420,9 +2433,11 @@ value it has makes the frame flicker on macOS."
                          latex-to-svg-frontend-editing-preview-margin))
                  (rows (and (memq corner '(smart-right smart-right-corner
                                            smart-left-corner right above
-                                           below smart-above-below))
+                                           below smart-above-below
+                                           smart-below-above))
                             (latex-to-svg-frontend--span-rows span window)))
-                 (start (and (memq corner '(above below smart-above-below))
+                 (start (and (memq corner '(above below smart-above-below
+                                            smart-below-above))
                              (latex-to-svg-frontend--span-start-x span window)))
                  (gap (car latex-to-svg-frontend-editing-preview-margin))
                  (corner (if (eq corner 'smart-right)
@@ -2441,7 +2456,10 @@ value it has makes the frame flicker on macOS."
                              'left rows (nth 1 edges) (+ height b b)))
                            ('smart-above-below
                             (latex-to-svg-frontend--editing-preview-above-or-below
-                             rows edges gap (+ height b b)))
+                             'above rows edges gap (+ height b b)))
+                           ('smart-below-above
+                            (latex-to-svg-frontend--editing-preview-above-or-below
+                             'below rows edges gap (+ height b b)))
                            (_ corner)))
                  (`(,x . ,y) (latex-to-svg-frontend--editing-preview-position
                               corner edges (+ width b b) (+ height b b) rows
