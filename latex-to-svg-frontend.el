@@ -2588,10 +2588,10 @@ VALUE is EL's source, numbered as `--render-element' numbers it, from
 `latex-to-svg-frontend-editing-preview-engine' with none, the frame's
 padding, `:quiet' t, `:tentative' t, and the size and color at EL's
 start (see `--appearance-arguments').  `:tentative' tells the backend
-that a failure is expected: a half-typed formula that fails with the
-precompiled preamble (the `.fmt' file) is not compiled again with the
-full preamble, and the `.fmt' file stays in use.  Nil when EL's engine
-typesets nothing (`skip', or a cookie's warning)."
+not to record a failure, so a half-typed formula does not leave a
+failure record (an `.eld' and a `.log' file in the cache) at every
+pause.  Nil when EL's engine typesets nothing (`skip', or a cookie's
+warning)."
   (let* ((source (latex-to-svg-frontend--math-value el))
          (begin (latex-to-svg-frontend--math-begin el))
          (own (latex-to-svg-frontend--engine-for source))
