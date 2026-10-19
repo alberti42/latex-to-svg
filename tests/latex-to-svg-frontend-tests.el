@@ -981,6 +981,36 @@ a height of 23.  `latex-to-svg-frontend--x-height-ratio' reads
             (latex-to-svg-frontend-mode 1)
             (should-not warnings)))))))
 
+(ert-deftest l2sf-color-options-checked-when-a-graphical-window-shows-the-buffer ()
+  ;; A mode turned on with no graphical frame, as in a daemon, checks no
+  ;; color option.  When a graphical window first shows the buffer, the
+  ;; options are checked before the math is drawn.  A buffer checked
+  ;; when the mode turned on is not checked again then.
+  (let ((warnings nil))
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (_type message &rest _) (push message warnings))))
+      (l2sf-tests--with-stub
+        (let ((latex-to-svg-frontend-foreground-color "no-such-color"))
+          (l2sf-tests--md "$a$\n"
+            (cl-letf (((symbol-function 'latex-to-svg-frontend--graphical-p)
+                       (lambda () nil)))
+              (latex-to-svg-frontend-mode 1))
+            (should-not warnings)
+            (should latex-to-svg-frontend--undrawn)
+            (l2sf-tests--with-frame
+              (latex-to-svg-frontend--refresh-if-changed))
+            (should (= (length warnings) 1))
+            (should (string-match-p "foreground-color" (car warnings)))
+            (should-not latex-to-svg-frontend--options-unchecked))
+          (setq warnings nil)
+          (l2sf-tests--with-frame
+            (l2sf-tests--md "$a$\n"
+              (latex-to-svg-frontend-mode 1)
+              (should (= (length warnings) 1))
+              (setq latex-to-svg-frontend--undrawn t)
+              (latex-to-svg-frontend--refresh-if-changed)
+              (should (= (length warnings) 1)))))))))
+
 (ert-deftest l2sf-appearance-reads-the-display-frame ()
   ;; The signature is the `default' face's colors on the frame that shows
   ;; the buffer, and the x-height there; nil, nil, nil on no frame.

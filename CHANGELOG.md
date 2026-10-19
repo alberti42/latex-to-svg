@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `(TOP-BOTTOM LEFT-RIGHT)` (default `(4 4)`); a negative number moves the
   frame past the edge. Only on a graphical frame.
 
+### Fixed
+
+- A color option that is not a color is reported when a graphical window
+  first shows the buffer, if the mode turned on while no frame was
+  graphical, as in a daemon. Before, it was ignored with no warning.
+
 ## [0.23.0] - 2026-10-18
 
 ### Added

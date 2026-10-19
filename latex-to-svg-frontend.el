@@ -883,6 +883,12 @@ one with no display frame, for which the backend compiles and returns
 no image.  `--refresh-if-changed' renders that math once a graphical
 window shows the buffer.")
 
+(defvar-local latex-to-svg-frontend--options-unchecked nil
+  "Non-nil when the color options were not checked for lack of a frame.
+`latex-to-svg-frontend--check-options' sets it when no graphical frame
+exists, and `--refresh-if-changed' checks them again when a graphical
+window shows the buffer.")
+
 (defun latex-to-svg-frontend--display-frame (buffer)
   "Return the graphical frame of a window showing BUFFER, or nil.
 See `latex-to-svg-frontend--display-window'."
@@ -986,13 +992,17 @@ string, or that a graphical frame cannot resolve, is ignored when
 equations are drawn (see `latex-to-svg-frontend--option-color').  A
 color resolves on a frame, so the check uses the frame that shows the
 buffer, else any graphical frame; with none, as in a daemon that has
-opened no graphical frame yet, it checks nothing."
-  (when-let* ((frame (or (latex-to-svg-frontend--display-frame
-                          (current-buffer))
-                         (seq-find #'display-graphic-p (frame-list)))))
+opened no graphical frame yet, it checks nothing and sets
+`latex-to-svg-frontend--options-unchecked', so that
+`latex-to-svg-frontend--refresh-if-changed' checks them when a graphical
+window shows the buffer."
+  (let ((frame (or (latex-to-svg-frontend--display-frame (current-buffer))
+                   (seq-find #'display-graphic-p (frame-list)))))
+    (setq latex-to-svg-frontend--options-unchecked (null frame))
     (dolist (option '(latex-to-svg-frontend-foreground-color
                       latex-to-svg-frontend-background-color))
-      (when-let* ((color (symbol-value option))
+      (when-let* ((frame)
+                  (color (symbol-value option))
                   ((not (latex-to-svg-frontend--option-color option frame))))
         (display-warning
          'latex-to-svg-frontend
@@ -3773,11 +3783,15 @@ shows the buffer, render the math with no preview (see
 requested while no window showed the buffer.  Otherwise refresh the
 previews if the appearance changed.  Nothing can be drawn without a
 graphical window, so neither runs while none shows the buffer; the
-check runs again when one does."
+check runs again when one does.  Before the math is rendered, the color
+options are checked if no graphical frame existed when they were last
+checked (see `latex-to-svg-frontend--options-unchecked')."
   (cond ((and latex-to-svg-frontend-mode
               latex-to-svg-frontend--undrawn
               (latex-to-svg-frontend--display-window (current-buffer)))
          (setq latex-to-svg-frontend--undrawn nil)
+         (when latex-to-svg-frontend--options-unchecked
+           (latex-to-svg-frontend--check-options))
          (latex-to-svg-frontend--update-buffer (current-buffer)))
         ((and (latex-to-svg-frontend--present-p)
               (latex-to-svg-frontend--display-window (current-buffer))
