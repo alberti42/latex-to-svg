@@ -4080,6 +4080,16 @@ after a hide.  The selected frame counts as graphical."
                         'safe-local-variable)
                    '(-2 0))))
 
+(ert-deftest l2sf-editing-preview-smart-right ()
+  ;; `smart-right' keeps `right' unless the equation's lines end right
+  ;; of the frame's left edge.
+  (should (eq (latex-to-svg-frontend--editing-preview-smart-right 400 410)
+              'right))
+  (should (eq (latex-to-svg-frontend--editing-preview-smart-right 410 410)
+              'right))
+  (should (eq (latex-to-svg-frontend--editing-preview-smart-right 411 410)
+              'smart-right-corner)))
+
 (ert-deftest l2sf-editing-preview-smart-corner ()
   ;; `smart-right-corner' puts a frame 40 pixels high at the top right,
   ;; from the top edge at 20, unless an equation's rows start above its
@@ -4108,10 +4118,10 @@ after a hide.  The selected frame counts as graphical."
   (l2sf-tests--editing-preview "$a$ and \\eqref{x} after\n"
     (goto-char (1+ (point-min)))
     (latex-to-svg-frontend--handle-cursor)
-    (should (equal l2sf-tests--shown '(fake-image right)))
+    (should (equal l2sf-tests--shown '(fake-image smart-right)))
     (insert "b")
     (latex-to-svg-frontend--handle-cursor)
-    (should (equal l2sf-tests--shown '(fake-image right)))
+    (should (equal l2sf-tests--shown '(fake-image smart-right)))
     (goto-char (point-max))
     (latex-to-svg-frontend--handle-cursor)
     (should-not l2sf-tests--shown)
@@ -4147,7 +4157,7 @@ after a hide.  The selected frame counts as graphical."
         (should-not l2sf-tests--shown)
         (set-window-buffer (selected-window) buffer)
         (latex-to-svg-frontend--editing-preview-follow)
-        (should (equal l2sf-tests--shown '(fake-image right)))))))
+        (should (equal l2sf-tests--shown '(fake-image smart-right)))))))
 
 (ert-deftest l2sf-failed-numbered-equation-keeps-its-numbers ()
   ;; A failed `align' still takes its two numbers: the equation below it is

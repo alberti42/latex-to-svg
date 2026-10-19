@@ -20,8 +20,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the source. The frame covers the text under it, which does not move. It
   shows the image the equation had when point entered it.
   `latex-to-svg-frontend-editing-preview` sets where the frame goes: `right`
-  (default) at the right edge, beside the equation, following it when the
-  window scrolls; `top-right`, `top-left`, `bottom-left` or `bottom-right` at
+  at the right edge, beside the equation, following it when the window
+  scrolls; `smart-right` (default) the same, unless the frame would cover the
+  lines of the equation, then as `smart-right-corner`; `top-right`, `top-left`, `bottom-left` or `bottom-right` at
   that corner; `smart-right-corner` is `top-right`, or `bottom-right` when the
   frame there would cover lines of the equation, and `smart-left-corner` the
   same on the left; nil turns the frame off.

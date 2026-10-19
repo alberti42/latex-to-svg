@@ -345,9 +345,11 @@ frame beside it, at the right edge of the window, an Isearch included. The
 frame covers the text under it, which does not move. It shows the image the
 equation had when point entered it; an edit is typeset when point leaves the
 equation. `latex-to-svg-frontend-editing-preview` sets where the frame goes:
-`right` (default) puts it at the right edge of the window, with its top at the
-top of the equation's first line, and it follows the equation when the window
-scrolls. `top-right`, `top-left`, `bottom-left` and `bottom-right` put it at
+`right` puts it at the right edge of the window, with its top at the top of the
+equation's first line, and it follows the equation when the window scrolls.
+`smart-right` (default) does the same, unless the frame there would cover the
+lines of the equation, from the beginning of its first line; then it puts the
+frame as `smart-right-corner` does. `top-right`, `top-left`, `bottom-left` and `bottom-right` put it at
 that corner. `smart-right-corner` is `top-right`, or `bottom-right` when the
 frame there would cover lines of the equation; `smart-left-corner` is
 `top-left`, or `bottom-left`. To turn the frame off:
