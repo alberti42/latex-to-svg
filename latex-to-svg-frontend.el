@@ -2103,7 +2103,10 @@ the selected window, which `line-pixel-height' measures."
     (inhibit-double-buffering . t))
   "Parameters of the editing preview's frame.
 Those of corfu's child frame, `corfu--frame-parameters', with a border
-of one pixel and no fringes.")
+of one pixel and no fringes.  A parameter missing here comes from
+`default-frame-alist': with (fullscreen . fullboth) there, a child
+frame made without (fullscreen . nil) is made fullscreen, which crashed
+Emacs 32.0.50 on macOS in `-[EmacsWindow constrainFrameRect:toScreen:]'.")
 
 (defvar latex-to-svg-frontend--editing-preview-frame nil
   "The child frame of the editing preview, or nil.

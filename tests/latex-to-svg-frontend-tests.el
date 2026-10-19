@@ -4004,6 +4004,13 @@ after a hide.  The selected frame counts as graphical."
 (defvar l2sf-tests--shown nil
   "What `l2sf-tests--editing-preview' records the frame showing.")
 
+(ert-deftest l2sf-editing-preview-frame-is-not-fullscreen ()
+  ;; Without it, `fullscreen' comes from `default-frame-alist', and a
+  ;; fullscreen child frame crashed Emacs on macOS.
+  (should (equal (assq 'fullscreen
+                       latex-to-svg-frontend--editing-preview-parameters)
+                 '(fullscreen))))
+
 (ert-deftest l2sf-editing-preview-buffer-has-no-margins ()
   ;; A default margin would take its width from the image's, which
   ;; would then be cut on the right.
