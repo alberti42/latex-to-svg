@@ -440,15 +440,30 @@ Equations that use a project's own macros or packages fail with the backend's
 default preamble. Set the project's preamble in its `.dir-locals.el`, in one of
 two backend options:
 
-- `latex-to-svg-backend-preamble-packages` is dumped into a `.fmt` file, one
-  per project: the place for packages, which it then reads once.
-- `latex-to-svg-backend-preamble-macros` is written into every
-  compile and adds no `.fmt` file: enough for macros.
+| Option | Use it for | Treatment |
+| --- | --- | --- |
+| `latex-to-svg-backend-preamble-packages` | LaTeX packages, including your own `.sty` files, which rarely change | dumped into a `.fmt` file of the project and read once; changing them dumps the whole `.fmt` file again |
+| `latex-to-svg-backend-preamble-macros` | a few macros of your own that you change often | read at every compile; an edit dumps nothing |
 
-For a file of macros, `\input` it:
+The names before 0.16.0, `latex-to-svg-backend-appended-preamble` and
+`latex-to-svg-backend-preamble-not-precompiled`, are obsolete aliases of these
+two and still work.
+
+Files the preamble loads are followed when you list them, each in the list of
+the preamble that loads it:
+
+| Option | Lists the files of | An edit of one |
+| --- | --- | --- |
+| `latex-to-svg-backend-preamble-package-files` | `-preamble-packages`, such as your own `.sty` | dumps the `.fmt` file again, and compiles the equations again |
+| `latex-to-svg-backend-preamble-macro-files` | `-preamble-macros`, such as `macros.tex` | compiles the equations again |
+
+Names are relative to the project root, as for `\input`, or absolute. For
+example:
 
 ```elisp
-((nil . ((latex-to-svg-backend-preamble-macros . "\\input{macros.tex}"))))
+((nil . ((latex-to-svg-backend-preamble-packages . "\\usepackage{physics}")
+         (latex-to-svg-backend-preamble-macros . "\\input{macros.tex}")
+         (latex-to-svg-backend-preamble-macro-files . ("macros.tex")))))
 ```
 
 Every backslash is doubled, as in any Elisp string. `\input` finds the file in
@@ -456,9 +471,10 @@ the project root (`project-root`), or in `default-directory` outside a
 project. To make the directory holding `.dir-locals.el` a project root, set
 `project-vc-extra-root-markers` to `'(".dir-locals.el")`.
 
-Both options are LaTeX code, so Emacs asks before applying them from
+Both preamble options are LaTeX code, so Emacs asks before applying them from
 `.dir-locals.el`, and answering `!` trusts only that exact value: the next
-edit of the string asks again. For a project you started or otherwise trust,
+edit of the string asks again. The two file lists are `:safe`: the backend
+only reads their files' modification times. For a project you started or otherwise trust,
 list its directory, the one holding `.dir-locals.el`, in
 `safe-local-variable-directories` (Emacs 30.1+). Emacs then applies that
 `.dir-locals.el` without asking, whatever it sets:
@@ -470,17 +486,22 @@ list its directory, the one holding `.dir-locals.el`, in
 
 The backend README's
 [A project's preamble](https://github.com/alberti42/latex-to-svg-backend#a-projects-preamble)
-compares the two options and gives the details.
+compares the two preamble options and gives the details.
 
 This package follows the setting:
 
 - The first render of a file waits until its `.dir-locals.el` is applied, and
-  setting either option updates the previews (see
+  setting any of these options updates the previews (see
   [Changing an option](#changing-an-option)).
-- **After editing `macros.tex`**, run `C-u M-x latex-to-svg-frontend-refresh`:
-  it deletes the buffer's `.fmt` file and compiles its equations again. It does
-  this for the current buffer only; other open files of the project need their
-  own.
+- **After editing a listed file**, run `M-x latex-to-svg-frontend-refresh`. An
+  equation requested after the edit is compiled with the new file, but an
+  equation already shown keeps its picture until the front-end asks for it
+  again, and the refresh does.
+- **After editing a file that is not listed**, run
+  `C-u M-x latex-to-svg-frontend-refresh`: it deletes the buffer's `.fmt` file
+  and compiles its equations again.
+- Both commands do this for the current buffer only; other open files of the
+  project need their own.
 - The `ratex` engine has no preamble. An equation that uses a project macro
   fails with RaTeX and, with `latex-to-svg-frontend-fallback` on (the default),
   is typeset by LaTeX. If you set `latex-to-svg-frontend-engine` to `ratex`,
