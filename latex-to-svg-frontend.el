@@ -553,6 +553,20 @@ leaves the equation.  nil shows no frame.  Only on a graphical frame."
           (memq value '(top-right top-left bottom-left bottom-right smart nil)))
   :group 'latex-to-svg-frontend)
 
+(defcustom latex-to-svg-frontend-editing-preview-padding 4
+  "Padding (in pt) around the image in the editing preview.
+The same values as `latex-to-svg-frontend-padding-display': a number
+of pt applied to all four sides, or a list of four numbers (TOP RIGHT
+BOTTOM LEFT); 0 or nil crops the image to the ink.  The image in the
+frame is drawn with this padding in place of the preview's own; it has
+the preview's background, `latex-to-svg-frontend-background-color'
+\(transparent by default, which shows the frame's).  Passed to
+`latex-to-svg-backend' as `:padding'; applies from cache (no
+recompile).  See `latex-to-svg-frontend-editing-preview'."
+  :type latex-to-svg-frontend--padding-type
+  :safe #'latex-to-svg-frontend--padding-p
+  :group 'latex-to-svg-frontend)
+
 (defcustom latex-to-svg-frontend-suppress-emphasis t
   "Whether to strip markup emphasis decoration from math source text.
 Markup font-lock (Org's `+…+' / `_…_' / `/…/', Markdown's `*…*', ...) has no
@@ -2148,6 +2162,26 @@ The frame is made, hidden, when there is none or it has another parent."
       (setq latex-to-svg-frontend--editing-preview-frame frame))
     frame))
 
+(defun latex-to-svg-frontend--editing-preview-image (ov)
+  "Return the image of preview OV for the editing preview.
+It is OV's image drawn with `latex-to-svg-frontend-editing-preview-padding'
+\(see `latex-to-svg-frontend--overlay-request'), fetched from cache once
+per image of OV and padding, and recorded on OV.  When the cache has no
+picture for it, OV's own image."
+  (let ((image (overlay-get ov 'latex-to-svg-frontend-image))
+        (padding latex-to-svg-frontend-editing-preview-padding)
+        (shown (overlay-get ov 'latex-to-svg-frontend-editing-preview)))
+    (if (and (eq (nth 0 shown) image) (equal (nth 1 shown) padding))
+        (nth 2 shown)
+      (let ((padded (or (apply #'latex-to-svg-backend
+                               (overlay-get ov 'latex-to-svg-frontend-value)
+                               :padding padding
+                               (latex-to-svg-frontend--overlay-request ov))
+                        image)))
+        (overlay-put ov 'latex-to-svg-frontend-editing-preview
+                     (list image padding padded))
+        padded))))
+
 (defun latex-to-svg-frontend--editing-preview-show (window image corner &optional ov)
   "Show IMAGE in the editing preview, at CORNER of WINDOW.
 CORNER is as in `latex-to-svg-frontend--editing-preview-position', or
@@ -2155,8 +2189,9 @@ CORNER is as in `latex-to-svg-frontend--editing-preview-position', or
 whose image it shows (see `--editing-preview-smart-corner').  The
 frame's background is that of the `default' face on WINDOW's frame, and
 its border that of the face `latex-to-svg-frontend-editing-preview-border'.
-Each parameter is set only when it changes: corfu notes that setting a
-frame parameter to the value it has makes the frame flicker on macOS."
+Each parameter is set only when it changes: corfu
+notes that setting a frame parameter to the value it has makes the
+frame flicker on macOS."
   (let* ((parent (window-frame window))
          (frame (latex-to-svg-frontend--editing-preview-frame parent))
          (win (frame-root-window frame))
@@ -2232,7 +2267,8 @@ Otherwise it is hidden."
              (eq (latex-to-svg-frontend--display-window (current-buffer))
                  (selected-window)))
         (latex-to-svg-frontend--editing-preview-show
-         (selected-window) image corner ov)
+         (selected-window) (latex-to-svg-frontend--editing-preview-image ov)
+         corner ov)
       (latex-to-svg-frontend--editing-preview-hide))))
 
 ;;;; Numbering
@@ -3050,6 +3086,26 @@ point is instead (see `latex-to-svg-frontend--heal-modified')."
 
 ;;;; Refresh (theme / font tracking)
 
+(defun latex-to-svg-frontend--overlay-request (ov)
+  "Return the arguments after the value with which to fetch OV's image.
+A plist for `latex-to-svg-backend', from the engine, fallback and
+number range recorded on OV, with the color and size of the text at
+its start now, on the frame that displays its buffer.  Without
+`:callback'.  Call it in OV's buffer.  A key given before these
+arguments, as the editing preview's `:padding', overrides this one."
+  (let* ((display (overlay-get ov 'latex-to-svg-frontend-display-math))
+         (buffer (overlay-buffer ov))
+         (frame (latex-to-svg-frontend--display-frame buffer)))
+    (list :rescale-by (latex-to-svg-frontend--rescale-for display)
+          :color (latex-to-svg-frontend--foreground-for (overlay-start ov) frame)
+          :background (latex-to-svg-frontend--background-for frame)
+          :padding (latex-to-svg-frontend--padding-for display)
+          :x-height (latex-to-svg-frontend--x-height-at (overlay-start ov) buffer)
+          :metadata (car (overlay-get ov 'latex-to-svg-frontend-enums))
+          :engine (overlay-get ov 'latex-to-svg-frontend-engine)
+          :fallback (overlay-get ov 'latex-to-svg-frontend-fallback)
+          :quiet latex-to-svg-frontend-quiet)))
+
 (defun latex-to-svg-frontend--refresh-overlay (ov)
   "Fetch preview overlay OV's image again.
 Uses the value, engine and fallback recorded on OV, and tints and sizes
@@ -3070,36 +3126,21 @@ nil."
               (value (overlay-get ov 'latex-to-svg-frontend-value)))
     (with-current-buffer buffer
       (when (latex-to-svg-frontend--graphical-p)
-        (let ((frame (latex-to-svg-frontend--display-frame buffer)))
-          (when-let* ((image (latex-to-svg-backend
-                              value
-                              :rescale-by (latex-to-svg-frontend--rescale-for
-                                           (overlay-get ov 'latex-to-svg-frontend-display-math))
-                              :color (latex-to-svg-frontend--foreground-for
-                                      (overlay-start ov) frame)
-                              :background (latex-to-svg-frontend--background-for frame)
-                              :padding (latex-to-svg-frontend--padding-for
-                                        (overlay-get ov 'latex-to-svg-frontend-display-math))
-                              :x-height (latex-to-svg-frontend--x-height-at
-                                            (overlay-start ov) buffer)
-                              :metadata (car (overlay-get
-                                              ov 'latex-to-svg-frontend-enums))
-                              :engine (overlay-get
-                                       ov 'latex-to-svg-frontend-engine)
-                              :fallback (overlay-get
-                                         ov 'latex-to-svg-frontend-fallback)
-                              :quiet latex-to-svg-frontend-quiet
-                              :callback
-                              (lambda (outcome)
-                                (when (overlay-buffer ov)
-                                  (if outcome
-                                      (latex-to-svg-frontend--refresh-failed
-                                       ov outcome)
-                                    (latex-to-svg-frontend--refresh-overlay
-                                     ov)))))))
-            (overlay-put ov 'latex-to-svg-frontend-image image)
-            (when (overlay-get ov 'display)
-              (latex-to-svg-frontend--show-image ov image))))))))
+        (when-let* ((image (apply
+                            #'latex-to-svg-backend
+                            value
+                            :callback
+                            (lambda (outcome)
+                              (when (overlay-buffer ov)
+                                (if outcome
+                                    (latex-to-svg-frontend--refresh-failed
+                                     ov outcome)
+                                  (latex-to-svg-frontend--refresh-overlay
+                                   ov))))
+                            (latex-to-svg-frontend--overlay-request ov))))
+          (overlay-put ov 'latex-to-svg-frontend-image image)
+          (when (overlay-get ov 'display)
+            (latex-to-svg-frontend--show-image ov image)))))))
 
 (defun latex-to-svg-frontend--refresh-failed (ov failure)
   "Replace preview overlay OV, whose compile ended in FAILURE.

@@ -4019,6 +4019,28 @@ after a hide.  The selected frame counts as graphical."
       (setq-default left-margin-width left)
       (kill-buffer " *latex-to-svg-frontend-editing-preview*"))))
 
+(ert-deftest l2sf-editing-preview-image-padding ()
+  ;; The frame's image is fetched with the padding of the option in
+  ;; place of the preview's, and the preview's other arguments.  It is
+  ;; fetched again only when the preview's image or the padding changes.
+  (l2sf-tests--editing-preview "$a$ after\n"
+    (setq-local latex-to-svg-frontend-padding-inline 1)
+    (setq-local latex-to-svg-frontend-editing-preview-padding '(1 2 3 4))
+    (let ((ov (car (l2sf-tests--overlays))))
+      (setq l2sf-tests--calls nil)
+      (goto-char (1+ (point-min)))
+      (latex-to-svg-frontend--handle-cursor)
+      (should (equal l2sf-tests--calls '(("$a$" . latex))))
+      (should (equal (plist-get l2sf-tests--last-args :padding) '(1 2 3 4)))
+      (should (equal (plist-get l2sf-tests--last-args :color) "#ffffff"))
+      (latex-to-svg-frontend--handle-cursor)
+      (should (= (length l2sf-tests--calls) 1))
+      (setq-local latex-to-svg-frontend-editing-preview-padding 0)
+      (latex-to-svg-frontend--handle-cursor)
+      (should (= (length l2sf-tests--calls) 2))
+      (should (equal (plist-get l2sf-tests--last-args :padding) 0))
+      (should (eq (overlay-get ov 'latex-to-svg-frontend-image) 'fake-image)))))
+
 (ert-deftest l2sf-editing-preview-smart-corner ()
   ;; `smart' puts a frame 40 pixels high at the top right, from the top
   ;; edge at 20, unless an equation's rows start above its bottom at 60.

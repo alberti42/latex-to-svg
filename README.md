@@ -353,8 +353,11 @@ equation. To turn the frame off:
 (setq latex-to-svg-frontend-editing-preview nil)
 ```
 
-The face `latex-to-svg-frontend-editing-preview-border` sets the color of
-the frame's border. The child frame is shown only on a graphical frame.
+`latex-to-svg-frontend-editing-preview-padding` sets the padding around the
+image in the frame, with the values of the other padding options: a number
+of pt for all four sides (default 4), or `(TOP RIGHT BOTTOM LEFT)`. The face
+`latex-to-svg-frontend-editing-preview-border` sets the color of the
+frame's border. The child frame is shown only on a graphical frame.
 
 ### Per-mode configuration
 
