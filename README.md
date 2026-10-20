@@ -17,6 +17,8 @@ on top of its LaTeX source, which stays in the buffer: when the cursor moves
 into an equation, the overlay shows the source for editing, and when the
 cursor leaves it, the equation is rendered again.
 
+Disclosure: Written with AI assistance (Claude). Every change is reviewed and tested by the author, and design decisions are the author's.
+
 This repo is the **front-end**: a shared core plus thin per-mode adaptors.
 
 - **`latex-to-svg-frontend`** — the core: math detection, overlay lifecycle,
