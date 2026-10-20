@@ -60,6 +60,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - A color option that is not a color is reported when a graphical window
   first shows the buffer, if the mode turned on while no frame was
   graphical, as in a daemon. Before, it was ignored with no warning.
+- An equation is fontified again before it is drawn when point leaves it
+  after an edit, so the preview takes the color of its current faces
+  (issue #10). Before, in `markdown-ts-mode`, changing `\[` to `$$` in
+  an equation holding a line of `=`, and then `\]` to `$$`, left the
+  opening line with `markdown-ts-setext-heading`, and the preview in the
+  heading's color, until the buffer was fontified again.
 
 ## [0.23.0] - 2026-10-18
 

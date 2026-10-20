@@ -1987,9 +1987,26 @@ debounced backstop.  When `latex-to-svg-frontend-incremental-reconcile'
 is on, EL is numbered from the preceding overlay and only the equations
 below it are re-threaded (`--reconcile-from'); otherwise a full scan.
 Then the other buffers that share the text do the same
-\(`--leave-in-other-buffers')."
+\(`--leave-in-other-buffers').
+
+With `font-lock-mode' on, EL is fontified again first: the preview takes
+its color from the faces at its opening delimiter, and font-lock
+fontifies only the edited lines.  In `markdown-ts-mode', changing the
+opening `\\[' of an equation holding a line of `=' to `$$' makes the
+lines above it a setext heading; changing the closing `\\]' to `$$'
+makes them an equation again, but the opening line kept
+`markdown-ts-setext-heading', and the preview the heading's color
+\(issue #10).
+Of the adaptors, only `markdown-ts-mode' needs this so far, where the
+face at the delimiter depends on other lines of the equation.  It runs
+for every adaptor: it costs one equation's fontification when point
+leaves an edited equation (2.6 ms for 5 lines), and a new adaptor
+gets correct colors with no work of its own."
   (let ((beg (latex-to-svg-frontend--math-begin el))
         (end (latex-to-svg-frontend--math-end el)))
+    (when font-lock-mode
+      (font-lock-flush beg end)
+      (font-lock-ensure beg end))
     (if latex-to-svg-frontend-incremental-reconcile
         (progn
           (latex-to-svg-frontend--render-element

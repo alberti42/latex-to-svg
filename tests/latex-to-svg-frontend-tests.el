@@ -1387,6 +1387,39 @@ heading keeps its face, and so does the math in it."
       (should (equal (get-text-property (point) 'face)
                      '(markdown-ts-delimiter))))))
 
+(ert-deftest l2sf-markdown-ts-math-face-on-leave ()
+  "Leaving an edited equation fontifies it before it is drawn.
+Changing `\\[' to `$$' makes the lines above `=' a setext heading;
+changing `\\]' to `$$' makes them an equation again, and font-lock
+fontifies only the edited line.  Leaving the equation gives the
+opening line the math face again (issue #10)."
+  (skip-unless (and (require 'markdown-ts-mode nil t)
+                    (treesit-language-available-p 'markdown)
+                    (treesit-language-available-p 'markdown-inline)))
+  (l2sf-tests--with-stub
+    (l2sf-tests--md "\\[\nx\n=\ny\n\\]\n\nAfter\n"
+      (let ((markdown-ts-mode-hook nil))
+        (markdown-ts-mode))
+      ;; `font-lock-mode' stays off in batch and in a buffer whose name
+      ;; starts with a space.
+      (rename-buffer "l2sf-tests-font-lock" t)
+      (let ((noninteractive nil))
+        (font-lock-mode 1))
+      (latex-to-svg-for-markdown-mode 1)
+      (font-lock-ensure)
+      (dolist (pair '(("\\[" . "$$") ("\\]" . "$$")))
+        (goto-char (point-min))
+        (search-forward (car pair))
+        (replace-match (cdr pair) t t)
+        (font-lock-ensure (line-beginning-position) (line-end-position))
+        (run-hooks 'post-command-hook))
+      (should (equal (get-text-property (point-min) 'face)
+                     '(markdown-ts-setext-heading)))
+      (search-forward "After")
+      (run-hooks 'post-command-hook)
+      (should (equal (get-text-property (point-min) 'face)
+                     '(markdown-ts-latex))))))
+
 (ert-deftest l2sf-clears-overlays ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ $b$\n"
