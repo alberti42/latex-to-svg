@@ -46,22 +46,7 @@
 (require 'treesit nil t)
 
 (defconst latex-to-svg-for-markdown-version "0.24.1"
-  "The version of `latex-to-svg-for-markdown', as in the `Version:' header.
-It is also the oldest `latex-to-svg-frontend' this adaptor works with:
-each adaptor requires the front-end of its own release.")
-
-(if (fboundp 'latex-to-svg-frontend-check-version)
-    (latex-to-svg-frontend-check-version
-     :package 'latex-to-svg-for-markdown
-     :version latex-to-svg-for-markdown-version
-     :requires latex-to-svg-for-markdown-version)
-  ;; A front-end before 0.24.0, which added the function.
-  (error "%s %s needs latex-to-svg-frontend 0.24.0 or newer, \
-but Emacs loaded an older version from %s.  Update latex-to-svg-frontend \
-to 0.24.0 or newer, then restart Emacs"
-         'latex-to-svg-for-markdown latex-to-svg-for-markdown-version
-         (or (symbol-file 'latex-to-svg-frontend-mode 'defun)
-             "an unknown file")))
+  "The version of `latex-to-svg-for-markdown', as in the `Version:' header.")
 
 (defvar markdown-hide-markup)
 (defvar markdown-ts-hide-markup)

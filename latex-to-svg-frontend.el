@@ -90,7 +90,7 @@
 
 (defconst latex-to-svg-frontend-version "0.24.1"
   "The version of the loaded front-end, as in the `Version:' header.
-An adaptor passes the version it requires to
+A package passes the version it requires to
 `latex-to-svg-frontend-check-version', which compares it with this.")
 
 (defconst latex-to-svg-frontend--backend-version "0.16.1"
@@ -127,19 +127,17 @@ Called when this file is loaded."
 
 (cl-defun latex-to-svg-frontend-check-version (&key package version requires)
   "Signal an error if the loaded front-end is older than PACKAGE requires.
-PACKAGE is the symbol of the package that calls this, such as an
-adaptor, VERSION its version, and REQUIRES the oldest front-end it
-works with.  The front-end's version is `latex-to-svg-frontend-version',
-of the front-end in memory: after an upgrade in a running Emacs, the
-file on disk can be new while the front-end loaded before it is old.
-An adaptor calls this when it is loaded.  A front-end before 0.24.0
-has no such function, so the adaptor tests it with `fboundp' first:
+PACKAGE is the symbol of the package that calls this, VERSION its
+version, and REQUIRES the oldest front-end it works with.  The
+front-end's version is `latex-to-svg-frontend-version', of the
+front-end in memory: after an upgrade in a running Emacs, the file on
+disk can be new while the front-end loaded before it is old.  A package
+calls this when it is loaded.  A front-end before 0.24.0 has no such
+function, so the package tests it with `fboundp' first:
 
   (if (fboundp \='latex-to-svg-frontend-check-version)
       (latex-to-svg-frontend-check-version
-       :package \='latex-to-svg-for-org
-       :version latex-to-svg-for-org-version
-       :requires latex-to-svg-for-org-version)
+       :package \='my-package :version \"1.2.0\" :requires \"0.24.0\")
     (error \"... needs latex-to-svg-frontend 0.24.0 or newer ...\"))"
   (unless (version<= requires latex-to-svg-frontend-version)
     (latex-to-svg-frontend--version-error

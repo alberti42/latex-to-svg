@@ -5706,6 +5706,17 @@ newer, then restart Emacs\\'"
                      :package 'latex-to-svg-for-org
                      :version "0.25.0" :requires "0.25.0")))))))
 
+(ert-deftest l2sf-adaptors-load-over-an-older-frontend ()
+  ;; MELPA builds each package on its own schedule, so for a few hours
+  ;; after a release an adaptor can be newer than the front-end.
+  (let ((latex-to-svg-frontend-version "0.1.0"))
+    (dolist (file '("latex-to-svg-for-org.el"
+                    "latex-to-svg-for-markdown.el"
+                    "latex-to-svg-for-latex.el"
+                    "latex-to-svg-for-gnus.el"
+                    "latex-to-svg-for-elfeed.el"))
+      (load (expand-file-name file l2sf-tests--repo-root) nil t))))
+
 (ert-deftest l2sf-adaptors-require-the-frontend-of-their-release ()
   ;; Drift guard: each adaptor requires the frontend at the version of its
   ;; own release, so upgrading an adaptor alone also upgrades the frontend.

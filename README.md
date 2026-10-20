@@ -896,7 +896,7 @@ references are, so it leaves them alone:
   your package is loaded. The front-end's version is the constant
   `latex-to-svg-frontend-version`. Both exist since 0.24.0: test the
   function with `fboundp` first, and with an older front-end say that it
-  must be 0.24.0 or newer, as the adaptors do.
+  must be 0.24.0 or newer.
 
 Call them in a buffer where `latex-to-svg-frontend-mode` is on, since the
 excluded regions come from the adaptor.

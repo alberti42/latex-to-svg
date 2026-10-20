@@ -24,6 +24,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the package loads, as an init file does; set after it loads, they cannot
   be told from the options they name.
 
+### Removed
+
+- The adaptors no longer check, when they are loaded, that the
+  front-end Emacs loaded is the one of their release. MELPA builds each
+  package on its own schedule, so for a few hours after a release an
+  adaptor could be newer than the front-end, and it signalled an error
+  at load. The front-end still checks the backend, and
+  `latex-to-svg-frontend-check-version` stays for other packages.
+
 ## [0.24.1] - 2026-10-20
 
 ### Fixed
