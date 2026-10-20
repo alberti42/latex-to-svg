@@ -12,6 +12,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.1] - 2026-10-20
+
+### Fixed
+
+- The error an adaptor signals when Emacs loaded a front-end before
+  0.24.0 starts with the adaptor's name as an argument of the message,
+  so checkdoc, which wants a message to start with a capital letter,
+  passes. The message is the same.
+
 ## [0.24.0] - 2026-10-20
 
 ### Added
@@ -1090,7 +1099,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/alberti42/latex-to-svg/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/alberti42/latex-to-svg/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/alberti42/latex-to-svg/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/alberti42/latex-to-svg/compare/v0.22.1...v0.22.2
