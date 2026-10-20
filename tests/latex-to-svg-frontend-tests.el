@@ -5036,9 +5036,12 @@ Each element is (BEG END TEXT); every overlay must display a newline."
   ;; Inline and display math take their own padding, on the first render
   ;; and on a refresh.  A kind whose option is nil takes the obsolete
   ;; `latex-to-svg-frontend-padding', so an old config still pads both; an
-  ;; explicit 0 does not fall back.
+  ;; explicit 0 does not fall back.  Setting the obsolete option warns
+  ;; (see `l2sf-warns-about-obsolete-options'); it counts as warned here.
   (l2sf-tests--with-stub
-    (let ((paddings nil))
+    (let ((paddings nil)
+          (latex-to-svg-frontend--obsolete-warned
+           '(latex-to-svg-frontend-padding)))
       (cl-letf (((symbol-function 'latex-to-svg-backend)
                  (lambda (latex &rest args)
                    (l2sf-tests--check-colors args)
@@ -5583,6 +5586,30 @@ STAR nil means LaTeX's sectioning commands."
                            (l2sf-tests--overlays))))
         (should (equal (overlay-get ref 'latex-to-svg-frontend-ref) "eq:b"))
         (should (equal "(2)" (substring-no-properties (overlay-get ref 'display))))))))
+
+(ert-deftest l2sf-warns-about-obsolete-options ()
+  ;; Setting an obsolete option non-nil warns once per session, with what
+  ;; `make-obsolete-variable' recorded; nil, and a `let', do not warn.
+  (let ((latex-to-svg-frontend--obsolete-warned nil)
+        (padding (default-value 'latex-to-svg-frontend-padding))
+        warnings)
+    (cl-letf (((symbol-function 'display-warning)
+               (lambda (_type message &rest _)
+                 (push message warnings))))
+      (unwind-protect
+          (progn
+            (set-default 'latex-to-svg-frontend-padding nil)
+            (cl-progv '(latex-to-svg-frontend-padding) '(2)
+              nil)
+            (should-not warnings)
+            (set-default 'latex-to-svg-frontend-padding 2)
+            (set-default 'latex-to-svg-frontend-padding 3)
+            (should (equal
+                     warnings
+                     '("`latex-to-svg-frontend-padding' is obsolete since \
+0.18.0; set `latex-to-svg-frontend-padding-inline' and \
+`latex-to-svg-frontend-padding-display'."))))
+        (set-default 'latex-to-svg-frontend-padding padding)))))
 
 ;;; --- Release hygiene ------------------------------------------------------
 

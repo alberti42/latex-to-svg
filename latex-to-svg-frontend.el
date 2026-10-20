@@ -286,6 +286,38 @@ full pass.  Set to nil to force the full scan everywhere."
   :safe #'booleanp
   :group 'latex-to-svg-frontend)
 
+(defvar latex-to-svg-frontend--obsolete-warned nil
+  "The obsolete options already reported in this session.")
+
+(defun latex-to-svg-frontend--warn-obsolete (option value)
+  "Warn that OPTION is obsolete when VALUE is non-nil, once per session.
+The warning says what `make-obsolete-variable' recorded for OPTION: the
+version and what to set instead.  Emacs reports an obsolete variable
+only when it compiles the code that sets it, which an init file seldom
+is."
+  (when (and value
+             (not (memq option latex-to-svg-frontend--obsolete-warned)))
+    (push option latex-to-svg-frontend--obsolete-warned)
+    (pcase-let ((`(,current ,_ ,version) (get option 'byte-obsolete-variable)))
+      (display-warning
+       'latex-to-svg-frontend
+       (format "`%s' is obsolete since %s; %s" option version
+               (if (stringp current)
+                   current
+                 (format "use `%s' instead." current)))
+       :warning))))
+
+(defconst latex-to-svg-frontend--obsolete-aliases-set
+  (seq-filter (lambda (alias)
+                (or (boundp alias) (get alias 'saved-value)))
+              '(latex-to-svg-frontend-inline-rescale
+                latex-to-svg-frontend-display-rescale
+                latex-to-svg-frontend-background-padding))
+  "The obsolete aliases the user set before this file loaded.
+An alias bound, or saved by Customize, before this file defines it was
+set by the user's init file.  Once the alias exists, setting it cannot
+be told from setting its option: both are one variable.")
+
 ;; Before the defcustoms on purpose, like the padding alias below:
 ;; `defvaralias' discards a value the obsolete name already holds.
 (define-obsolete-variable-alias 'latex-to-svg-frontend-inline-rescale
@@ -378,6 +410,12 @@ with `setq', `setq-local' or Customize updates the previews on its own."
 ;; this file loads would silently lose it if the alias came afterwards.
 (define-obsolete-variable-alias 'latex-to-svg-frontend-background-padding
   'latex-to-svg-frontend-padding "0.16.0")
+;; The option it names is obsolete too, so say what to set instead.
+(make-obsolete-variable
+ 'latex-to-svg-frontend-background-padding
+ "set `latex-to-svg-frontend-padding-inline' and \
+`latex-to-svg-frontend-padding-display'."
+ "0.16.0")
 
 (defconst latex-to-svg-frontend--padding-type
   '(choice (const :tag "None" nil)
@@ -4380,6 +4418,30 @@ an option of this package updates the previews on its own (see
     (latex-to-svg-frontend--clear-region (point-min) (point-max))
     (setq latex-to-svg-frontend--rendered-appearance nil
           latex-to-svg-frontend--undrawn nil)))
+
+(defconst latex-to-svg-frontend--obsolete-options
+  '(latex-to-svg-frontend-padding)
+  "The obsolete options reported when they are set non-nil.
+The obsolete aliases are not among them: an alias and its option are
+one variable, so the value does not tell which name the user set.  An
+alias set before this file loaded is reported when it loads (see
+`latex-to-svg-frontend--obsolete-aliases-set').")
+
+(defun latex-to-svg-frontend--obsolete-option-set
+    (symbol newval operation _where)
+  "Report SYMBOL, an obsolete option, when OPERATION sets it to NEWVAL.
+A variable watcher on each of `--obsolete-options'.  It acts on `set'
+only, as `latex-to-svg-frontend--option-changed' does."
+  (when (eq operation 'set)
+    (latex-to-svg-frontend--warn-obsolete symbol newval)))
+
+(dolist (option latex-to-svg-frontend--obsolete-options)
+  (add-variable-watcher option
+                        #'latex-to-svg-frontend--obsolete-option-set)
+  (latex-to-svg-frontend--warn-obsolete option (default-value option)))
+
+(dolist (alias latex-to-svg-frontend--obsolete-aliases-set)
+  (latex-to-svg-frontend--warn-obsolete alias t))
 
 (provide 'latex-to-svg-frontend)
 
