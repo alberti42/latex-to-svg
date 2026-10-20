@@ -874,9 +874,47 @@ references are, so it leaves them alone:
 - `latex-to-svg-frontend-span-at` — `(fn POS)` → the `(kind start end)` of
   the span POS is on, or nil. POS is on a span from start to end, both
   included: this is where this package shows the source of a span.
+- `latex-to-svg-frontend-in-math-p` — `(fn &optional POS)` → the
+  `(kind start end)` of the math POS (default point) is inside, or nil.
+  POS is inside when start < POS < end, and a reference is not math. For a
+  function that acts only in math, such as a completion function in
+  `completion-at-point-functions`.
 
 Call them in a buffer where `latex-to-svg-frontend-mode` is on, since the
 excluded regions come from the adaptor.
+
+For example, to complete LaTeX macro names in math, and keep a dictionary
+completion function such as `cape-dict` out of math, in Markdown buffers:
+
+```elisp
+(defvar my-latex-macros '("alpha" "beta" "frac" "sqrt" "sum" "int"))
+
+(defun my-latex-macro-capf ()
+  "Complete a LaTeX macro name after a backslash, in math only."
+  (when (latex-to-svg-frontend-in-math-p)
+    (let ((beg (save-excursion (skip-chars-backward "a-zA-Z") (point))))
+      (when (eq (char-before beg) ?\\)
+        (list beg (point) my-latex-macros)))))
+
+(defun my-capf-outside-math (capf)
+  "Return a completion function that calls CAPF only outside math."
+  (lambda ()
+    (unless (latex-to-svg-frontend-in-math-p)
+      (funcall capf))))
+
+(add-hook 'latex-to-svg-for-markdown-mode-hook
+          (lambda ()
+            (when latex-to-svg-for-markdown-mode
+              (add-hook 'completion-at-point-functions
+                        #'my-latex-macro-capf nil t)
+              (add-hook 'completion-at-point-functions
+                        (my-capf-outside-math #'cape-dict) nil t))))
+```
+
+The mode hook runs when the mode turns off too, hence the test of
+`latex-to-svg-for-markdown-mode`. Math is detected once it has its
+closing delimiter, so `\al` completes in `$x + \al$`, not in a `$x + \al`
+still being typed.
 
 ## Troubleshooting
 

@@ -54,6 +54,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-backend-preamble-macro-files`, the files the project's
   preambles load (backend 0.16.0), updates the previews, as setting a
   preamble does.
+- `latex-to-svg-frontend-in-math-p` returns the math point is inside, or
+  nil: strictly between its delimiters, and not in a reference. For a
+  function that acts only in math, such as a completion function in
+  `completion-at-point-functions`.
 
 ### Fixed
 

@@ -1422,6 +1422,22 @@ their KIND are those of `latex-to-svg-frontend-spans'."
         (seq-find (lambda (span) (and (< (nth 1 span) pos) (<= pos (nth 2 span))))
                   spans))))
 
+(defun latex-to-svg-frontend-in-math-p (&optional pos)
+  "Return (KIND START END) of the math POS is inside, or nil.
+POS defaults to point.  POS is inside math from START to END when
+START < POS < END: point before the opening delimiter or after the
+closing one is outside, so a word typed next to an equation is not
+math.  A reference is not math.  The spans and their KIND are those of
+`latex-to-svg-frontend-spans'.
+
+For a function that acts only in math, such as a completion function
+in `completion-at-point-functions'."
+  (let ((pos (or pos (point))))
+    (seq-find (lambda (span)
+                (and (not (eq (car span) 'reference))
+                     (< (nth 1 span) pos (nth 2 span))))
+              (latex-to-svg-frontend--spans-near pos pos))))
+
 ;;;; Overlays
 
 (defun latex-to-svg-frontend--center-prefix (ov image)

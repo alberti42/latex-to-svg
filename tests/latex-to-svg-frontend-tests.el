@@ -283,6 +283,23 @@ prefers the span that starts at POS."
       (should (equal (latex-to-svg-frontend-span-at 11) y))
       (should-not (latex-to-svg-frontend-span-at 12)))))
 
+(ert-deftest l2sf-in-math-p ()
+  "`latex-to-svg-frontend-in-math-p' takes START < POS < END, defaults to
+point, and leaves out references and code."
+  (l2sf-tests--md "a $x$ \\eqref{e} `$c$`\n\\[\ny\n\\]\n"
+    (setq-local latex-to-svg-frontend-exclude-function
+                #'latex-to-svg-for-markdown--exclusions)
+    (should-not (latex-to-svg-frontend-in-math-p 3))
+    (should (equal (latex-to-svg-frontend-in-math-p 4) '(inline 3 6)))
+    (should (equal (latex-to-svg-frontend-in-math-p 5) '(inline 3 6)))
+    (should-not (latex-to-svg-frontend-in-math-p 6))
+    (should (latex-to-svg-frontend-span-at 9))
+    (should-not (latex-to-svg-frontend-in-math-p 9))
+    (search-forward "$c")
+    (should-not (latex-to-svg-frontend-in-math-p))
+    (search-forward "y")
+    (should (eq (car (latex-to-svg-frontend-in-math-p)) 'display))))
+
 (ert-deftest l2sf-exclude-function-honored ()
   ;; The core skips any opener inside a region returned by the buffer-local
   ;; `exclude-function' (grammar-independent: a trivial region-returning fn).
