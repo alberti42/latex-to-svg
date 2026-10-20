@@ -4033,7 +4033,9 @@ link (`ancestors' in `org-fold-show-context-detail').  These markups
 have no option for it.  Nothing before the first heading can be
 folded, so there it does nothing."
   (save-excursion
-    (when (ignore-errors (outline-back-to-heading t) t)
+    (when (condition-case nil
+              (outline-back-to-heading t)
+            (outline-before-first-heading nil))
       (outline-show-entry)
       ;; Each earlier heading of a lower level than the last one shown is
       ;; the next heading above.  `outline-up-heading' is not used: it
