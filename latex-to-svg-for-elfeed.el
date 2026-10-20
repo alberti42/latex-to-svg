@@ -58,10 +58,10 @@ each adaptor requires the front-end of its own release.")
      :version latex-to-svg-for-elfeed-version
      :requires latex-to-svg-for-elfeed-version)
   ;; A front-end before 0.24.0, which added the function.
-  (error "latex-to-svg-for-elfeed %s needs latex-to-svg-frontend 0.24.0 or newer, \
+  (error "%s %s needs latex-to-svg-frontend 0.24.0 or newer, \
 but Emacs loaded an older version from %s.  Update latex-to-svg-frontend \
 to 0.24.0 or newer, then restart Emacs"
-         latex-to-svg-for-elfeed-version
+         'latex-to-svg-for-elfeed latex-to-svg-for-elfeed-version
          (or (symbol-file 'latex-to-svg-frontend-mode 'defun)
              "an unknown file")))
 
