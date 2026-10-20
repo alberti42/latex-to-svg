@@ -999,15 +999,16 @@ the opening delimiter of an equation, in a window showing BUFFER (see
 `latex-to-svg-frontend--display-window'), in pixels: its pixel size,
 slot 2 of `query-font', times its ratio
 \(`latex-to-svg-frontend--x-height-ratio').  The faces at POS and their
-`:height' apply, and so does `text-scale-mode'.  When no font is found
-at POS, or it has no glyph for `x', it is
-`latex-to-svg-frontend--x-height', which is nil when BUFFER is shown
-in no graphical window."
+`:height' apply, and so does `text-scale-mode'.  When POS is outside
+the accessible part of BUFFER, no font is found at POS, or the font has
+no glyph for `x', it is `latex-to-svg-frontend--x-height', which is nil
+when BUFFER is shown in no graphical window."
   (let ((buffer (or buffer (current-buffer))))
     (or (when-let* ((win (latex-to-svg-frontend--display-window buffer)))
           (with-selected-frame (window-frame win)
             (with-current-buffer buffer
-              (when-let* ((font (ignore-errors (font-at pos win)))
+              (when-let* ((font (and (<= (point-min) pos) (< pos (point-max))
+                                     (font-at pos win)))
                           (info (query-font font))
                           (ratio (latex-to-svg-frontend--x-height-ratio
                                   (aref info 0) (window-frame win))))

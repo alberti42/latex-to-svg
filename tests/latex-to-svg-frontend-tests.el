@@ -893,7 +893,9 @@ a height of 23.  `latex-to-svg-frontend--x-height-ratio' reads
          (progn
            (set-face-attribute 'default nil :foreground "white" :background "black")
            (cl-letf (((symbol-function 'latex-to-svg-frontend--display-window)
-                      (lambda (_buffer) (selected-window)))
+                      (lambda (buffer)
+                        (set-window-buffer (selected-window) buffer)
+                        (selected-window)))
                      ((symbol-function 'color-values)
                       (lambda (color &optional _frame)
                         (if (string-match-p "\\`#[[:xdigit:]]\\{6\\}\\'" color)
@@ -1131,6 +1133,27 @@ The newest call is first.  Use inside `l2sf-tests--with-stub'."
             (latex-to-svg-frontend--refresh-buffer (current-buffer))
             (should (equal (sort heights (lambda (x y) (string< (car x) (car y))))
                            '(("$a$" . 9.0) ("$b$" . 9.0) ("$c$" . 10.0))))))))))
+
+(ert-deftest l2sf-x-height-at-outside-the-buffer ()
+  ;; A POS outside the accessible part of the buffer, such as the marker of
+  ;; a deleted equation at `point-max', or text outside a narrowing, gets
+  ;; the `default' face's x-height (10 in `l2sf-tests--with-frame').  The
+  ;; stub of `font-at' signals there, as the real one does.
+  (l2sf-tests--with-frame
+    (cl-letf (((symbol-function 'font-at)
+               (lambda (pos &rest _)
+                 (unless (and (<= (point-min) pos) (< pos (point-max)))
+                   (signal 'args-out-of-range
+                           (list pos (point-min) (point-max))))
+                 'big))
+              ((symbol-function 'query-font)
+               (lambda (_font) ["l2sf-tests-big" nil 20 nil 20 5 nil nil nil])))
+      (with-temp-buffer
+        (insert "abc")
+        (should (equal (latex-to-svg-frontend--x-height-at 2) 15.0))
+        (should (equal (latex-to-svg-frontend--x-height-at 4) 10.0))
+        (narrow-to-region 2 3)
+        (should (equal (latex-to-svg-frontend--x-height-at 1) 10.0))))))
 
 (ert-deftest l2sf-x-height-ratio-from-the-x-glyph ()
   ;; The ratio is the ascent of `x' with the font opened at 1000 pixels,
