@@ -6,8 +6,8 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-5-5
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.24.1
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.24.1"))
+;; Version: 0.24.2
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.24.2"))
 ;; Keywords: tex, news, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -47,7 +47,7 @@
 
 (require 'latex-to-svg-frontend)
 
-(defconst latex-to-svg-for-elfeed-version "0.24.1"
+(defconst latex-to-svg-for-elfeed-version "0.24.2"
   "The version of `latex-to-svg-for-elfeed', as in the `Version:' header.")
 
 (defvar latex-to-svg-for-elfeed-mode)

@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.2] - 2026-10-20
+
 ### Added
 
 - Setting the obsolete `latex-to-svg-frontend-padding` non-nil shows a
@@ -1120,7 +1122,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.24.2...HEAD
+[0.24.2]: https://github.com/alberti42/latex-to-svg/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/alberti42/latex-to-svg/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/alberti42/latex-to-svg/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/alberti42/latex-to-svg/compare/v0.22.2...v0.23.0
