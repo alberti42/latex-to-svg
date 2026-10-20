@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-10-20
+
 ### Added
 
 - While point is in an equation and its LaTeX source is shown, the
@@ -71,6 +73,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   adaptor, such as `latex-to-svg-for-org-version`.
   `latex-to-svg-frontend-check-version` takes `:package`, `:version` and
   `:requires`, for another package that requires the front-end.
+
+### Changed
+
+- The front-end requires `latex-to-svg-backend` 0.16.1, which has
+  `latex-to-svg-backend-version`, the version the front-end checks when it
+  is loaded. 0.16.0 cancels a request (`latex-to-svg-backend-cancel`)
+  and takes the `:tentative` keyword: the editing preview cancels the
+  request before each new one, and a half-typed formula does not leave a
+  failure record in the cache at every pause. The README and the docstrings use the backend's new
+  names of the two preamble options,
+  `latex-to-svg-backend-preamble-packages` and
+  `latex-to-svg-backend-preamble-macros`.
 
 ### Fixed
 
@@ -1076,7 +1090,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.23.0...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/alberti42/latex-to-svg/compare/v0.23.0...v0.24.0
 [0.23.0]: https://github.com/alberti42/latex-to-svg/compare/v0.22.2...v0.23.0
 [0.22.2]: https://github.com/alberti42/latex-to-svg/compare/v0.22.1...v0.22.2
 [0.22.1]: https://github.com/alberti42/latex-to-svg/compare/v0.22.0...v0.22.1

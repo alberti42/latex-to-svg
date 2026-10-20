@@ -6,8 +6,8 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.23.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.23.0"))
+;; Version: 0.24.0
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.24.0"))
 ;; Keywords: tex, org, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -49,7 +49,7 @@
 
 (require 'latex-to-svg-frontend)
 
-(defconst latex-to-svg-for-org-version "0.23.0"
+(defconst latex-to-svg-for-org-version "0.24.0"
   "The version of `latex-to-svg-for-org', as in the `Version:' header.
 It is also the oldest `latex-to-svg-frontend' this adaptor works with:
 each adaptor requires the front-end of its own release.")

@@ -6,8 +6,8 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.23.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.15.1"))
+;; Version: 0.24.0
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.16.1"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -88,12 +88,12 @@
 (require 'seq)
 (require 'cl-lib)
 
-(defconst latex-to-svg-frontend-version "0.23.0"
+(defconst latex-to-svg-frontend-version "0.24.0"
   "The version of the loaded front-end, as in the `Version:' header.
 An adaptor passes the version it requires to
 `latex-to-svg-frontend-check-version', which compares it with this.")
 
-(defconst latex-to-svg-frontend--backend-version "0.15.1"
+(defconst latex-to-svg-frontend--backend-version "0.16.1"
   "The oldest `latex-to-svg-backend' this front-end works with.
 The same version as in the `Package-Requires' header.")
 
@@ -148,7 +148,6 @@ has no such function, so the adaptor tests it with `fboundp' first:
      (symbol-file 'latex-to-svg-frontend-check-version 'defun))))
 
 (latex-to-svg-frontend--check-backend-version)
-
 
 (defgroup latex-to-svg-frontend nil
   "Preview LaTeX math in markup buffers as SVG via `latex-to-svg-backend'."
