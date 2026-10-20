@@ -5618,6 +5618,67 @@ STAR nil means LaTeX's sectioning commands."
     (should (seq-every-p #'stringp versions))
     (should (equal (seq-uniq versions) (list (car versions))))))
 
+(ert-deftest l2sf-version-constants-match-the-headers ()
+  ;; Drift guard: each package's version constant is its `Version:'
+  ;; header, and `--backend-version' the backend's floor in
+  ;; `Package-Requires'.
+  (dolist (package '(latex-to-svg-frontend
+                     latex-to-svg-for-org latex-to-svg-for-markdown
+                     latex-to-svg-for-latex latex-to-svg-for-gnus
+                     latex-to-svg-for-elfeed))
+    (require package)
+    (should (equal (symbol-value (intern (format "%s-version" package)))
+                   (l2sf-tests--header-version (format "%s.el" package)))))
+  (let ((requires (with-temp-buffer
+                    (insert-file-contents
+                     (expand-file-name "latex-to-svg-frontend.el"
+                                       l2sf-tests--repo-root))
+                    (car (read-from-string
+                          (lm-header "package-requires"))))))
+    (should (equal latex-to-svg-frontend--backend-version
+                   (cadr (assq 'latex-to-svg-backend requires))))))
+
+(ert-deftest l2sf-check-backend-version ()
+  "`latex-to-svg-frontend--check-backend-version' signals an error when
+the loaded backend is older than the floor or has no version."
+  (let ((latex-to-svg-frontend-version "0.24.0")
+        (latex-to-svg-frontend--backend-version "0.16.1"))
+    (let ((latex-to-svg-backend-version "0.16.1"))
+      (latex-to-svg-frontend--check-backend-version))
+    (let ((latex-to-svg-backend-version "0.17.0"))
+      (latex-to-svg-frontend--check-backend-version))
+    (let ((latex-to-svg-backend-version "0.16.0"))
+      (should (string-match-p
+               "\\`latex-to-svg-frontend 0\\.24\\.0 needs \
+latex-to-svg-backend 0\\.16\\.1 or newer, but Emacs loaded version \
+0\\.16\\.0 from .+\\.  Update latex-to-svg-backend to 0\\.16\\.1 or \
+newer, then restart Emacs\\'"
+               (cadr (should-error
+                      (latex-to-svg-frontend--check-backend-version))))))
+    (let ((latex-to-svg-backend-version nil))
+      (should (string-match-p
+               "loaded a version older than 0\\.16\\.1 from "
+               (cadr (should-error
+                      (latex-to-svg-frontend--check-backend-version))))))))
+
+(ert-deftest l2sf-check-version ()
+  "`latex-to-svg-frontend-check-version' signals an error when the
+loaded front-end is older than the package requires."
+  (let ((latex-to-svg-frontend-version "0.24.0"))
+    (latex-to-svg-frontend-check-version
+     :package 'latex-to-svg-for-org :version "0.24.0" :requires "0.24.0")
+    (latex-to-svg-frontend-check-version
+     :package 'latex-to-svg-for-org :version "0.23.0" :requires "0.23.0")
+    (should (string-match-p
+             "\\`latex-to-svg-for-org 0\\.25\\.0 needs \
+latex-to-svg-frontend 0\\.25\\.0 or newer, but Emacs loaded version \
+0\\.24\\.0 from .+\\.  Update latex-to-svg-frontend to 0\\.25\\.0 or \
+newer, then restart Emacs\\'"
+             (cadr (should-error
+                    (latex-to-svg-frontend-check-version
+                     :package 'latex-to-svg-for-org
+                     :version "0.25.0" :requires "0.25.0")))))))
+
 (ert-deftest l2sf-adaptors-require-the-frontend-of-their-release ()
   ;; Drift guard: each adaptor requires the frontend at the version of its
   ;; own release, so upgrading an adaptor alone also upgrades the frontend.

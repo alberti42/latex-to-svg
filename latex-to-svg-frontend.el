@@ -88,6 +88,68 @@
 (require 'seq)
 (require 'cl-lib)
 
+(defconst latex-to-svg-frontend-version "0.23.0"
+  "The version of the loaded front-end, as in the `Version:' header.
+An adaptor passes the version it requires to
+`latex-to-svg-frontend-check-version', which compares it with this.")
+
+(defconst latex-to-svg-frontend--backend-version "0.15.1"
+  "The oldest `latex-to-svg-backend' this front-end works with.
+The same version as in the `Package-Requires' header.")
+
+(defun latex-to-svg-frontend--version-error
+    (package version dependency requires loaded file)
+  "Signal that PACKAGE VERSION needs DEPENDENCY REQUIRES or newer.
+LOADED describes the version of DEPENDENCY that Emacs loaded, from
+FILE (nil if unknown)."
+  (error "%s %s needs %s %s or newer, but Emacs loaded %s from %s.  \
+Update %s to %s or newer, then restart Emacs"
+         package version dependency requires loaded
+         (or file "an unknown file") dependency requires))
+
+(defun latex-to-svg-frontend--check-backend-version ()
+  "Signal an error if the loaded backend is older than this front-end needs.
+The backend's version is `latex-to-svg-backend-version', of the backend
+in memory: after an upgrade in a running Emacs, the file on disk can be
+new while the backend loaded before it is old.  A backend with no
+`latex-to-svg-backend-version' is older than 0.16.1, which added it.
+Called when this file is loaded."
+  (let ((version (bound-and-true-p latex-to-svg-backend-version)))
+    (unless (and (stringp version)
+                 (version<= latex-to-svg-frontend--backend-version version))
+      (latex-to-svg-frontend--version-error
+       'latex-to-svg-frontend latex-to-svg-frontend-version
+       'latex-to-svg-backend latex-to-svg-frontend--backend-version
+       (if (stringp version)
+           (concat "version " version)
+         "a version older than 0.16.1")
+       (symbol-file 'latex-to-svg-backend 'defun)))))
+
+(cl-defun latex-to-svg-frontend-check-version (&key package version requires)
+  "Signal an error if the loaded front-end is older than PACKAGE requires.
+PACKAGE is the symbol of the package that calls this, such as an
+adaptor, VERSION its version, and REQUIRES the oldest front-end it
+works with.  The front-end's version is `latex-to-svg-frontend-version',
+of the front-end in memory: after an upgrade in a running Emacs, the
+file on disk can be new while the front-end loaded before it is old.
+An adaptor calls this when it is loaded.  A front-end before 0.24.0
+has no such function, so the adaptor tests it with `fboundp' first:
+
+  (if (fboundp \='latex-to-svg-frontend-check-version)
+      (latex-to-svg-frontend-check-version
+       :package \='latex-to-svg-for-org
+       :version latex-to-svg-for-org-version
+       :requires latex-to-svg-for-org-version)
+    (error \"... needs latex-to-svg-frontend 0.24.0 or newer ...\"))"
+  (unless (version<= requires latex-to-svg-frontend-version)
+    (latex-to-svg-frontend--version-error
+     package version 'latex-to-svg-frontend requires
+     (concat "version " latex-to-svg-frontend-version)
+     (symbol-file 'latex-to-svg-frontend-check-version 'defun))))
+
+(latex-to-svg-frontend--check-backend-version)
+
+
 (defgroup latex-to-svg-frontend nil
   "Preview LaTeX math in markup buffers as SVG via `latex-to-svg-backend'."
   :group 'text

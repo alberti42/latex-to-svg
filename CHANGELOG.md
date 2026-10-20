@@ -58,6 +58,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nil: strictly between its delimiters, and not in a reference. For a
   function that acts only in math, such as a completion function in
   `completion-at-point-functions`.
+- When the front-end is loaded, it signals an error if the backend Emacs
+  loaded is older than the one it requires, naming the backend's file,
+  and says to update the backend to that version or newer and restart
+  Emacs (issue #12). Before, an old backend failed at the first equation
+  with an error about a keyword argument, such as `:x-height`. Each
+  adaptor does the same for the front-end, with
+  `latex-to-svg-frontend-check-version`, or, with a front-end before
+  0.24.0, which has no such function, says that it must be 0.24.0 or
+  newer.
+- `latex-to-svg-frontend-version` and a version constant in each
+  adaptor, such as `latex-to-svg-for-org-version`.
+  `latex-to-svg-frontend-check-version` takes `:package`, `:version` and
+  `:requires`, for another package that requires the front-end.
 
 ### Fixed
 

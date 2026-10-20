@@ -879,6 +879,14 @@ references are, so it leaves them alone:
   POS is inside when start < POS < end, and a reference is not math. For a
   function that acts only in math, such as a completion function in
   `completion-at-point-functions`.
+- `latex-to-svg-frontend-check-version` — `(fn &key PACKAGE VERSION
+  REQUIRES)`: signals an error if the front-end Emacs loaded is older than
+  REQUIRES, the oldest front-end PACKAGE (version VERSION) works with. The
+  message names the front-end's file and says to update it. Call it when
+  your package is loaded. The front-end's version is the constant
+  `latex-to-svg-frontend-version`. Both exist since 0.24.0: test the
+  function with `fboundp` first, and with an older front-end say that it
+  must be 0.24.0 or newer, as the adaptors do.
 
 Call them in a buffer where `latex-to-svg-frontend-mode` is on, since the
 excluded regions come from the adaptor.

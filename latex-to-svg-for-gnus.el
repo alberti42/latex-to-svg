@@ -48,6 +48,24 @@
 
 (require 'latex-to-svg-frontend)
 
+(defconst latex-to-svg-for-gnus-version "0.23.0"
+  "The version of `latex-to-svg-for-gnus', as in the `Version:' header.
+It is also the oldest `latex-to-svg-frontend' this adaptor works with:
+each adaptor requires the front-end of its own release.")
+
+(if (fboundp 'latex-to-svg-frontend-check-version)
+    (latex-to-svg-frontend-check-version
+     :package 'latex-to-svg-for-gnus
+     :version latex-to-svg-for-gnus-version
+     :requires latex-to-svg-for-gnus-version)
+  ;; A front-end before 0.24.0, which added the function.
+  (error "latex-to-svg-for-gnus %s needs latex-to-svg-frontend 0.24.0 or newer, \
+but Emacs loaded an older version from %s.  Update latex-to-svg-frontend \
+to 0.24.0 or newer, then restart Emacs"
+         latex-to-svg-for-gnus-version
+         (or (symbol-file 'latex-to-svg-frontend-mode 'defun)
+             "an unknown file")))
+
 (defvar gnus-emphasis-alist)
 (defvar gnus-article-emphasis-alist)
 (defvar gnus-summary-buffer)
