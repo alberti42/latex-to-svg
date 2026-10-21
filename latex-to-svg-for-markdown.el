@@ -6,8 +6,8 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.24.2
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.24.2"))
+;; Version: 0.25.0
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.25.0"))
 ;; Keywords: tex, markdown, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -45,7 +45,7 @@
 (require 'latex-to-svg-frontend)
 (require 'treesit nil t)
 
-(defconst latex-to-svg-for-markdown-version "0.24.2"
+(defconst latex-to-svg-for-markdown-version "0.25.0"
   "The version of `latex-to-svg-for-markdown', as in the `Version:' header.")
 
 (defvar markdown-hide-markup)
