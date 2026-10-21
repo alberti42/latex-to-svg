@@ -76,6 +76,24 @@ jobs:
           git clone https://github.com/riscy/melpazoid.git ~/melpazoid
           pip install ~/melpazoid
 
+      # melpazoid installs latex-to-svg-backend from MELPA, which has
+      # develop's backend floor only once the backend is released.  Until
+      # then the file signals when it is loaded, and melpazoid fails on
+      # that alone.  On develop, and on a pull request from it, lower the
+      # floor in this checkout to 0.16.1, the oldest backend with
+      # `latex-to-svg-backend-version', so that melpazoid checks the rest
+      # against the backend MELPA has.  Only the front-end's job ships
+      # latex-to-svg-frontend.el.
+      - name: Lower the backend floor to the backend on MELPA
+        if: >-
+          matrix.package == 'latex-to-svg-frontend'
+          && (github.ref_name == 'develop' || github.head_ref == 'develop')
+        run: |
+          sed -i 's/^(defconst latex-to-svg-frontend--backend-version "[0-9.]*"$/(defconst latex-to-svg-frontend--backend-version "0.16.1"/' \
+            latex-to-svg-frontend.el
+          grep -n '^(defconst latex-to-svg-frontend--backend-version "0.16.1"$' \
+            latex-to-svg-frontend.el
+
       - name: Run melpazoid
         env:
           LOCAL_REPO: ${{ github.workspace }}
