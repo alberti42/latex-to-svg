@@ -12,6 +12,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The previews follow `latex-to-svg-backend-preamble-base`, the name that
+  `latex-to-svg-backend` 0.17.0 gives `latex-to-svg-backend-preamble`.
+  The old name still works and shows a warning.
+
 ## [0.24.2] - 2026-10-20
 
 ### Added

@@ -3692,7 +3692,7 @@ it like the text at its start now (see
 `latex-to-svg-frontend--foreground-for' and
 `latex-to-svg-frontend--x-height-at').
 When the cache has no picture for them, because a backend option in the
-cache key changed \(`latex-to-svg-backend-preamble',
+cache key changed \(`latex-to-svg-backend-preamble-base',
 `latex-to-svg-backend-preamble-macros') or the entry was
 collected, the backend compiles it and this runs again when the compile
 is done.  OV keeps its old image until then; an OV
@@ -3836,7 +3836,7 @@ never rendered, as `--render-on-leave' never renders it."
     latex-to-svg-frontend-rescale-display
     latex-to-svg-frontend-center-display-math
     latex-to-svg-frontend-failure-mark
-    latex-to-svg-backend-preamble
+    latex-to-svg-backend-preamble-base
     latex-to-svg-backend-preamble-packages
     latex-to-svg-backend-preamble-macros
     latex-to-svg-backend-preamble-package-files

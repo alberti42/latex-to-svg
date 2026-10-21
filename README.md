@@ -219,7 +219,7 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
   with 0.12.0 together with the backend's warning for a program that is not
   found; 0.12.1 fixed the texres engine on Emacs 29 to 31. The per-project
   preambles came with 0.11.1: the
-  backend reads `latex-to-svg-backend-preamble`, `-preamble-packages` and
+  backend reads `latex-to-svg-backend-preamble-base`, `-preamble-packages` and
   `-preamble-macros` in the buffer that asks for an equation, and the
   front-end watches all three, so that setting one updates the previews. The engine
   choice (`:engine`, behind `latex-to-svg-frontend-engine` and the
@@ -422,7 +422,7 @@ These options update the previews on their own when you set them, with `setq`,
 | `latex-to-svg-frontend-foreground-color`, `-foreground-ignored-faces`, `-background-color`, `-padding-inline`, `-padding-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-rescale-inline`, `-rescale-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
-| `latex-to-svg-backend-preamble`, `-preamble-packages`, `-preamble-macros` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
+| `latex-to-svg-backend-preamble-base`, `-preamble-packages`, `-preamble-macros` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-preamble-package-files`, `-preamble-macro-files` | the equations are compiled with the new list, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-line-width` | the numbered equations are compiled with the new width, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-ratex-macros` | the equations typeset with RaTeX are compiled with the new macros, or taken from cache if compiled with them before |
@@ -455,9 +455,15 @@ two backend options:
 | `latex-to-svg-backend-preamble-packages` | LaTeX packages, including your own `.sty` files, which rarely change | dumped into a `.fmt` file of the project and read once; changing them dumps the whole `.fmt` file again |
 | `latex-to-svg-backend-preamble-macros` | a few macros of your own that you change often | read at every compile; an edit dumps nothing |
 
+`latex-to-svg-backend-preamble-base` holds the document class and base
+packages, and the two options above are appended to it. A project sets it only
+to change the class options or to remove a base package that conflicts with one
+it adds (`newtxmath` and `amssymb` both define `\Bbbk`).
+
 The names before 0.16.0, `latex-to-svg-backend-appended-preamble` and
 `latex-to-svg-backend-preamble-not-precompiled`, are obsolete aliases of these
-two and still work.
+two and still work. `latex-to-svg-backend-preamble` is an obsolete alias of
+`latex-to-svg-backend-preamble-base` since backend 0.17.0.
 
 Files the preamble loads are followed when you list them, each in the list of
 the preamble that loads it:
