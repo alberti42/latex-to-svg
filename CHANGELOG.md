@@ -14,11 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The previews follow the names of `latex-to-svg-backend` 0.18.0:
-  setting `latex-to-svg-backend-preamble-not-precompiled` or
-  `latex-to-svg-backend-preamble-not-precompiled-files` updates them.
-  The obsolete `-preamble-macros` and `-preamble-macro-files` still
-  work. The README puts macro files in
+- Requires `latex-to-svg-backend` 0.18.0, which makes
+  `latex-to-svg-backend-preamble-not-precompiled` and
+  `latex-to-svg-backend-preamble-not-precompiled-files` options again,
+  for a package that cannot be dumped, and no longer turns precompiling
+  off for the rest of the session after a failed dump. The previews
+  follow the new names. The obsolete `-preamble-macros` and
+  `-preamble-macro-files` still work. The README puts macro files in
   `latex-to-svg-backend-preamble-packages`, listed in
   `latex-to-svg-backend-preamble-package-files`.
 

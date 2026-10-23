@@ -198,9 +198,13 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 - Emacs 29.1+ with SVG image support. Each adaptor's page lists the major
   modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.17.0+ (the backend) — the floor is set by 0.17.0, which renames
-  `latex-to-svg-backend-preamble` to `latex-to-svg-backend-preamble-base`;
-  the front-end watches the new name. 0.16.1 brought
+  0.18.0+ (the backend) — the floor is set by 0.18.0, which makes
+  `latex-to-svg-backend-preamble-not-precompiled` and
+  `-preamble-not-precompiled-files` options again, and
+  `-preamble-macros` and `-preamble-macro-files` their obsolete aliases;
+  the front-end watches the new names. 0.17.0 renames
+  `latex-to-svg-backend-preamble` to `latex-to-svg-backend-preamble-base`,
+  which the front-end watches. 0.16.1 brought
   `latex-to-svg-backend-version`: when the front-end is loaded, it warns
   if the backend Emacs loaded is older than the one it requires. With
   0.16.0 the editing preview
