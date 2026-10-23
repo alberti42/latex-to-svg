@@ -6,8 +6,8 @@
 ;; Maintainer: Andrea Alberti <a.alberti82@gmail.com>
 ;; Assisted-by: Claude:claude-opus-5-5
 ;; URL: https://github.com/alberti42/latex-to-svg
-;; Version: 0.25.0
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.25.0"))
+;; Version: 0.25.1
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-frontend "0.25.1"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -48,7 +48,7 @@
 (require 'format-spec)
 (require 'project)
 
-(defconst latex-to-svg-for-latex-version "0.25.0"
+(defconst latex-to-svg-for-latex-version "0.25.1"
   "The version of `latex-to-svg-for-latex', as in the `Version:' header.")
 
 (declare-function LaTeX-verbatim-environments "latex")
