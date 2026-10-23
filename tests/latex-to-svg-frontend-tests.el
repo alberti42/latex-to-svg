@@ -4477,6 +4477,33 @@ after a hide.  The selected frame counts as graphical."
     (latex-to-svg-frontend--handle-cursor)
     (should-not latex-to-svg-frontend--typing)))
 
+(ert-deftest l2sf-typing-forgets-math-left-or-deleted ()
+  ;; Text typed after the closing delimiter is outside the math, so the
+  ;; frame hides; so does it when the math is deleted, or the buffer is
+  ;; erased and refilled, as pdf-tools does with the buffer that edits an
+  ;; annotation.
+  (dolist (edit (list (lambda ()
+                        (forward-char)
+                        (insert " more prose"))
+                      (lambda ()
+                        (forward-char)
+                        (delete-char -3))
+                      (lambda ()
+                        (erase-buffer)
+                        (save-excursion (insert "Prose with no math.\n")))))
+    (l2sf-tests--editing-preview "$a$ after\n"
+      (goto-char (point-max))
+      (insert "$c$")
+      (backward-char)
+      (latex-to-svg-frontend--handle-cursor)
+      (let ((l2sf-tests--image 'typed-image))
+        (latex-to-svg-frontend--request-while-typing))
+      (should (equal l2sf-tests--shown '(typed-image smart-above-below)))
+      (funcall edit)
+      (latex-to-svg-frontend--handle-cursor)
+      (should-not l2sf-tests--shown)
+      (should-not latex-to-svg-frontend--typing))))
+
 (ert-deftest l2sf-typing-shows-a-failed-equation-once-typeset ()
   ;; An equation that failed has no picture: editing it shows the frame
   ;; once an edit typesets.

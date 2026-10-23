@@ -22,6 +22,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `latex-to-svg-backend-preamble-packages`, listed in
   `latex-to-svg-backend-preamble-package-files`.
 
+### Fixed
+
+- The editing preview's frame no longer stays visible over the text
+  typed after math, after the math is deleted, or after the buffer is
+  erased and filled again (pdf-tools does this in the buffer that edits
+  an annotation). Text typed right after the closing delimiter counted
+  as part of the math typeset while typing.
+
 ## [0.25.0] - 2026-10-21
 
 ### Changed

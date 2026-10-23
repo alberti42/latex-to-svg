@@ -1916,8 +1916,8 @@ an edit re-renders it."
 
 (defvar-local latex-to-svg-frontend--typing nil
   "What was typeset while typing, or nil: (BEG END IMAGE FAILURE).
-BEG and END are markers of the span of the math typeset; END advances
-over text inserted at it.  IMAGE is the last picture typeset, nil until
+BEG and END are markers of the span of the math typeset; text inserted
+at END is outside it.  IMAGE is the last picture typeset, nil until
 one is.  FAILURE is the plist of the last request when it ended without
 a picture, else nil.  It holds while point is in BEG..END (see
 `latex-to-svg-frontend--typing-state'); `--handle-cursor' clears it
@@ -2705,10 +2705,12 @@ nil."
         (latex-to-svg-frontend--request-while-typing)))))
 
 (defun latex-to-svg-frontend--typing-state ()
-  "Return `latex-to-svg-frontend--typing' when point is in its span."
+  "Return `latex-to-svg-frontend--typing' when point is in its span.
+An empty span holds no math: it was deleted, or the buffer was erased."
   (when-let* ((typing latex-to-svg-frontend--typing)
               (beg (marker-position (nth 0 typing)))
               (end (marker-position (nth 1 typing)))
+              ((< beg end))
               ((<= beg (point) end)))
     typing))
 
@@ -2793,7 +2795,7 @@ frame from its first picture on."
         (latex-to-svg-frontend--clear-typing)
         (setq latex-to-svg-frontend--typing
               (list (copy-marker begin)
-                    (copy-marker (latex-to-svg-frontend--math-end el) t)
+                    (copy-marker (latex-to-svg-frontend--math-end el))
                     nil nil)))
       (let ((typing latex-to-svg-frontend--typing))
         (letrec ((callback
