@@ -424,8 +424,8 @@ These options update the previews on their own when you set them, with `setq`,
 | `latex-to-svg-frontend-foreground-color`, `-foreground-ignored-faces`, `-background-color`, `-padding-inline`, `-padding-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-rescale-inline`, `-rescale-display` | the pictures are redrawn from cache |
 | `latex-to-svg-frontend-center-display-math` | the pictures are redrawn from cache |
-| `latex-to-svg-backend-preamble-base`, `-preamble-packages`, `-preamble-macros` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
-| `latex-to-svg-backend-preamble-package-files`, `-preamble-macro-files` | the equations are compiled with the new list, or taken from cache if compiled with it before |
+| `latex-to-svg-backend-preamble-base`, `-preamble-packages`, `-preamble-not-precompiled` | the equations are compiled with the new preamble, or taken from cache if compiled with it before |
+| `latex-to-svg-backend-preamble-package-files`, `-preamble-not-precompiled-files` | the equations are compiled with the new list, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-line-width` | the numbered equations are compiled with the new width, or taken from cache if compiled with it before |
 | `latex-to-svg-backend-ratex-macros` | the equations typeset with RaTeX are compiled with the new macros, or taken from cache if compiled with them before |
 
@@ -449,49 +449,42 @@ Other options apply to equations rendered afterwards.
 ### Projects with their own macros
 
 Equations that use a project's own macros or packages fail with the backend's
-default preamble. Set the project's preamble in its `.dir-locals.el`, in one of
-two backend options:
-
-| Option | Use it for | Treatment |
-| --- | --- | --- |
-| `latex-to-svg-backend-preamble-packages` | LaTeX packages, including your own `.sty` files, which rarely change | dumped into a `.fmt` file of the project and read once; changing them dumps the whole `.fmt` file again |
-| `latex-to-svg-backend-preamble-macros` | a few macros of your own that you change often | read at every compile; an edit dumps nothing |
-
-`latex-to-svg-backend-preamble-base` holds the document class and base
-packages, and the two options above are appended to it. A project sets it only
-to change the class options or to remove a base package that conflicts with one
-it adds (`newtxmath` and `amssymb` both define `\Bbbk`).
-
-The names before 0.16.0, `latex-to-svg-backend-appended-preamble` and
-`latex-to-svg-backend-preamble-not-precompiled`, are obsolete aliases of these
-two and still work. `latex-to-svg-backend-preamble` is an obsolete alias of
-`latex-to-svg-backend-preamble-base` since backend 0.17.0.
-
-Files the preamble loads are followed when you list them, each in the list of
-the preamble that loads it:
-
-| Option | Lists the files of | An edit of one |
-| --- | --- | --- |
-| `latex-to-svg-backend-preamble-package-files` | `-preamble-packages`, such as your own `.sty` | dumps the `.fmt` file again, and compiles the equations again |
-| `latex-to-svg-backend-preamble-macro-files` | `-preamble-macros`, such as `macros.tex` | compiles the equations again |
-
-Names are relative to the project root, as for `\input`, or absolute. For
-example:
+default preamble. The project's packages, and an `\input` of its macro files,
+go in `latex-to-svg-backend-preamble-packages`, which is appended to
+`latex-to-svg-backend-preamble-base` and dumped into a `.fmt` file of the
+project. List the files it loads in
+`latex-to-svg-backend-preamble-package-files`: an edit of one dumps the `.fmt`
+file again, and compiles the equations again. Set both in the project's
+`.dir-locals.el`. Names are relative to the project root, as for `\input`, or
+absolute. For example:
 
 ```elisp
-((nil . ((latex-to-svg-backend-preamble-packages . "\\usepackage{physics}")
-         (latex-to-svg-backend-preamble-macros . "\\input{macros.tex}")
-         (latex-to-svg-backend-preamble-macro-files . ("macros.tex")))))
+((nil . ((latex-to-svg-backend-preamble-packages
+          . "\\usepackage{physics}\n\\input{macros.tex}")
+         (latex-to-svg-backend-preamble-package-files . ("macros.tex")))))
 ```
+
+`latex-to-svg-backend-preamble-base` holds the document class and base
+packages. A project sets it only to change the class options or to remove a
+base package that conflicts with one it adds (`newtxmath` and `amssymb` both
+define `\Bbbk`).
+
+`latex-to-svg-backend-appended-preamble` is an obsolete alias of
+`latex-to-svg-backend-preamble-packages` since backend 0.16.0, and
+`latex-to-svg-backend-preamble` of `latex-to-svg-backend-preamble-base` since
+backend 0.17.0. Both still work. `latex-to-svg-backend-preamble-macros` and
+`latex-to-svg-backend-preamble-macro-files` are obsolete since backend 0.18.0:
+put their macro files in `-preamble-packages` and list them in
+`-preamble-package-files`.
 
 Every backslash is doubled, as in any Elisp string. `\input` finds the file in
 the project root (`project-root`), or in `default-directory` outside a
 project. To make the directory holding `.dir-locals.el` a project root, set
 `project-vc-extra-root-markers` to `'(".dir-locals.el")`.
 
-Both preamble options are LaTeX code, so Emacs asks before applying them from
+A preamble option is LaTeX code, so Emacs asks before applying it from
 `.dir-locals.el`, and answering `!` trusts only that exact value: the next
-edit of the string asks again. The two file lists are `:safe`: the backend
+edit of the string asks again. The file lists are `:safe`: the backend
 only reads their files' modification times. For a project you started or otherwise trust,
 list its directory, the one holding `.dir-locals.el`, in
 `safe-local-variable-directories` (Emacs 30.1+). Emacs then applies that
@@ -504,7 +497,9 @@ list its directory, the one holding `.dir-locals.el`, in
 
 The backend README's
 [A project's preamble](https://github.com/alberti42/latex-to-svg-backend#a-projects-preamble)
-compares the two preamble options and gives the details.
+gives the details. A package that cannot be dumped into the `.fmt` file goes
+in `latex-to-svg-backend-preamble-not-precompiled`: see the backend README's
+[Troubleshooting](https://github.com/alberti42/latex-to-svg-backend#troubleshooting).
 
 This package follows the setting:
 
