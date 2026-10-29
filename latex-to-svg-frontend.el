@@ -7,7 +7,7 @@
 ;; Assisted-by: Claude:claude-opus-4-8
 ;; URL: https://github.com/alberti42/latex-to-svg
 ;; Version: 0.25.1
-;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.18.0"))
+;; Package-Requires: ((emacs "29.1") (latex-to-svg-backend "0.18.1"))
 ;; Keywords: tex, math, images
 
 ;; This package is free software; you can redistribute it and/or modify
@@ -93,7 +93,7 @@
 A package passes the version it requires to
 `latex-to-svg-frontend-check-version', which compares it with this.")
 
-(defconst latex-to-svg-frontend--backend-version "0.18.0"
+(defconst latex-to-svg-frontend--backend-version "0.18.1"
   "The oldest `latex-to-svg-backend' this front-end works with.
 The same version as in the `Package-Requires' header.")
 

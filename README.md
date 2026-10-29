@@ -198,7 +198,9 @@ what it skips (see [One adaptor per markup](#one-adaptor-per-markup)).
 - Emacs 29.1+ with SVG image support. Each adaptor's page lists the major
   modes it works in (see [One adaptor per markup](#one-adaptor-per-markup)).
 - [`latex-to-svg-backend`](https://github.com/alberti42/latex-to-svg-backend)
-  0.18.0+ (the backend) — the floor is set by 0.18.0, which makes
+  0.18.1+ (the backend) — the floor is set by 0.18.1, whose texres
+  engine no longer cuts off the right side of an equation wider than
+  `latex-to-svg-backend-line-width`. 0.18.0 makes
   `latex-to-svg-backend-preamble-not-precompiled` and
   `-preamble-not-precompiled-files` options again, and
   `-preamble-macros` and `-preamble-macro-files` their obsolete aliases;
