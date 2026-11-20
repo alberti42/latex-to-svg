@@ -12,14 +12,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.2] - 2026-11-20
+
 ### Changed
 
 - Requires `latex-to-svg-backend` 0.19.0: after an update of TeX,
   texres or RaTeX, an equation the old version rejected no longer stays
-  failed until `latex-to-svg-backend-invalidate`.
-- Requires `latex-to-svg-backend` 0.18.1, whose texres engine no longer
-  cuts off the right side of an equation wider than the `varwidth` box
-  (`latex-to-svg-backend-line-width`, default `\linewidth` ≈ 345pt).
+  failed until `latex-to-svg-backend-invalidate`. With 0.18.1, the
+  texres engine no longer cuts off the right side of an equation wider
+  than the `varwidth` box (`latex-to-svg-backend-line-width`, default
+  `\linewidth` ≈ 345pt).
 
 ### Fixed
 
@@ -1172,7 +1174,8 @@ Initial release (as the Org-only `org-latex-to-svg`).
 
 - Preview Org LaTeX math as SVG images.
 
-[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.25.1...HEAD
+[Unreleased]: https://github.com/alberti42/latex-to-svg/compare/v0.25.2...HEAD
+[0.25.2]: https://github.com/alberti42/latex-to-svg/compare/v0.25.1...v0.25.2
 [0.25.1]: https://github.com/alberti42/latex-to-svg/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/alberti42/latex-to-svg/compare/v0.24.2...v0.25.0
 [0.24.2]: https://github.com/alberti42/latex-to-svg/compare/v0.24.1...v0.24.2
