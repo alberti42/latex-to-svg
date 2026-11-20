@@ -18,6 +18,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   cuts off the right side of an equation wider than the `varwidth` box
   (`latex-to-svg-backend-line-width`, default `\linewidth` ≈ 345pt).
 
+### Fixed
+
+- Text typed with point on the opening delimiter of math no longer
+  disappears under the image once point leaves. With a deletion there
+  too, as when electric-pair inserts `()` and `)` is deleted, the math
+  no longer loses its image.
+- After auto-revert or `revert-buffer` reloads a file whose changes end
+  inside math, the editing preview's frame no longer shows on the lines
+  above that math. The preview covered the text the reload inserted.
+
 ## [0.25.1] - 2026-10-23
 
 ### Changed

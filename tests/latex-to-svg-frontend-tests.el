@@ -1520,6 +1520,53 @@ character further it is not."
         (should (eq (overlay-get first 'display) 'fake-image))
         (should (null (overlay-get second 'display)))))))
 
+(ert-deftest l2sf-text-typed-before-math-stays-outside ()
+  "Text typed with point on the opening delimiter is not part of the
+preview.  Once typed, as `d'; with a deletion too, as electric-pair
+inserting `()' and `)' then deleted."
+  (dolist (edit (list (lambda () (insert "d"))
+                      (lambda ()
+                        (insert "()")
+                        (delete-char -1)
+                        (insert "d"))))
+    (l2sf-tests--with-stub
+      (l2sf-tests--md "Hello $a$ after\n"
+        (setq-local latex-to-svg-frontend-mode t)
+        (latex-to-svg-frontend--render-region (point-min) (point-max))
+        (let ((ov (car (l2sf-tests--overlays))))
+          (goto-char (overlay-start ov))
+          (latex-to-svg-frontend--handle-cursor)
+          (funcall edit)
+          (latex-to-svg-frontend--handle-cursor)
+          (should (equal (buffer-substring-no-properties
+                          (overlay-start ov) (overlay-end ov))
+                         "$a$"))
+          (should-not (overlay-get ov 'latex-to-svg-frontend-modified))
+          (goto-char (point-max))
+          (latex-to-svg-frontend--handle-cursor)
+          (should (overlay-buffer ov))
+          (should (eq (overlay-get ov 'display) 'fake-image)))))))
+
+(ert-deftest l2sf-revert-into-math-keeps-the-preview-on-it ()
+  "A revert that replaces the text from above the math up to inside it
+leaves the lines above off the preview, so point there is on none."
+  (let ((file (make-temp-file "l2sf-revert")))
+    (unwind-protect
+        (progn
+          (with-temp-file file
+            (insert "top\nnew line\nmore new\nfoo $c+b$ end\n"))
+          (l2sf-tests--with-stub
+            (l2sf-tests--md "top\nold line\nfoo $a+b$ end\n"
+              (setq-local latex-to-svg-frontend-mode t)
+              (latex-to-svg-frontend--render-region (point-min) (point-max))
+              (insert-file-contents file nil nil nil t)
+              (goto-char (point-min))
+              (forward-line 1)
+              (latex-to-svg-frontend--handle-cursor)
+              (should-not (latex-to-svg-frontend--revealable-overlay-at
+                           (point))))))
+      (delete-file file))))
+
 (ert-deftest l2sf-reveal-follows-option-and-read-only ()
   (l2sf-tests--with-stub
     (l2sf-tests--md "$a$ after\n"

@@ -1761,7 +1761,18 @@ same cache entry.  Replaces any existing preview overlay in the span."
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
       (latex-to-svg-frontend--clear-region b e)
-      (let ((ov (make-overlay b e)))
+      ;; FRONT-ADVANCE t: text inserted at the start of the math stays
+      ;; outside the overlay, as text inserted at its end does.  Else:
+      ;; - text typed with point on the opening delimiter went inside,
+      ;;   and the image covered it once point left;
+      ;; - with a deletion there too (electric-pair inserts `()', then
+      ;;   `)' is deleted), the overlay counted as edited, no math
+      ;;   started at its start, and leaving it deleted the preview;
+      ;; - a revert that replaced the text from above the math up to
+      ;;   inside it (`insert-file-contents' with REPLACE) inserted the
+      ;;   new text inside the overlay, which then covered lines with no
+      ;;   math, and point on them showed the editing preview.
+      (let ((ov (make-overlay b e nil t)))
         (overlay-put ov 'latex-to-svg-frontend t)
         (overlay-put ov 'latex-to-svg-frontend-value value)
         (overlay-put ov 'latex-to-svg-frontend-engine engine)
@@ -1882,7 +1893,8 @@ an edit re-renders it."
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
       (latex-to-svg-frontend--clear-region b e)
-      (let ((ov (make-overlay b e)))
+      ;; FRONT-ADVANCE t: see `latex-to-svg-frontend--set-overlay'.
+      (let ((ov (make-overlay b e nil t)))
         (overlay-put ov 'latex-to-svg-frontend t)
         (overlay-put ov 'latex-to-svg-frontend-unrendered t)
         (overlay-put ov 'latex-to-svg-frontend-source source)
@@ -2257,7 +2269,8 @@ defining LABEL."
         (e (if (markerp end) (marker-position end) end)))
     (when (and b e (< b e) (<= (point-min) b) (<= e (point-max)))
       (latex-to-svg-frontend--clear-region b e)
-      (let ((ov (make-overlay b e)))
+      ;; FRONT-ADVANCE t: see `latex-to-svg-frontend--set-overlay'.
+      (let ((ov (make-overlay b e nil t)))
         (overlay-put ov 'latex-to-svg-frontend t)
         (overlay-put ov 'latex-to-svg-frontend-ref label)
         (overlay-put ov 'latex-to-svg-frontend-ref-num num)
