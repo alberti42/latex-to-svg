@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Requires `latex-to-svg-backend` 0.19.0: after an update of TeX,
+  texres or RaTeX, an equation the old version rejected no longer stays
+  failed until `latex-to-svg-backend-invalidate`.
 - Requires `latex-to-svg-backend` 0.18.1, whose texres engine no longer
   cuts off the right side of an equation wider than the `varwidth` box
   (`latex-to-svg-backend-line-width`, default `\linewidth` ≈ 345pt).
